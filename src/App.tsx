@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { FolderPicker } from './components/FolderPicker';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -10,6 +10,7 @@ import { CarsView } from './views/CarsView';
 import { RaceResultsView } from './views/RaceResultsView';
 import { loadFolder, loadFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses } from './lib/analytics';
+import * as storage from './lib/storage';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 
 function App() {
@@ -22,8 +23,25 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('overview');
   const [loaded, setLoaded] = useState(false);
+  const [hasCachedData, setHasCachedData] = useState(false);
+  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
 
-  const applyParsedData = useCallback((parsed: RaceFile[]) => {
+  // Check for cached data on mount
+  useEffect(() => {
+    const cached = storage.loadFiles();
+    if (cached && cached.length > 0) {
+      setHasCachedData(true);
+    }
+  }, []);
+
+  // Persist filters whenever they change (skip initial empty state)
+  useEffect(() => {
+    if (loaded) {
+      storage.saveFilters(selectedDrivers, selectedClasses, activeView);
+    }
+  }, [selectedDrivers, selectedClasses, activeView, loaded]);
+
+  const applyParsedData = useCallback((parsed: RaceFile[], restoreFilters = false) => {
     if (parsed.length === 0) {
       setError('No valid XML race files found.');
       setLoading(false);
@@ -32,19 +50,34 @@ function App() {
     setFiles(parsed);
     const classes = getAllClasses(parsed);
     setAllClasses(classes);
-    setSelectedClasses(classes);
-    const allDrivers = getAllDrivers(parsed);
-    setDrivers(allDrivers);
-    const players = detectPlayerDrivers(parsed);
-    setSelectedDrivers(players);
+    const allDriversList = getAllDrivers(parsed);
+    setDrivers(allDriversList);
+
+    const savedFilters = restoreFilters ? storage.loadFilters() : null;
+    if (savedFilters) {
+      // Restore saved filters, but only keep values that still exist in the data
+      const validDrivers = savedFilters.selectedDrivers.filter(d => allDriversList.some(dl => dl.name === d));
+      const validClasses = savedFilters.selectedClasses.filter(c => classes.includes(c));
+      setSelectedDrivers(validDrivers.length > 0 ? validDrivers : detectPlayerDrivers(parsed));
+      setSelectedClasses(validClasses.length > 0 ? validClasses : classes);
+      setActiveView(savedFilters.activeView || 'overview');
+    } else {
+      setSelectedClasses(classes);
+      setSelectedDrivers(detectPlayerDrivers(parsed));
+    }
     setLoaded(true);
   }, []);
 
   const handleFolderSelected = useCallback(async (handle: FileSystemDirectoryHandle) => {
     setLoading(true);
     setError(null);
+    dirHandleRef.current = handle;
     try {
-      applyParsedData(await loadFolder(handle));
+      const parsed = await loadFolder(handle);
+      applyParsedData(parsed, true);
+      storage.saveFiles(parsed);
+      storage.saveDataSource('directory');
+      storage.saveDirectoryHandle(handle);
     } catch (e) {
       setError(`Failed to load data: ${(e as Error).message}`);
     } finally {
@@ -55,13 +88,50 @@ function App() {
   const handleFilesUploaded = useCallback(async (uploadedFiles: File[]) => {
     setLoading(true);
     setError(null);
+    dirHandleRef.current = null;
     try {
-      applyParsedData(await loadFiles(uploadedFiles));
+      const parsed = await loadFiles(uploadedFiles);
+      applyParsedData(parsed, true);
+      storage.saveFiles(parsed);
+      storage.saveDataSource('upload');
+      storage.clearDirectoryHandle();
     } catch (e) {
       setError(`Failed to load data: ${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
+  }, [applyParsedData]);
+
+  const handleRefresh = useCallback(async () => {
+    const handle = dirHandleRef.current;
+    if (!handle) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const perm = await (handle as any).requestPermission({ mode: 'read' });
+      if (perm !== 'granted') {
+        setError('Permission to read folder was denied.');
+        setLoading(false);
+        return;
+      }
+      const parsed = await loadFolder(handle);
+      applyParsedData(parsed, true);
+      storage.saveFiles(parsed);
+    } catch (e) {
+      setError(`Failed to refresh data: ${(e as Error).message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [applyParsedData]);
+
+  const handleResumeCached = useCallback(() => {
+    const cached = storage.loadFiles();
+    if (!cached || cached.length === 0) return;
+    applyParsedData(cached, true);
+    // Try to restore directory handle from IndexedDB
+    storage.loadDirectoryHandle().then(handle => {
+      if (handle) dirHandleRef.current = handle;
+    });
   }, [applyParsedData]);
 
   const handleReload = useCallback(() => {
@@ -72,6 +142,9 @@ function App() {
     setSelectedClasses([]);
     setLoaded(false);
     setError(null);
+    storage.clearAll();
+    dirHandleRef.current = null;
+    setHasCachedData(false);
   }, []);
 
   const filteredFiles = useMemo(
@@ -80,7 +153,15 @@ function App() {
   );
 
   if (!loaded) {
-    return <FolderPicker onFolderSelected={handleFolderSelected} onFilesUploaded={handleFilesUploaded} loading={loading} error={error} />;
+    return (
+      <FolderPicker
+        onFolderSelected={handleFolderSelected}
+        onFilesUploaded={handleFilesUploaded}
+        onResumeCached={hasCachedData ? handleResumeCached : undefined}
+        loading={loading}
+        error={error}
+      />
+    );
   }
 
   return (
@@ -93,6 +174,8 @@ function App() {
         selectedClasses={selectedClasses}
         onClassChange={setSelectedClasses}
         onReload={handleReload}
+        onRefresh={dirHandleRef.current ? handleRefresh : undefined}
+        refreshing={loading}
         activeView={activeView}
         onViewChange={setActiveView}
       />

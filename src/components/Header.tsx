@@ -1,4 +1,4 @@
-import { FolderOpen, User, Layers } from 'lucide-react';
+import { FolderOpen, User, Layers, RefreshCw } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
 import { getClassColor } from '../lib/analytics';
@@ -11,6 +11,8 @@ interface HeaderProps {
   selectedClasses: CarClass[];
   onClassChange: (classes: CarClass[]) => void;
   onReload: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   activeView: string;
   onViewChange: (view: string) => void;
 }
@@ -24,7 +26,7 @@ const VIEWS = [
   { id: 'races', label: 'Race Results' },
 ];
 
-export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, activeView, onViewChange }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange }: HeaderProps) {
   const driverOptions = drivers.map(d => ({
     value: d.name,
     label: d.name,
@@ -71,6 +73,17 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
               placeholder="Select drivers..."
               icon={<User className="w-3.5 h-3.5 text-racing-muted" />}
             />
+
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="p-2 text-racing-muted/50 hover:text-racing-green disabled:opacity-50 transition-colors cursor-pointer"
+                title="Refresh data from folder"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+            )}
 
             <button
               onClick={onReload}

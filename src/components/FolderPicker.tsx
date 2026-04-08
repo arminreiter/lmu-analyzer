@@ -1,14 +1,15 @@
 import { useRef } from 'react';
-import { FolderOpen, Upload, Shield, Zap } from 'lucide-react';
+import { FolderOpen, Upload, Shield, Zap, RotateCcw } from 'lucide-react';
 
 interface FolderPickerProps {
   onFolderSelected: (handle: FileSystemDirectoryHandle) => void;
   onFilesUploaded: (files: File[]) => void;
+  onResumeCached?: () => void;
   loading: boolean;
   error: string | null;
 }
 
-export function FolderPicker({ onFolderSelected, onFilesUploaded, loading, error }: FolderPickerProps) {
+export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached, loading, error }: FolderPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isSupported = 'showDirectoryPicker' in window;
 
@@ -127,6 +128,23 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, loading, error
               )}
             </button>
           </div>
+
+          {onResumeCached && (
+            <div className="mt-5 pt-5 border-t border-racing-border/30">
+              <button
+                onClick={onResumeCached}
+                disabled={loading}
+                className="px-6 py-3 bg-racing-card border border-racing-border text-racing-text hover:border-racing-green/30 hover:text-white
+                  disabled:opacity-50 font-racing font-bold text-sm tracking-[0.1em] rounded-lg
+                  transition-all disabled:cursor-not-allowed cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  RESUME LAST SESSION
+                </span>
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 p-3 bg-racing-red/5 border border-racing-red/20 rounded-lg">
