@@ -15,7 +15,10 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
 
   const handleFolderClick = async () => {
     try {
-      const handle = await window.showDirectoryPicker();
+      const handle = await window.showDirectoryPicker({
+        id: 'lmu-results',
+        startIn: 'desktop',
+      });
       onFolderSelected(handle);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
@@ -153,7 +156,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
           )}
 
           <p className="mt-6 text-racing-muted/70 text-[10px] font-mono tracking-wide">
-            DEFAULT: Documents\My Games\Le Mans Ultimate\UserData\Log\Results
+            DEFAULT: C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Log\Results
           </p>
         </div>
 
