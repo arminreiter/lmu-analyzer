@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@theme {
+  --color-racing-black: #06060a;
+  --color-racing-dark: #0c0c14;
+  --color-racing-card: #12121c;
+  --color-racing-card-hover: #181826;
+  --color-racing-border: #1e1e30;
+  --color-racing-highlight: #2a2a44;
+  --color-racing-red: #e10600;
+  --color-racing-red-dark: #b30500;
+  --color-racing-red-glow: #ff1a1a;
+  --color-racing-gold: #f5c518;
+  --color-racing-silver: #a8b2c1;
+  --color-racing-bronze: #cd7f32;
+  /* Racing timing colors — F1/WEC standard */
+  --color-racing-purple: #a855f7;    /* all-time best */
+  --color-racing-green: #00e676;     /* session best / improvement */
+  --color-racing-yellow: #fbbf24;    /* slower than best */
+  --color-racing-blue: #448aff;      /* info / neutral accent */
+  --color-racing-orange: #ff9100;    /* warning / incidents */
+  --color-racing-cyan: #22d3ee;      /* telemetry data */
+  --color-racing-text: #e0e4ec;
+  --color-racing-muted: #7a8194;
+  /* Car class colors */
+  --color-gt3: #448aff;
+  --color-hyper: #e10600;
+  --color-gte: #ff9100;
+  --color-lmp3: #00e676;
+
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-racing: 'Orbitron', 'Geist', sans-serif;
+}
+
+/* Fonts */
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/orbitron/v31/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyGy6xpmIyXjU1pg.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/geist/v1/gyBhhwUxId8gMGYQMKR3pzfaWI_RnOA4nZMES0Sz.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/geistmono/v1/or3yQ6H-1_WzNnHRif6iculjHNmfF_ScdoEB.woff2') format('woff2');
+}
+
+/* Base */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--color-racing-black);
+  color: var(--color-racing-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle scan line for atmosphere */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.scanline-overlay::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(225,6,0,0.06) 50%, transparent);
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Glow utilities — racing semantic */
+.glow-purple { text-shadow: 0 0 10px rgba(168,85,247,0.6), 0 0 30px rgba(168,85,247,0.15); }
+.glow-green  { text-shadow: 0 0 10px rgba(0,230,118,0.5), 0 0 25px rgba(0,230,118,0.15); }
+.glow-red    { text-shadow: 0 0 10px rgba(225,6,0,0.5), 0 0 25px rgba(225,6,0,0.15); }
+.glow-yellow { text-shadow: 0 0 8px rgba(251,191,36,0.5), 0 0 20px rgba(251,191,36,0.1); }
+
+/* Card component */
+.data-card {
+  background: var(--color-racing-card);
+  border: 1px solid var(--color-racing-border);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.data-card:hover {
+  border-color: rgba(225,6,0,0.2);
+}
+.data-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-racing-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-racing-highlight); }
+
+/* Select */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%234b5068' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* Staggered entrance */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fadeInUp 0.4s ease forwards; opacity: 0; }
+.animate-in-1 { animation-delay: 0.03s; }
+.animate-in-2 { animation-delay: 0.06s; }
+.animate-in-3 { animation-delay: 0.09s; }
+.animate-in-4 { animation-delay: 0.12s; }
+.animate-in-5 { animation-delay: 0.15s; }
+.animate-in-6 { animation-delay: 0.18s; }

@@ -1,0 +1,5 @@
+.claude/
+.playwright-mcp/
+data/
+node_modules/
+dist/
