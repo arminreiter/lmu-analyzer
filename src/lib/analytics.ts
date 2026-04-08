@@ -13,6 +13,14 @@ export function formatDelta(delta: number): string {
   return `${sign}${Math.abs(delta).toFixed(3)}`;
 }
 
+export function formatEventTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function getClassColor(carClass: CarClass): string {
   switch (carClass) {
     case 'Hyper': return 'var(--color-hyper)';
@@ -212,6 +220,45 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
   return result;
 }
 
+export function getAllSessionBests(files: RaceFile[], driverNames: string | string[]): PersonalBest[] {
+  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const results: PersonalBest[] = [];
+
+  for (const file of files) {
+    for (const session of file.sessions) {
+      const drivers = session.drivers.filter(d => names.includes(d.name));
+      for (const driver of drivers) {
+        let best: { lap: typeof driver.laps[0] } | null = null;
+        for (const lap of driver.laps) {
+          if (!lap.lapTime || lap.lapTime <= 0) continue;
+          if (!best || lap.lapTime < best.lap.lapTime!) best = { lap };
+        }
+        if (best) {
+          const l = best.lap;
+          results.push({
+            lapTime: l.lapTime!,
+            sector1: l.sector1,
+            sector2: l.sector2,
+            sector3: l.sector3,
+            topSpeed: l.topSpeed,
+            trackVenue: file.trackVenue,
+            carType: driver.carType,
+            carClass: driver.carClass,
+            sessionType: session.type,
+            date: file.timeString,
+            fileName: file.fileName,
+            lapNumber: l.num,
+            driverName: driver.name,
+          });
+        }
+      }
+    }
+  }
+
+  results.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime);
+  return results;
+}
+
 export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackVenue: string, carType: string): {
   s1: number | null; s2: number | null; s3: number | null; total: number | null;
 } {
@@ -342,6 +389,8 @@ export interface OverviewStats {
   bestOverallLap: PersonalBest | null;
   totalIncidents: number;
   totalPenalties: number;
+  totalTrackLimits: number;
+  penaltyTypes: Map<string, number>;
   avgLapTime: number | null;
   totalDistanceKm: number;
 }
@@ -355,6 +404,8 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
   let totalQualifying = 0;
   let totalIncidents = 0;
   let totalPenalties = 0;
+  let totalTrackLimits = 0;
+  const penaltyTypes = new Map<string, number>();
   let totalDistanceKm = 0;
   let lapTimeSum = 0;
   let lapTimeCount = 0;
@@ -380,7 +431,13 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
       totalIncidents += session.incidents.filter(
         i => names.some(n => i.description.includes(n) || i.driver1 === n)
       ).length;
-      totalPenalties += session.penalties.filter(p => names.includes(p.driver)).length;
+      const driverPenalties = session.penalties.filter(p => names.includes(p.driver));
+      totalPenalties += driverPenalties.length;
+      for (const pen of driverPenalties) {
+        const t = pen.type || 'Unknown';
+        penaltyTypes.set(t, (penaltyTypes.get(t) ?? 0) + 1);
+      }
+      totalTrackLimits += session.trackLimits.filter(tl => names.includes(tl.driver)).length;
 
       for (const lap of driver.laps) {
         if (lap.lapTime && lap.lapTime > 0) {
@@ -419,6 +476,8 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
     bestOverallLap: bestLap,
     totalIncidents,
     totalPenalties,
+    totalTrackLimits,
+    penaltyTypes,
     avgLapTime: lapTimeCount > 0 ? lapTimeSum / lapTimeCount : null,
     totalDistanceKm,
   };

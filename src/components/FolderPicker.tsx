@@ -173,7 +173,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
         <p className="mt-6 text-racing-muted/50 text-[10px] animate-in animate-in-4">
           <a href="https://a31.at" target="_blank" rel="noopener noreferrer"
             className="hover:text-racing-red transition-colors">
-            Armin Reiter &middot; a31 Labs
+            axrider &middot; a31 Labs
           </a>
         </p>
       </div>

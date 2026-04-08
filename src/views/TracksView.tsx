@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable } from '../components/SortableTable';
-import { formatLapTime, getTrackStats, getPersonalBests, getDriverSessions } from '../lib/analytics';
+import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getDriverSessions } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 interface TracksViewProps {
@@ -12,11 +12,13 @@ interface TracksViewProps {
 
 export function TracksView({ files, driverNames }: TracksViewProps) {
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const tracks = getTrackStats(files, driverNames);
   const bests = getPersonalBests(files, driverNames);
+  const allBests = getAllSessionBests(files, driverNames);
 
   const track = selectedTrack ?? tracks[0]?.trackVenue;
-  const trackBests = bests.filter(b => b.trackVenue === track);
+  const trackBests = (showAll ? allBests : bests).filter(b => b.trackVenue === track);
   const trackSessions = getDriverSessions(files, driverNames).filter(s => s.file.trackVenue === track);
 
   // Lap time progression over sessions for this track
@@ -91,30 +93,38 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
 
           {/* Personal Bests at this track */}
           <div className="data-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border">
+            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
               <h3 className="font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAPS BY CAR</h3>
+              <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
+                <button onClick={() => setShowAll(false)} className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>Best</button>
+                <button onClick={() => setShowAll(true)} className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>All</button>
+              </div>
             </div>
             <SortableTable<PersonalBest>
               columns={[
-                { key: 'pos', label: '#', width: '40px', sortValue: r => r.lapTime,
+                { key: 'pos', label: '#', width: '35px', sortValue: r => r.lapTime,
                   render: (_, i) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
-                { key: 'car', label: 'Car', width: '30%', sortValue: r => r.carType,
+                { key: 'car', label: 'Car', width: '18%', sortValue: r => r.carType,
                   render: r => <span className="text-white">{r.carType}</span> },
-                { key: 'class', label: 'Class', width: '65px', sortValue: r => r.carClass,
+                { key: 'class', label: 'Class', width: '70px', sortValue: r => r.carClass,
                   render: r => <ClassBadge carClass={r.carClass} /> },
-                { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '12%', sortValue: r => r.lapTime,
+                { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
                   render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
-                { key: 's1', label: 'S1', align: 'right', mono: true, width: '10%', sortValue: r => r.sector1,
+                { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
                   render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
-                { key: 's2', label: 'S2', align: 'right', mono: true, width: '10%', sortValue: r => r.sector2,
+                { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
                   render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
-                { key: 's3', label: 'S3', align: 'right', mono: true, width: '10%', sortValue: r => r.sector3,
+                { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
                   render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
-                { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '12%', sortValue: r => r.topSpeed,
+                { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
                   render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
+                { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
+                  render: r => <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
+                { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
+                  render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
               ]}
               data={trackBests.sort((a, b) => a.lapTime - b.lapTime)}
-              rowKey={r => r.carType}
+              rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
             />
           </div>
 

@@ -56,7 +56,21 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
       render: r => <span className="text-racing-muted">{r.driver.totalLaps}</span> },
     { key: 'pits', label: 'Pits', align: 'right', width: '45px', sortValue: r => r.driver.pitstops,
       render: r => <span className="text-racing-muted">{r.driver.pitstops}</span> },
-    { key: 'status', label: 'Status', width: '12%', sortValue: r => r.driver.finishStatus,
+    { key: 'incidents', label: 'Inc', align: 'center', width: '45px',
+      sortValue: r => r.session.incidents.filter(i => i.driver1 === r.driver.name || i.description.includes(r.driver.name)).length,
+      render: r => {
+        const count = r.session.incidents.filter(i => i.driver1 === r.driver.name || i.description.includes(r.driver.name)).length;
+        return count > 0 ? <span className="text-racing-orange font-mono">{count}</span> : <span className="text-racing-muted/30">0</span>;
+      } },
+    { key: 'penalties', label: 'Pen', align: 'center', width: '45px',
+      sortValue: r => r.session.penalties.filter(p => p.driver === r.driver.name).length,
+      render: r => {
+        const pens = r.session.penalties.filter(p => p.driver === r.driver.name);
+        if (pens.length === 0) return <span className="text-racing-muted/30">0</span>;
+        const types = pens.map(p => p.type).join(', ');
+        return <span className="text-racing-red font-mono" title={types}>{pens.length}</span>;
+      } },
+    { key: 'status', label: 'Status', width: '10%', sortValue: r => r.driver.finishStatus,
       render: r => <span className={`text-xs ${r.driver.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'}`}>{r.driver.finishStatus}</span> },
   ];
 

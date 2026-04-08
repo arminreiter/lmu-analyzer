@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getDriverSessions } from '../lib/analytics';
+import { formatLapTime, formatEventTime, getDriverSessions } from '../lib/analytics';
 import type { RaceFile, DriverResult, SessionData, LapData } from '../lib/types';
 
 interface SessionsViewProps {
@@ -89,28 +89,27 @@ function SessionDetail({ file, session, driver }: { file: RaceFile; session: Ses
     <div className="bg-racing-card border border-racing-border rounded-xl overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-racing-highlight/20 transition-colors cursor-pointer"
+        className="w-full px-4 py-3 grid hover:bg-racing-highlight/20 transition-colors cursor-pointer"
+        style={{ gridTemplateColumns: '72px minmax(0, 200px) 55px minmax(0, 1fr) 85px 55px 130px 30px 20px', alignItems: 'center', gap: '8px' }}
       >
-        <div className="flex items-center gap-3">
-          <span className={`px-2 py-0.5 rounded text-xs font-bold
-            ${session.type === 'Race' ? 'bg-racing-red/20 text-racing-red' :
-              session.type === 'Qualifying' ? 'bg-racing-yellow/20 text-racing-yellow' :
-              'bg-racing-blue/20 text-racing-blue'}`}>
-            {session.type}
-          </span>
-          <span className="text-white text-sm font-medium">{file.trackVenue}</span>
-          <ClassBadge carClass={driver.carClass} />
-          <span className="text-racing-muted text-xs">{driver.carType}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-sm text-racing-green">{formatLapTime(driver.bestLapTime)}</span>
-          <span className="text-racing-muted text-xs">{driver.totalLaps} laps</span>
-          <span className="text-racing-muted text-xs hidden sm:block">{file.timeString}</span>
-          {session.type === 'Race' && (
-            <span className="text-racing-gold text-xs font-bold">P{driver.classPosition}</span>
-          )}
-          {expanded ? <ChevronUp className="w-4 h-4 text-racing-muted" /> : <ChevronDown className="w-4 h-4 text-racing-muted" />}
-        </div>
+        <span className={`px-2 py-0.5 rounded text-xs font-bold text-center
+          ${session.type === 'Race' ? 'bg-racing-red/20 text-racing-red' :
+            session.type === 'Qualifying' ? 'bg-racing-yellow/20 text-racing-yellow' :
+            'bg-racing-blue/20 text-racing-blue'}`}>
+          {session.type}
+        </span>
+        <span className="text-white text-sm font-medium truncate text-left">{file.trackVenue}</span>
+        <ClassBadge carClass={driver.carClass} />
+        <span className="text-racing-muted text-xs truncate text-left">{driver.carType}</span>
+        <span className="font-mono text-sm text-racing-green text-right">{formatLapTime(driver.bestLapTime)}</span>
+        <span className="text-racing-muted text-xs text-right">{driver.totalLaps} laps</span>
+        <span className="text-racing-muted text-xs text-right">{file.timeString}</span>
+        <span className="text-right">
+          {session.type === 'Race'
+            ? <span className="text-racing-gold text-xs font-bold">P{driver.classPosition}</span>
+            : null}
+        </span>
+        {expanded ? <ChevronUp className="w-4 h-4 text-racing-muted" /> : <ChevronDown className="w-4 h-4 text-racing-muted" />}
       </button>
 
       {expanded && (
@@ -128,6 +127,122 @@ function SessionDetail({ file, session, driver }: { file: RaceFile; session: Ses
               </div>
             )}
           </div>
+
+          {/* Incidents for this driver */}
+          {(() => {
+            const driverIncidents = session.incidents.filter(
+              i => i.driver1 === driver.name || i.description.includes(driver.name)
+            );
+            if (driverIncidents.length === 0) return null;
+            return (
+              <div>
+                <h4 className="text-xs uppercase tracking-wider text-racing-orange mb-2">
+                  Incidents ({driverIncidents.length})
+                </h4>
+                <table className="w-full text-xs">
+                  <colgroup>
+                    <col style={{ width: '70px' }} />
+                    <col />
+                    <col style={{ width: '60px' }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="text-racing-muted/50 text-left">
+                      <th className="px-3 py-1 font-normal">Time</th>
+                      <th className="px-3 py-1 font-normal">Description</th>
+                      <th className="px-3 py-1 font-normal text-right">Severity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driverIncidents.map((inc, i) => (
+                      <tr key={i} className="border-t border-racing-orange/10 bg-racing-orange/[0.03]">
+                        <td className="px-3 py-1.5 text-racing-muted font-mono">{formatEventTime(inc.time)}</td>
+                        <td className="px-3 py-1.5 text-racing-text">{inc.description}</td>
+                        <td className="px-3 py-1.5 text-racing-orange font-mono text-right">{inc.severity > 0 ? inc.severity : '--'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* Penalties for this driver */}
+          {(() => {
+            const driverPenalties = session.penalties.filter(p => p.driver === driver.name);
+            if (driverPenalties.length === 0) return null;
+            return (
+              <div>
+                <h4 className="text-xs uppercase tracking-wider text-racing-red mb-2">
+                  Penalties ({driverPenalties.length})
+                </h4>
+                <table className="w-full text-xs">
+                  <colgroup>
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '120px' }} />
+                    <col />
+                    <col />
+                  </colgroup>
+                  <thead>
+                    <tr className="text-racing-muted/50 text-left">
+                      <th className="px-3 py-1 font-normal">Time</th>
+                      <th className="px-3 py-1 font-normal">Type</th>
+                      <th className="px-3 py-1 font-normal">Reason</th>
+                      <th className="px-3 py-1 font-normal">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driverPenalties.map((pen, i) => (
+                      <tr key={i} className="border-t border-racing-red/10 bg-racing-red/[0.03]">
+                        <td className="px-3 py-1.5 text-racing-muted font-mono">{formatEventTime(pen.time)}</td>
+                        <td className="px-3 py-1.5 text-racing-red font-medium">{pen.type}</td>
+                        <td className="px-3 py-1.5 text-racing-text">{pen.reason}</td>
+                        <td className="px-3 py-1.5 text-racing-muted/70">{pen.description !== pen.reason ? pen.description : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* Track Limits for this driver */}
+          {(() => {
+            const driverTL = session.trackLimits.filter(tl => tl.driver === driver.name);
+            if (driverTL.length === 0) return null;
+            return (
+              <div>
+                <h4 className="text-xs uppercase tracking-wider text-racing-yellow mb-2">
+                  Track Limits ({driverTL.length})
+                </h4>
+                <table className="w-full text-xs">
+                  <colgroup>
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '60px' }} />
+                    <col style={{ width: '80px' }} />
+                    <col />
+                  </colgroup>
+                  <thead>
+                    <tr className="text-racing-muted/50 text-left">
+                      <th className="px-3 py-1 font-normal">Time</th>
+                      <th className="px-3 py-1 font-normal text-right">Lap</th>
+                      <th className="px-3 py-1 font-normal text-right">Points</th>
+                      <th className="px-3 py-1 font-normal">Resolution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driverTL.map((tl, i) => (
+                      <tr key={i} className="border-t border-racing-yellow/10 bg-racing-yellow/[0.03]">
+                        <td className="px-3 py-1.5 text-racing-muted font-mono">{formatEventTime(tl.time)}</td>
+                        <td className="px-3 py-1.5 text-racing-text text-right">{tl.lap}</td>
+                        <td className="px-3 py-1.5 text-racing-yellow font-mono text-right">{tl.currentPoints}</td>
+                        <td className="px-3 py-1.5 text-racing-muted/70">{tl.resolution}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
 
           {/* Lap Times Chart */}
           {lapChartData.length > 1 && (

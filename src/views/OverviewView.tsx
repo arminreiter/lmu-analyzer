@@ -1,4 +1,4 @@
-import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route } from 'lucide-react';
+import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route, ShieldAlert } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ClassBadge } from '../components/ClassBadge';
 import { formatLapTime, getOverviewStats, getTrackStats, getCarStats } from '../lib/analytics';
@@ -39,7 +39,7 @@ export function OverviewView({ files, driverNames }: OverviewViewProps) {
       </div>
 
       {/* Safety stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="animate-in animate-in-2">
           <StatCard label="Incidents" value={stats.totalIncidents}
             icon={<AlertTriangle className="w-3.5 h-3.5" />}
@@ -51,16 +51,41 @@ export function OverviewView({ files, driverNames }: OverviewViewProps) {
             accent={stats.totalPenalties > 0 ? 'text-racing-red' : 'text-racing-green'} />
         </div>
         <div className="animate-in animate-in-4">
+          <StatCard label="Track Limits" value={stats.totalTrackLimits}
+            icon={<ShieldAlert className="w-3.5 h-3.5" />}
+            accent={stats.totalTrackLimits > 0 ? 'text-racing-yellow' : 'text-racing-green'} />
+        </div>
+        <div className="animate-in animate-in-5">
           <StatCard label="Laps / Session"
             value={stats.totalSessions > 0 ? (stats.totalLaps / stats.totalSessions).toFixed(1) : '0'} />
         </div>
-        <div className="animate-in animate-in-5">
+        <div className="animate-in animate-in-6">
           <StatCard label="Avg Laps / Race"
             value={stats.totalRaces > 0
               ? (stats.totalLaps / stats.totalRaces).toFixed(1)
               : '0'} />
         </div>
       </div>
+
+      {/* Penalty Breakdown */}
+      {stats.penaltyTypes.size > 0 && (
+        <div className="data-card overflow-hidden animate-in animate-in-3">
+          <div className="px-5 py-3 border-b border-racing-border flex items-center gap-2">
+            <div className="w-1 h-3 bg-racing-red rounded-full" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Penalty Breakdown</h3>
+          </div>
+          <div className="px-5 py-3 flex flex-wrap gap-3">
+            {Array.from(stats.penaltyTypes.entries())
+              .sort((a, b) => b[1] - a[1])
+              .map(([type, count]) => (
+                <div key={type} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-racing-red/[0.06] border border-racing-red/15">
+                  <span className="text-racing-red font-mono text-sm font-bold">{count}</span>
+                  <span className="text-racing-text text-xs">{type}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Tracks — best lap per track (meaningful because each track has its own length) */}
       <div className="data-card overflow-hidden animate-in animate-in-3">

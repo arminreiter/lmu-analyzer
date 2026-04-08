@@ -3,7 +3,7 @@ import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getPersonalBests, getTheoreticalBest } from '../lib/analytics';
+import { formatLapTime, getPersonalBests, getAllSessionBests, getTheoreticalBest } from '../lib/analytics';
 import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
 
 interface PersonalBestsViewProps {
@@ -15,8 +15,11 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
   const [filterClass, setFilterClass] = useState<CarClass | 'All'>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  const allBests = getPersonalBests(files, driverNames);
+  const bestOnly = getPersonalBests(files, driverNames);
+  const allSessions = getAllSessionBests(files, driverNames);
+  const allBests = showAll ? allSessions : bestOnly;
   const classes = Array.from(new Set(allBests.map(b => b.carClass)));
   const tracks = Array.from(new Set(allBests.map(b => b.trackVenue))).sort();
 
@@ -35,17 +38,6 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
 
   return (
     <div className="space-y-5">
-      {/* Explanation */}
-      <p className="text-racing-muted text-sm">
-        Best single lap time per car at each circuit. Only the fastest lap for each car is shown.
-      </p>
-
-      <div className="flex items-center gap-4 text-[10px] text-racing-muted font-mono">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-racing-purple" /> THEORETICAL BEST</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-racing-gold" /> FASTEST LAP</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-racing-green" /> BEST SECTOR</span>
-      </div>
-
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Class:</label>
@@ -54,6 +46,16 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Track:</label>
           <SearchableSelect value={filterTrack} options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(t => ({ value: t, label: t }))]} onChange={setFilterTrack} />
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
+          <button
+            onClick={() => setShowAll(false)}
+            className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+          >Best per Car</button>
+          <button
+            onClick={() => setShowAll(true)}
+            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+          >All Sessions</button>
         </div>
         <button onClick={() => setShowTheoretical(!showTheoretical)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
@@ -135,7 +137,7 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
             <SortableTable
               columns={columns}
               data={defaultSorted}
-              rowKey={r => `${r.carType}-${r.lapTime}`}
+              rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
               rowClass={r => r.lapTime === fastestLap ? 'bg-racing-gold/[0.03]' : ''}
               stickyRows={<>{theoreticalRows}</>}
             />
