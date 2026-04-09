@@ -36,30 +36,30 @@ function App() {
 
   // Auto-restore cached data on mount
   useEffect(() => {
-    const cached = storage.loadFiles();
-    if (cached && cached.length > 0) {
-      setHasCachedData(true);
-      // Auto-load cached data immediately
-      applyParsedData(cached, true);
-      // Try to restore directory handle for refresh capability
-      storage.loadDirectoryHandle().then(async handle => {
+    (async () => {
+      const cached = await storage.loadFiles();
+      if (cached && cached.length > 0) {
+        setHasCachedData(true);
+        applyParsedData(cached, true);
+        // Try to restore directory handle for refresh capability
+        const handle = await storage.loadDirectoryHandle();
         if (!handle) return;
         dirHandleRef.current = handle;
         // If data came from a directory, try to re-read fresh data
         if (storage.loadDataSource() === 'directory') {
           try {
-            const perm = await (handle as any).queryPermission({ mode: 'read' });
+            const perm = await (handle as FileSystemDirectoryHandle & { queryPermission(desc: { mode: string }): Promise<string> }).queryPermission({ mode: 'read' });
             if (perm === 'granted') {
               const parsed = await loadFolder(handle);
               applyParsedData(parsed, true);
-              storage.saveFiles(parsed);
+              await storage.saveFiles(parsed);
             }
           } catch {
             // Permission not granted or folder unavailable — cached data is still shown
           }
         }
-      });
-    }
+      }
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist filters whenever they change (skip initial empty state)
@@ -137,7 +137,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const perm = await (handle as any).requestPermission({ mode: 'read' });
+      const perm = await (handle as FileSystemDirectoryHandle & { requestPermission(desc: { mode: string }): Promise<string> }).requestPermission({ mode: 'read' });
       if (perm !== 'granted') {
         setError('Permission to read folder was denied.');
         setLoading(false);
@@ -153,14 +153,12 @@ function App() {
     }
   }, [applyParsedData]);
 
-  const handleResumeCached = useCallback(() => {
-    const cached = storage.loadFiles();
+  const handleResumeCached = useCallback(async () => {
+    const cached = await storage.loadFiles();
     if (!cached || cached.length === 0) return;
     applyParsedData(cached, true);
-    // Try to restore directory handle from IndexedDB
-    storage.loadDirectoryHandle().then(handle => {
-      if (handle) dirHandleRef.current = handle;
-    });
+    const handle = await storage.loadDirectoryHandle();
+    if (handle) dirHandleRef.current = handle;
   }, [applyParsedData]);
 
   const handleReload = useCallback(() => {

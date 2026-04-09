@@ -166,7 +166,7 @@ export function deduplicateRaces(files: RaceFile[]): RaceFile[] {
     // Keep merged session in the first file, mark others for removal
     cloned[group[0].fileIdx].sessions[group[0].sessionIdx] = merged;
     for (let k = 1; k < group.length; k++) {
-      cloned[group[k].fileIdx].sessions[group[k].sessionIdx] = null as any;
+      cloned[group[k].fileIdx].sessions[group[k].sessionIdx] = null as unknown as SessionData;
     }
   }
 

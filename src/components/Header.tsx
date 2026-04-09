@@ -102,6 +102,14 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
               </button>
             )}
 
+            <button
+              onClick={onReload}
+              className="p-2 text-racing-muted/50 hover:text-racing-red transition-colors cursor-pointer"
+              title="Change folder"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
+
             {canInstall && (
               <button
                 onClick={install}
@@ -111,14 +119,6 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
                 <Download className="w-3.5 h-3.5" />
               </button>
             )}
-
-            <button
-              onClick={onReload}
-              className="p-2 text-racing-muted/50 hover:text-racing-red transition-colors cursor-pointer"
-              title="Change folder"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
 

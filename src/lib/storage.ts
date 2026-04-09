@@ -12,7 +12,9 @@ const KEYS = {
 
 const DB_NAME = 'lmu-analyzer';
 const DB_STORE = 'handles';
+const DB_FILES_STORE = 'files';
 const DIR_HANDLE_KEY = 'directory-handle';
+const FILES_KEY = 'race-files';
 
 // --- localStorage helpers ---
 
@@ -42,19 +44,50 @@ export function loadFilters(): { selectedDrivers: string[]; selectedClasses: Car
   }
 }
 
-export function saveFiles(files: RaceFile[]) {
+export async function saveFiles(files: RaceFile[]) {
   try {
-    localStorage.setItem(KEYS.files, JSON.stringify(files));
+    const db = await openDB();
+    const tx = db.transaction(DB_FILES_STORE, 'readwrite');
+    tx.objectStore(DB_FILES_STORE).put(files, FILES_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    // Clean up old localStorage entry if it exists
+    localStorage.removeItem(KEYS.files);
   } catch {
-    // data too large — silently ignore
+    // IndexedDB unavailable — try localStorage as last resort
+    try {
+      localStorage.setItem(KEYS.files, JSON.stringify(files));
+    } catch {
+      // quota exceeded
+    }
   }
 }
 
-export function loadFiles(): RaceFile[] | null {
+export async function loadFiles(): Promise<RaceFile[] | null> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(DB_FILES_STORE, 'readonly');
+    const req = tx.objectStore(DB_FILES_STORE).get(FILES_KEY);
+    const files = await new Promise<RaceFile[] | null>((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    if (files) return files;
+  } catch {
+    // IndexedDB unavailable
+  }
+  // Fallback: try localStorage (migrates old data)
   try {
     const data = localStorage.getItem(KEYS.files);
     if (!data) return null;
-    return JSON.parse(data);
+    const files = JSON.parse(data) as RaceFile[];
+    // Migrate to IndexedDB
+    saveFiles(files);
+    return files;
   } catch {
     return null;
   }
@@ -88,18 +121,36 @@ export function clearProfileAvatar() {
   localStorage.removeItem(KEYS.profileAvatar);
 }
 
-export function clearAll() {
+export async function clearAll() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k));
   clearDirectoryHandle();
+  try {
+    const db = await openDB();
+    const tx = db.transaction(DB_FILES_STORE, 'readwrite');
+    tx.objectStore(DB_FILES_STORE).delete(FILES_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    // ignore
+  }
 }
 
 // --- IndexedDB for FileSystemDirectoryHandle ---
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
-      req.result.createObjectStore(DB_STORE);
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE);
+      }
+      if (!db.objectStoreNames.contains(DB_FILES_STORE)) {
+        db.createObjectStore(DB_FILES_STORE);
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
