@@ -541,7 +541,7 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
   }
 
   const columns: Column<typeof incidents[0]>[] = [
-    { key: 'time', label: 'Time', width: '80px', mono: true, sortValue: r => r.time,
+    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
       render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
     { key: 'desc', label: 'Description', sortValue: r => r.description,
       render: r => <span className="text-racing-text">{r.description}</span> },
@@ -577,14 +577,14 @@ function PenaltiesTab({ penalties }: { penalties: SessionDetailViewProps['sessio
   }
 
   const columns: Column<typeof penalties[0]>[] = [
-    { key: 'time', label: 'Time', width: '80px', mono: true, sortValue: r => r.time,
+    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
       render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
     { key: 'type', label: 'Type', width: '130px', sortValue: r => r.type,
       render: r => <span className="text-racing-red font-bold">{r.type}</span> },
-    { key: 'reason', label: 'Reason', sortValue: r => r.reason,
+    { key: 'reason', label: 'Reason', width: '120px', sortValue: r => r.reason,
       render: r => <span className="text-racing-text">{r.reason}</span> },
     { key: 'details', label: 'Details', sortValue: r => r.description,
-      render: r => <span className="text-racing-muted/70">{r.description !== r.reason ? r.description : ''}</span> },
+      render: r => <span className="text-racing-muted/70 whitespace-normal break-words">{r.description !== r.reason ? r.description : ''}</span> },
   ];
 
   return (
@@ -613,7 +613,7 @@ function TrackLimitsTab({ trackLimits }: { trackLimits: SessionDetailViewProps['
   }
 
   const columns: Column<typeof trackLimits[0]>[] = [
-    { key: 'time', label: 'Time', width: '80px', mono: true, sortValue: r => r.time,
+    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
       render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
     { key: 'lap', label: 'Lap', align: 'right', width: '60px', sortValue: r => r.lap,
       render: r => <span className="text-white">{r.lap}</span> },
