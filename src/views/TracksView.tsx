@@ -56,7 +56,9 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
     { key: 'pos', label: '#', width: '35px', sortValue: r => r.lapTime,
       render: (_, i) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
     { key: 'car', label: 'Car', width: '18%', sortValue: r => r.carType,
-      render: r => <span className="text-white">{r.carType}</span> },
+      render: r => onNavigate
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('cars', r.carType); }} className="text-white cursor-pointer">{r.carType}</button>
+        : <span className="text-white">{r.carType}</span> },
     { key: 'class', label: 'Class', width: '70px', sortValue: r => r.carClass,
       render: r => <ClassBadge carClass={r.carClass} /> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,

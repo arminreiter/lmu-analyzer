@@ -36,7 +36,9 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
 
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
     { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackVenue,
-      render: r => <span className="text-white">{r.trackVenue}</span> },
+      render: r => onNavigate
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackVenue); }} className="text-white cursor-pointer">{r.trackVenue}</button>
+        : <span className="text-white">{r.trackVenue}</span> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
     { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
