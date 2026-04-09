@@ -5,7 +5,7 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
-import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
+import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
 
@@ -16,8 +16,8 @@ interface PersonalBestsViewProps {
 }
 
 export const PersonalBestsView = memo(function PersonalBestsView({ files, driverNames, onNavigate }: PersonalBestsViewProps) {
-  const [filterClass, setFilterClass] = useState<CarClass | 'All'>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
+  const [filterCar, setFilterCar] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
   const [lapMode, setLapMode] = useState<LapMode>('car');
 
@@ -25,14 +25,14 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
   const everyLap = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
   const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
-  const classes = Array.from(new Set(allBests.map(b => b.carClass)));
   const tracks = Array.from(new Set(allBests.map(b => b.trackVenue))).sort();
+  const cars = Array.from(new Set(allBests.map(b => b.carType))).sort();
 
   const filtered = useMemo(() => allBests.filter(b => {
-    if (filterClass !== 'All' && b.carClass !== filterClass) return false;
     if (filterTrack !== 'All' && b.trackVenue !== filterTrack) return false;
+    if (filterCar !== 'All' && b.carType !== filterCar) return false;
     return true;
-  }), [allBests, filterClass, filterTrack]);
+  }), [allBests, filterTrack, filterCar]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, PersonalBest[]>();
@@ -48,12 +48,12 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
     <div className="space-y-5">
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-2">
-          <label className="text-racing-muted text-[10px] uppercase tracking-wider">Class:</label>
-          <SearchableSelect value={filterClass} options={[{ value: 'All', label: 'All Classes' }, ...classes.map(c => ({ value: c, label: c }))]} onChange={v => setFilterClass(v as CarClass | 'All')} />
-        </div>
-        <div className="flex items-center gap-2">
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Track:</label>
           <SearchableSelect value={filterTrack} options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(t => ({ value: t, label: t }))]} onChange={setFilterTrack} />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-racing-muted text-[10px] uppercase tracking-wider">Car:</label>
+          <SearchableSelect value={filterCar} options={[{ value: 'All', label: 'All Cars' }, ...cars.map(c => ({ value: c, label: c }))]} onChange={setFilterCar} />
         </div>
         <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
           {(['car', 'session', 'all'] as LapMode[]).map(mode => (

@@ -33,7 +33,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
     .sort((a, b) => b.file.timeString.localeCompare(a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
 
   const columns: Column<SessionRow>[] = useMemo(() => [
-    { key: 'type', label: 'Type', width: '80px',
+    { key: 'type', label: 'Type', width: '95px',
       sortValue: r => r.session.type,
       render: r => (
         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold
