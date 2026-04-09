@@ -34,13 +34,33 @@ function App() {
   });
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
 
-  // Check for cached data on mount
+  // Auto-restore cached data on mount
   useEffect(() => {
     const cached = storage.loadFiles();
     if (cached && cached.length > 0) {
       setHasCachedData(true);
+      // Auto-load cached data immediately
+      applyParsedData(cached, true);
+      // Try to restore directory handle for refresh capability
+      storage.loadDirectoryHandle().then(async handle => {
+        if (!handle) return;
+        dirHandleRef.current = handle;
+        // If data came from a directory, try to re-read fresh data
+        if (storage.loadDataSource() === 'directory') {
+          try {
+            const perm = await (handle as any).queryPermission({ mode: 'read' });
+            if (perm === 'granted') {
+              const parsed = await loadFolder(handle);
+              applyParsedData(parsed, true);
+              storage.saveFiles(parsed);
+            }
+          } catch {
+            // Permission not granted or folder unavailable — cached data is still shown
+          }
+        }
+      });
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist filters whenever they change (skip initial empty state)
   useEffect(() => {

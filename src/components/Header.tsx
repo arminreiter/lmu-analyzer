@@ -1,7 +1,8 @@
-import { FolderOpen, User, Layers, RefreshCw, Gauge } from 'lucide-react';
+import { FolderOpen, User, Layers, RefreshCw, Gauge, Download } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
 import { getClassColor } from '../lib/analytics';
+import { useInstallPrompt } from '../lib/useInstallPrompt';
 
 interface HeaderProps {
   selectedDrivers: string[];
@@ -33,6 +34,7 @@ const VIEWS = [
 ];
 
 export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace }: HeaderProps) {
+  const { canInstall, install } = useInstallPrompt();
   const driverOptions = drivers.map(d => ({
     value: d.name,
     label: d.name,
@@ -97,6 +99,16 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
                 title="Refresh data from folder"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+
+            {canInstall && (
+              <button
+                onClick={install}
+                className="p-2 text-racing-muted/50 hover:text-racing-green transition-colors cursor-pointer"
+                title="Install app"
+              >
+                <Download className="w-3.5 h-3.5" />
               </button>
             )}
 

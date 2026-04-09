@@ -1,6 +1,8 @@
-import { Shield, Coffee, FileText, Lock, Cpu, Code2 } from 'lucide-react';
+import { Shield, Coffee, FileText, Lock, Cpu, Code2, Download, Timer } from 'lucide-react';
+import { useInstallPrompt } from '../lib/useInstallPrompt';
 
 export function AboutView() {
+  const { canInstall, install } = useInstallPrompt();
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="animate-in animate-in-1">
@@ -56,6 +58,81 @@ export function AboutView() {
       <div className="animate-in animate-in-3">
         <div className="data-card carbon-fiber overflow-hidden">
           <div className="px-6 py-4 border-b border-racing-border flex items-center gap-2">
+            <Download className="w-4 h-4 text-racing-green" />
+            <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Install as App</h3>
+          </div>
+          <div className="px-6 py-5 space-y-4 text-sm text-racing-text leading-relaxed">
+            <p>
+              LMU Analyzer is a Progressive Web App (PWA). You can install it on your desktop or mobile device for quick access — it works offline and launches like a native app.
+            </p>
+            {canInstall ? (
+              <button
+                onClick={install}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all cursor-pointer
+                  bg-racing-green/10 border border-racing-green/30 text-racing-green
+                  hover:bg-racing-green/20 hover:border-racing-green/50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Install LMU Analyzer
+              </button>
+            ) : (
+              <p className="text-racing-muted text-xs">
+                If the install button appears in the header (<Download className="w-3 h-3 inline" />), click it to install. On some browsers, you can also use the browser menu to add this app to your home screen.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="animate-in animate-in-4">
+        <div className="data-card carbon-fiber overflow-hidden">
+          <div className="px-6 py-4 border-b border-racing-border flex items-center gap-2">
+            <Timer className="w-4 h-4 text-racing-yellow" />
+            <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Benchmark Times</h3>
+          </div>
+          <div className="px-6 py-5 space-y-4 text-sm text-racing-text leading-relaxed">
+            <p>
+              Benchmark lap times are provided by <span className="text-white font-medium">ohne_speed</span> — the go-to resource for LMU reference times and car setups.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all
+                  bg-racing-green/8 border border-racing-green/20 text-racing-green/80
+                  hover:bg-racing-green/15 hover:text-racing-green hover:border-racing-green/35"
+              >
+                Benchmark Spreadsheet
+              </a>
+              <a
+                href="https://www.youtube.com/@ohne_speed"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all
+                  bg-racing-red/8 border border-racing-red/20 text-racing-red/80
+                  hover:bg-racing-red/15 hover:text-racing-red hover:border-racing-red/35"
+              >
+                YouTube
+              </a>
+              <a
+                href="https://discord.com/invite/dFAqhnuSXH"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all
+                  bg-[#5865F2]/8 border border-[#5865F2]/20 text-[#5865F2]/80
+                  hover:bg-[#5865F2]/15 hover:text-[#5865F2] hover:border-[#5865F2]/35"
+              >
+                Discord
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="animate-in animate-in-5">
+        <div className="data-card carbon-fiber overflow-hidden">
+          <div className="px-6 py-4 border-b border-racing-border flex items-center gap-2">
             <Code2 className="w-4 h-4 text-racing-muted" />
             <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Open Source</h3>
           </div>
@@ -91,7 +168,7 @@ export function AboutView() {
         </div>
       </div>
 
-      <div className="animate-in animate-in-4">
+      <div className="animate-in animate-in-6">
         <div className="data-card carbon-fiber overflow-hidden">
           <div className="px-6 py-4 border-b border-racing-border">
             <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">How It Works</h3>
