@@ -1,49 +1,25 @@
-import { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useMemo, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
-import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getCarStats, getDriverSessions, getPersonalBests, getAllSessionBests } from '../lib/analytics';
+import { SortableTable } from '../components/SortableTable';
+import { formatLapTime, getCarStats, getPersonalBests, getAllSessionBests } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 interface CarsViewProps {
   files: RaceFile[];
   driverNames: string[];
+  initialCar?: string | null;
 }
 
-export function CarsView({ files, driverNames }: CarsViewProps) {
-  const [selectedCar, setSelectedCar] = useState<string | null>(null);
+export const CarsView = memo(function CarsView({ files, driverNames, initialCar }: CarsViewProps) {
+  const [selectedCar, setSelectedCar] = useState<string | null>(initialCar ?? null);
   const [showAll, setShowAll] = useState(false);
-  const cars = getCarStats(files, driverNames);
-  const bests = getPersonalBests(files, driverNames);
-  const allBests = getAllSessionBests(files, driverNames);
+  const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
+  const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const allBests = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
 
   const car = selectedCar ?? cars[0]?.carType;
   const carInfo = cars.find(c => c.carType === car);
-  const carBests = (showAll ? allBests : bests).filter(b => b.carType === car);
-  const carSessions = getDriverSessions(files, driverNames).filter(s => s.driver.carType === car);
-
-  // Lap time progression
-  const progressionData = carSessions
-    .filter(({ driver }) => driver.bestLapTime && driver.bestLapTime > 0)
-    .map(({ file, driver }) => ({
-      session: file.timeString.slice(5, 16),
-      lapTime: driver.bestLapTime!,
-      track: file.trackVenue,
-    }));
-
-  // Consistency analysis - standard deviation of lap times per session
-  const consistencyData = carSessions.map(({ file, driver }) => {
-    const validLaps = driver.laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!);
-    if (validLaps.length < 2) return null;
-    const avg = validLaps.reduce((a, b) => a + b, 0) / validLaps.length;
-    const variance = validLaps.reduce((sum, t) => sum + (t - avg) ** 2, 0) / validLaps.length;
-    return {
-      session: file.timeString.slice(5, 16),
-      stdDev: Math.sqrt(variance),
-      avg,
-      track: file.trackVenue,
-    };
-  }).filter(Boolean) as Array<{ session: string; stdDev: number; avg: number; track: string }>;
+  const carBests = useMemo(() => (showAll ? allBests : bests).filter(b => b.carType === car), [showAll, allBests, bests, car]);
 
   return (
     <div className="space-y-6">
@@ -82,8 +58,8 @@ export function CarsView({ files, driverNames }: CarsViewProps) {
                 <p className="text-white text-lg font-bold">{carInfo.totalLaps}</p>
               </div>
               <div>
-                <p className="text-racing-muted text-xs uppercase">Best Lap</p>
-                <p className="text-white text-lg font-bold font-mono">{formatLapTime(carInfo.bestLapTime)}</p>
+                <p className="text-racing-muted text-xs uppercase">Distance</p>
+                <p className="text-white text-lg font-bold font-mono">{Math.round(carInfo.totalDistanceKm).toLocaleString()} km</p>
               </div>
               <div>
                 <p className="text-racing-muted text-xs uppercase">Tracks</p>
@@ -124,47 +100,8 @@ export function CarsView({ files, driverNames }: CarsViewProps) {
               rowKey={r => `${r.trackVenue}-${r.fileName}-${r.lapNumber}`}
             />
           </div>
-
-          {/* Lap Time Progression */}
-          {progressionData.length > 1 && (
-            <div className="data-card carbon-fiber p-4">
-              <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">PERFORMANCE OVER TIME</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={progressionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-                  <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
-                  <Tooltip
-                    contentStyle={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { track: string } }).payload.track]}
-                  />
-                  <Line type="monotone" dataKey="lapTime" stroke="#e10600" strokeWidth={2} dot={{ fill: '#e10600', r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Consistency */}
-          {consistencyData.length > 1 && (
-            <div className="data-card carbon-fiber p-4">
-              <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">CONSISTENCY (LAP TIME STD DEV)</h3>
-              <p className="text-racing-muted text-xs mb-3">Lower is more consistent</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={consistencyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-                  <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
-                  <Tooltip
-                    contentStyle={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: unknown, _: unknown, entry: unknown) => [`${Number(v).toFixed(3)}s`, (entry as { payload: { track: string } }).payload.track]}
-                  />
-                  <Line type="monotone" dataKey="stdDev" stroke="#9c27b0" strokeWidth={2} dot={{ fill: '#9c27b0', r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
         </>
       )}
     </div>
   );
-}
+});

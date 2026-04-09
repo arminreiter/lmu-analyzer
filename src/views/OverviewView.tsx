@@ -1,9 +1,15 @@
+import { useMemo, memo } from 'react';
 import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route, ShieldAlert, Trophy } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { formatLapTime, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
+
+function fmtSector(v: number | null) {
+  if (v === null) return '--';
+  return v.toFixed(3);
+}
 
 const trackColumns: Column<TrackStats>[] = [
   {
@@ -12,29 +18,34 @@ const trackColumns: Column<TrackStats>[] = [
     render: t => <span className="text-racing-text">{t.trackVenue}</span>,
   },
   {
-    key: 'sessions', label: 'Sessions', align: 'right', mono: true, width: '90px',
-    sortValue: t => t.sessionCount,
-    render: t => t.sessionCount,
-  },
-  {
-    key: 'laps', label: 'Laps', align: 'right', mono: true, width: '80px',
-    sortValue: t => t.totalLaps,
-    render: t => t.totalLaps,
-  },
-  {
-    key: 'classes', label: 'Classes', align: 'right', width: '130px',
-    sortable: false,
-    render: t => <div className="flex gap-1 justify-end">{t.classes.map(c => <ClassBadge key={c} carClass={c} />)}</div>,
-  },
-  {
-    key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px',
-    sortValue: t => t.bestLapTime ?? Infinity,
+    key: 'car', label: 'Car',
+    sortValue: t => t.bestCar,
     render: t => (
-      <div>
-        <span className="text-white font-medium">{formatLapTime(t.bestLapTime)}</span>
-        {t.bestCar && <p className="text-[10px] text-racing-muted truncate">{t.bestCar}</p>}
+      <div className="flex items-center gap-1.5">
+        <span className="text-racing-muted text-xs">{t.bestCar}</span>
+        <ClassBadge carClass={t.bestCarClass} />
       </div>
     ),
+  },
+  {
+    key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '7rem',
+    sortValue: t => t.bestLapTime ?? Infinity,
+    render: t => <span className="text-racing-green font-medium whitespace-nowrap">{formatLapTime(t.bestLapTime)}</span>,
+  },
+  {
+    key: 's1', label: 'S1', align: 'right', mono: true, width: '5.5rem',
+    sortValue: t => t.bestS1,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS1)}</span>,
+  },
+  {
+    key: 's2', label: 'S2', align: 'right', mono: true, width: '5.5rem',
+    sortValue: t => t.bestS2,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS2)}</span>,
+  },
+  {
+    key: 's3', label: 'S3', align: 'right', mono: true, width: '5.5rem',
+    sortValue: t => t.bestS3,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS3)}</span>,
   },
 ];
 
@@ -50,42 +61,37 @@ const carColumns: Column<CarStats>[] = [
     render: c => <ClassBadge carClass={c.carClass} />,
   },
   {
-    key: 'sessions', label: 'Sessions', align: 'right', mono: true, width: '90px',
+    key: 'sessions', label: 'Sessions', align: 'right', mono: true, width: '5.5rem',
     sortValue: c => c.sessionCount,
     render: c => c.sessionCount,
   },
   {
-    key: 'laps', label: 'Laps', align: 'right', mono: true, width: '80px',
+    key: 'laps', label: 'Laps', align: 'right', mono: true, width: '5rem',
     sortValue: c => c.totalLaps,
     render: c => c.totalLaps,
   },
   {
-    key: 'tracks', label: 'Tracks', align: 'right', mono: true, width: '75px',
+    key: 'tracks', label: 'Tracks', align: 'right', mono: true, width: '5rem',
     sortValue: c => c.tracks.length,
     render: c => c.tracks.length,
   },
   {
-    key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px',
-    sortValue: c => c.bestLapTime ?? Infinity,
-    render: c => (
-      <div>
-        <span className="text-white font-medium">{formatLapTime(c.bestLapTime)}</span>
-        {c.bestTrack && <p className="text-[10px] text-racing-muted truncate">{c.bestTrack}</p>}
-      </div>
-    ),
+    key: 'distance', label: 'Distance', align: 'right', mono: true, width: '7rem',
+    sortValue: c => c.totalDistanceKm,
+    render: c => <span className="text-racing-muted whitespace-nowrap">{Math.round(c.totalDistanceKm).toLocaleString()} km</span>,
   },
 ];
 
 interface OverviewViewProps {
   files: RaceFile[];
   driverNames: string[];
-  onViewChange?: (view: string) => void;
+  onNavigate?: (view: string, context?: string) => void;
 }
 
-export function OverviewView({ files, driverNames, onViewChange }: OverviewViewProps) {
-  const stats = getOverviewStats(files, driverNames);
-  const tracks = getTrackStats(files, driverNames);
-  const cars = getCarStats(files, driverNames);
+export const OverviewView = memo(function OverviewView({ files, driverNames, onNavigate }: OverviewViewProps) {
+  const stats = useMemo(() => getOverviewStats(files, driverNames), [files, driverNames]);
+  const tracks = useMemo(() => getTrackStats(files, driverNames), [files, driverNames]);
+  const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
 
   return (
     <div className="space-y-5">
@@ -141,58 +147,39 @@ export function OverviewView({ files, driverNames, onViewChange }: OverviewViewP
         </div>
       </div>
 
-      {/* Penalty Breakdown */}
-      {stats.penaltyTypes.size > 0 && (
-        <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-3">
-          <div className="px-5 py-3 border-b border-racing-border flex items-center">
-            <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Penalty Breakdown</h3>
-          </div>
-          <div className="px-5 py-3 flex flex-wrap gap-3">
-            {Array.from(stats.penaltyTypes.entries())
-              .sort((a, b) => b[1] - a[1])
-              .map(([type, count]) => (
-                <div key={type} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-racing-red/[0.06] border border-racing-red/15">
-                  <span className="text-racing-red font-mono text-sm font-bold">{count}</span>
-                  <span className="text-racing-text text-xs">{type}</span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
       {/* Tracks — best lap per track */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-3">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center">
-          <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Best Lap per Circuit</h3>
+        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
+          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAP PER CIRCUIT</h3>
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{tracks.length} tracks</span>
-          {onViewChange && (
-            <button onClick={() => onViewChange('tracks')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors">View all →</button>
+          {onNavigate && (
+            <button onClick={() => onNavigate('tracks')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
         </div>
         <SortableTable<TrackStats>
           columns={trackColumns}
           data={tracks}
           rowKey={t => t.trackVenue}
-          onRowClick={onViewChange ? () => onViewChange('tracks') : undefined}
+          onRowClick={onNavigate ? (row) => onNavigate('tracks', row.trackVenue) : undefined}
         />
       </div>
 
       {/* Cars */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-4">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center">
-          <h3 className="section-stripe text-[11px] font-semibold uppercase tracking-[0.12em] text-racing-muted">Cars Used</h3>
+        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
+          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">CARS USED</h3>
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{cars.length} cars</span>
-          {onViewChange && (
-            <button onClick={() => onViewChange('cars')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors">View all →</button>
+          {onNavigate && (
+            <button onClick={() => onNavigate('cars')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
         </div>
         <SortableTable<CarStats>
           columns={carColumns}
           data={cars}
           rowKey={c => c.carType}
-          onRowClick={onViewChange ? () => onViewChange('cars') : undefined}
+          onRowClick={onNavigate ? (row) => onNavigate('cars', row.carType) : undefined}
         />
       </div>
     </div>
   );
-}
+});

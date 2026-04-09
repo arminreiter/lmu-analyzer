@@ -10,7 +10,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, sub, icon, accent }: StatCardProps) {
   return (
-    <div className="data-card racing-stripe carbon-fiber p-4 group">
+    <div className="data-card racing-stripe carbon-fiber p-4 group h-full">
       <div className="flex items-start justify-between mb-2 pl-2">
         <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-racing-muted">{label}</span>
         {icon && <span className="text-racing-muted/50 group-hover:text-racing-red/60 transition-colors">{icon}</span>}

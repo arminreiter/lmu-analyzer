@@ -98,6 +98,7 @@ export interface RaceFile {
   damageMult: number;
   fuelMult: number;
   tireMult: number;
+  freeSettings: number;
   vehiclesAllowed: string[];
   sessions: SessionData[];
 }

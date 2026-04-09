@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
@@ -11,30 +11,33 @@ interface PersonalBestsViewProps {
   driverNames: string[];
 }
 
-export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps) {
+export const PersonalBestsView = memo(function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps) {
   const [filterClass, setFilterClass] = useState<CarClass | 'All'>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
-  const bestOnly = getPersonalBests(files, driverNames);
-  const allSessions = getAllSessionBests(files, driverNames);
+  const bestOnly = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const allSessions = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
   const allBests = showAll ? allSessions : bestOnly;
   const classes = Array.from(new Set(allBests.map(b => b.carClass)));
   const tracks = Array.from(new Set(allBests.map(b => b.trackVenue))).sort();
 
-  const filtered = allBests.filter(b => {
+  const filtered = useMemo(() => allBests.filter(b => {
     if (filterClass !== 'All' && b.carClass !== filterClass) return false;
     if (filterTrack !== 'All' && b.trackVenue !== filterTrack) return false;
     return true;
-  });
+  }), [allBests, filterClass, filterTrack]);
 
-  const grouped = new Map<string, PersonalBest[]>();
-  for (const b of filtered) {
-    const arr = grouped.get(b.trackVenue) ?? [];
-    arr.push(b);
-    grouped.set(b.trackVenue, arr);
-  }
+  const grouped = useMemo(() => {
+    const map = new Map<string, PersonalBest[]>();
+    for (const b of filtered) {
+      const arr = map.get(b.trackVenue) ?? [];
+      arr.push(b);
+      map.set(b.trackVenue, arr);
+    }
+    return map;
+  }, [filtered]);
 
   return (
     <div className="space-y-5">
@@ -149,4 +152,4 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
       )}
     </div>
   );
-}
+});

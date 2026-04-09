@@ -64,7 +64,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
       <div className="absolute top-0 right-[10%] w-[2px] h-full opacity-[0.03] bg-racing-red" style={{ transform: 'rotate(-15deg)', transformOrigin: 'top' }} />
       <div className="absolute top-0 right-[12%] w-[1px] h-full opacity-[0.02] bg-racing-red" style={{ transform: 'rotate(-15deg)', transformOrigin: 'top' }} />
 
-      <div className="max-w-md w-full text-center relative z-10">
+      <div className="max-w-lg w-full text-center relative z-10">
         {/* Logo */}
         <div className="mb-10 animate-in animate-in-1">
           <div className="inline-flex items-center justify-center mb-5">

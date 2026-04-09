@@ -6,6 +6,8 @@ const KEYS = {
   selectedClasses: 'lmu-analyzer-selected-classes',
   activeView: 'lmu-analyzer-active-view',
   dataSource: 'lmu-analyzer-data-source', // 'directory' | 'upload'
+  profileName: 'lmu-analyzer-profile-name',
+  profileAvatar: 'lmu-analyzer-profile-avatar',
 } as const;
 
 const DB_NAME = 'lmu-analyzer';
@@ -64,6 +66,26 @@ export function saveDataSource(source: 'directory' | 'upload') {
 
 export function loadDataSource(): 'directory' | 'upload' | null {
   return localStorage.getItem(KEYS.dataSource) as 'directory' | 'upload' | null;
+}
+
+export function saveProfileName(name: string) {
+  try { localStorage.setItem(KEYS.profileName, name); } catch { /* ignore */ }
+}
+
+export function loadProfileName(): string | null {
+  return localStorage.getItem(KEYS.profileName);
+}
+
+export function saveProfileAvatar(dataUrl: string) {
+  try { localStorage.setItem(KEYS.profileAvatar, dataUrl); } catch { /* ignore */ }
+}
+
+export function loadProfileAvatar(): string | null {
+  return localStorage.getItem(KEYS.profileAvatar);
+}
+
+export function clearProfileAvatar() {
+  localStorage.removeItem(KEYS.profileAvatar);
 }
 
 export function clearAll() {

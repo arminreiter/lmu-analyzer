@@ -1,8 +1,9 @@
+import { useState, useMemo, memo } from 'react';
 import { Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getRaceResults, type RaceResult } from '../lib/analytics';
+import { formatLapTime, getRaceResults, isRatedRace, type RaceResult } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
 interface RaceResultsViewProps {
@@ -10,15 +11,21 @@ interface RaceResultsViewProps {
   driverNames: string[];
 }
 
-export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
-  const results = getRaceResults(files, driverNames);
+export const RaceResultsView = memo(function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
+  const [filter, setFilter] = useState<'all' | 'online' | 'rated'>('all');
+  const allResults = useMemo(() => getRaceResults(files, driverNames), [files, driverNames]);
+  const results = useMemo(() => {
+    if (filter === 'online') return allResults.filter(r => r.file.setting === 'Multiplayer');
+    if (filter === 'rated') return allResults.filter(r => isRatedRace(r.file));
+    return allResults;
+  }, [allResults, filter]);
 
-  const positionData = results.map((r, i) => ({
+  const positionData = useMemo(() => results.map((r, i) => ({
     race: `${r.file.trackVenue.slice(0, 12)} ${r.file.timeString.slice(5, 10)}`,
     position: r.classPosition,
     total: r.classDrivers,
     idx: i,
-  })).reverse();
+  })).reverse(), [results]);
 
   // Stats
   const totalRaces = results.length;
@@ -76,6 +83,22 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Filter */}
+      <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-3 py-1.5 transition-colors cursor-pointer ${filter === 'all' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+        >All Races</button>
+        <button
+          onClick={() => setFilter('online')}
+          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'online' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+        >Online</button>
+        <button
+          onClick={() => setFilter('rated')}
+          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'rated' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+        >Rated</button>
+      </div>
+
       {/* Race Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="data-card carbon-fiber p-4 text-center">
@@ -150,4 +173,4 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
       )}
     </div>
   );
-}
+});

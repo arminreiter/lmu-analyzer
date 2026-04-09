@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
@@ -61,29 +61,29 @@ function LapDetailsTable({ driver }: { driver: DriverResult }) {
 function SessionDetail({ file, session, driver }: { file: RaceFile; session: SessionData; driver: DriverResult }) {
   const [expanded, setExpanded] = useState(false);
 
-  const lapsWithTime = driver.laps.filter(l => l.lapTime && l.lapTime > 0);
+  const lapsWithTime = useMemo(() => driver.laps.filter(l => l.lapTime && l.lapTime > 0), [driver.laps]);
 
-  const lapChartData = lapsWithTime.map(l => ({
+  const lapChartData = useMemo(() => lapsWithTime.map(l => ({
     lap: l.num,
     time: l.lapTime,
     s1: l.sector1,
     s2: l.sector2,
     s3: l.sector3,
-  }));
+  })), [lapsWithTime]);
 
-  const tireData = driver.laps.filter(l => l.tireWear.fl > 0).map(l => ({
+  const tireData = useMemo(() => driver.laps.filter(l => l.tireWear.fl > 0).map(l => ({
     lap: l.num,
     FL: +(l.tireWear.fl * 100).toFixed(1),
     FR: +(l.tireWear.fr * 100).toFixed(1),
     RL: +(l.tireWear.rl * 100).toFixed(1),
     RR: +(l.tireWear.rr * 100).toFixed(1),
-  }));
+  })), [driver.laps]);
 
-  const fuelData = driver.laps.filter(l => l.fuel > 0).map(l => ({
+  const fuelData = useMemo(() => driver.laps.filter(l => l.fuel > 0).map(l => ({
     lap: l.num,
     fuel: +(l.fuel * 100).toFixed(1),
     used: +(l.fuelUsed * 100).toFixed(2),
-  }));
+  })), [driver.laps]);
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
@@ -336,17 +336,17 @@ function SessionDetail({ file, session, driver }: { file: RaceFile; session: Ses
   );
 }
 
-export function SessionsView({ files, driverNames }: SessionsViewProps) {
+export const SessionsView = memo(function SessionsView({ files, driverNames }: SessionsViewProps) {
   const [filterType, setFilterType] = useState<string>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
 
-  const allSessions = getDriverSessions(files, driverNames);
-  const tracks = Array.from(new Set(allSessions.map(s => s.file.trackVenue))).sort();
+  const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
+  const tracks = useMemo(() => Array.from(new Set(allSessions.map(s => s.file.trackVenue))).sort(), [allSessions]);
 
-  const filtered = allSessions
+  const filtered = useMemo(() => allSessions
     .filter(s => filterType === 'All' || s.session.type === filterType)
     .filter(s => filterTrack === 'All' || s.file.trackVenue === filterTrack)
-    .sort((a, b) => b.file.timeString.localeCompare(a.file.timeString));
+    .sort((a, b) => b.file.timeString.localeCompare(a.file.timeString)), [allSessions, filterType, filterTrack]);
 
   return (
     <div className="space-y-4">
@@ -388,4 +388,4 @@ export function SessionsView({ files, driverNames }: SessionsViewProps) {
       ))}
     </div>
   );
-}
+});

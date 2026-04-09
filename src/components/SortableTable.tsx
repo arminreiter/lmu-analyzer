@@ -112,7 +112,7 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, 
                 <td
                   key={col.key}
                   className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}
-                    ${col.mono ? 'font-mono' : ''} truncate`}
+                    ${col.mono ? 'font-mono' : ''} ${!col.align || col.align === 'left' ? 'truncate' : ''}`}
                 >
                   {col.render(row, i)}
                 </td>

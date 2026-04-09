@@ -8,9 +8,10 @@ import { SessionsView } from './views/SessionsView';
 import { TracksView } from './views/TracksView';
 import { CarsView } from './views/CarsView';
 import { RaceResultsView } from './views/RaceResultsView';
+import { DriverProfileView } from './views/DriverProfileView';
 import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
-import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses } from './lib/analytics';
+import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateRaces } from './lib/analytics';
 import * as storage from './lib/storage';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 
@@ -23,6 +24,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('overview');
+  const [viewContext, setViewContext] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [hasCachedData, setHasCachedData] = useState(false);
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
@@ -42,12 +44,13 @@ function App() {
     }
   }, [selectedDrivers, selectedClasses, activeView, loaded]);
 
-  const applyParsedData = useCallback((parsed: RaceFile[], restoreFilters = false) => {
-    if (parsed.length === 0) {
+  const applyParsedData = useCallback((rawParsed: RaceFile[], restoreFilters = false) => {
+    if (rawParsed.length === 0) {
       setError('No valid XML race files found.');
       setLoading(false);
       return;
     }
+    const parsed = deduplicateRaces(rawParsed);
     setFiles(parsed);
     const classes = getAllClasses(parsed);
     setAllClasses(classes);
@@ -148,6 +151,11 @@ function App() {
     setHasCachedData(false);
   }, []);
 
+  const navigateTo = useCallback((view: string, context?: string) => {
+    setActiveView(view);
+    setViewContext(context ?? null);
+  }, []);
+
   const filteredFiles = useMemo(
     () => filterFilesByClasses(files, selectedClasses),
     [files, selectedClasses]
@@ -191,12 +199,13 @@ function App() {
           </div>
         ) : (
           <>
-            {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onViewChange={setActiveView} />}
+            {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} />}
             {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} />}
-            {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} />}
-            {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} />}
+            {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} />}
+            {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} />}
             {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} />}
+            {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
           </>
         )}
       </main>

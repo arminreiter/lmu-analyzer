@@ -1,4 +1,180 @@
-import type { RaceFile, PersonalBest, DriverSummary, DriverResult, SessionData, CarClass } from './types';
+import type { RaceFile, PersonalBest, DriverSummary, DriverResult, LapData, SessionData, CarClass } from './types';
+
+// ---------------------------------------------------------------------------
+// Race deduplication / merging
+// ---------------------------------------------------------------------------
+
+function parseTime(ts: string): number {
+  // "2026/04/06 13:29:27" → epoch ms
+  return new Date(ts.replace(/\//g, '-')).getTime();
+}
+
+function hasOverlappingDriverLaps(s1: SessionData, s2: SessionData): boolean {
+  for (const d1 of s1.drivers) {
+    const d2 = s2.drivers.find(d => d.name === d1.name);
+    if (!d2) continue;
+    let matches = 0;
+    for (const l1 of d1.laps) {
+      if (l1.lapTime === null || l1.lapTime <= 0) continue;
+      for (const l2 of d2.laps) {
+        if (l2.num === l1.num && l2.lapTime !== null && Math.abs(l1.lapTime - l2.lapTime) < 0.001) {
+          matches++;
+          if (matches >= 2) return true;
+          break;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function mergeDriverResult(entries: DriverResult[]): DriverResult {
+  // Pick the entry with the best finish as the base for metadata
+  const sorted = [...entries].sort((a, b) => {
+    const aOk = a.finishStatus === 'Finished Normally' || a.finishStatus === '' || a.finishStatus === 'None';
+    const bOk = b.finishStatus === 'Finished Normally' || b.finishStatus === '' || b.finishStatus === 'None';
+    if (aOk !== bOk) return aOk ? -1 : 1;
+    return b.totalLaps - a.totalLaps;
+  });
+  const base = { ...sorted[0] };
+
+  // Merge laps: union by lap number, keep the first occurrence
+  const lapMap = new Map<number, LapData>();
+  for (const entry of entries) {
+    for (const lap of entry.laps) {
+      if (!lapMap.has(lap.num)) lapMap.set(lap.num, lap);
+    }
+  }
+  base.laps = Array.from(lapMap.values()).sort((a, b) => a.num - b.num);
+  base.totalLaps = Math.max(base.totalLaps, base.laps.length);
+
+  // Recalculate best lap from merged data
+  let best: number | null = null;
+  for (const lap of base.laps) {
+    if (lap.lapTime && lap.lapTime > 0 && (best === null || lap.lapTime < best)) {
+      best = lap.lapTime;
+    }
+  }
+  base.bestLapTime = best;
+  return base;
+}
+
+function mergeRaceSessions(sessions: SessionData[]): SessionData {
+  // Use the most complete session as the base
+  const sorted = [...sessions].sort((a, b) => b.mostLapsCompleted - a.mostLapsCompleted);
+  const base = { ...sorted[0] };
+
+  // Merge all drivers across session duplicates
+  const driverMap = new Map<string, DriverResult[]>();
+  for (const s of sessions) {
+    for (const d of s.drivers) {
+      const list = driverMap.get(d.name);
+      if (list) list.push(d);
+      else driverMap.set(d.name, [d]);
+    }
+  }
+  base.drivers = Array.from(driverMap.values()).map(list =>
+    list.length === 1 ? list[0] : mergeDriverResult(list),
+  );
+
+  // Merge stream events — deduplicate by time + description
+  const incidentKeys = new Set<string>();
+  base.incidents = [];
+  for (const s of sessions) {
+    for (const inc of s.incidents) {
+      const key = `${inc.time.toFixed(1)}|${inc.description}`;
+      if (!incidentKeys.has(key)) { incidentKeys.add(key); base.incidents.push(inc); }
+    }
+  }
+  const penaltyKeys = new Set<string>();
+  base.penalties = [];
+  for (const s of sessions) {
+    for (const pen of s.penalties) {
+      const key = `${pen.time.toFixed(1)}|${pen.driver}|${pen.type}`;
+      if (!penaltyKeys.has(key)) { penaltyKeys.add(key); base.penalties.push(pen); }
+    }
+  }
+  const tlKeys = new Set<string>();
+  base.trackLimits = [];
+  for (const s of sessions) {
+    for (const tl of s.trackLimits) {
+      const key = `${tl.time.toFixed(1)}|${tl.driver}|${tl.lap}`;
+      if (!tlKeys.has(key)) { tlKeys.add(key); base.trackLimits.push(tl); }
+    }
+  }
+
+  return base;
+}
+
+/**
+ * Detects and merges duplicate Race sessions across files.
+ * Two Race sessions are considered the same event when they share the same track,
+ * occur within 60 minutes of each other, and have at least one driver with
+ * identical lap times at the same lap number.
+ *
+ * Merged sessions combine driver laps (union by lap number) and keep the
+ * best finish metadata (Finished > DNF, more laps > fewer).
+ */
+export function deduplicateRaces(files: RaceFile[]): RaceFile[] {
+  interface RaceRef { fileIdx: number; sessionIdx: number }
+
+  const refs: RaceRef[] = [];
+  for (let fi = 0; fi < files.length; fi++) {
+    for (let si = 0; si < files[fi].sessions.length; si++) {
+      if (files[fi].sessions[si].type === 'Race') refs.push({ fileIdx: fi, sessionIdx: si });
+    }
+  }
+
+  // Group refs that belong to the same physical race
+  const used = new Set<number>();
+  const groups: RaceRef[][] = [];
+
+  for (let i = 0; i < refs.length; i++) {
+    if (used.has(i)) continue;
+    const group = [refs[i]];
+    used.add(i);
+    const fileI = files[refs[i].fileIdx];
+    const sessI = fileI.sessions[refs[i].sessionIdx];
+    const tI = parseTime(sessI.dateTime || fileI.timeString);
+
+    for (let j = i + 1; j < refs.length; j++) {
+      if (used.has(j)) continue;
+      const fileJ = files[refs[j].fileIdx];
+      const sessJ = fileJ.sessions[refs[j].sessionIdx];
+      if (fileI.trackVenue !== fileJ.trackVenue) continue;
+      const tJ = parseTime(sessJ.dateTime || fileJ.timeString);
+      if (Math.abs(tI - tJ) > 60 * 60 * 1000) continue;
+      if (hasOverlappingDriverLaps(sessI, sessJ)) {
+        group.push(refs[j]);
+        used.add(j);
+      }
+    }
+    groups.push(group);
+  }
+
+  // Nothing to merge
+  if (groups.every(g => g.length === 1)) return files;
+
+  // Clone files so we can mutate
+  const cloned: RaceFile[] = files.map(f => ({ ...f, sessions: [...f.sessions] }));
+
+  for (const group of groups) {
+    if (group.length === 1) continue;
+    const sessions = group.map(r => cloned[r.fileIdx].sessions[r.sessionIdx]);
+    const merged = mergeRaceSessions(sessions);
+
+    // Keep merged session in the first file, mark others for removal
+    cloned[group[0].fileIdx].sessions[group[0].sessionIdx] = merged;
+    for (let k = 1; k < group.length; k++) {
+      cloned[group[k].fileIdx].sessions[group[k].sessionIdx] = null as any;
+    }
+  }
+
+  // Remove null sessions and empty files
+  return cloned
+    .map(f => ({ ...f, sessions: f.sessions.filter(Boolean) }))
+    .filter(f => f.sessions.length > 0);
+}
 
 export function formatLapTime(seconds: number | null): string {
   if (seconds === null || seconds <= 0) return '--:--.---';
@@ -39,6 +215,10 @@ export function getClassBgClass(carClass: CarClass): string {
     case 'LMP3': return 'bg-lmp3/20 text-lmp3 border-lmp3/30';
     default: return 'bg-racing-muted/20 text-racing-muted border-racing-muted/30';
   }
+}
+
+export function isRatedRace(file: RaceFile): boolean {
+  return file.setting === 'Multiplayer' && file.freeSettings !== 2147483647;
 }
 
 export function getAllClasses(files: RaceFile[]): CarClass[] {
@@ -129,7 +309,16 @@ export function detectPlayerDrivers(files: RaceFile[]): string[] {
         for (const session of file.sessions) {
           const players = session.drivers.filter(d => d.isPlayer);
           if (players.length >= 2 && players.length <= 3) {
-            const hasKnown = players.some(p => localNames.has(p.name));
+            const hasKnown = players.some(p => {
+              if (localNames.has(p.name)) return true;
+              const firstName = p.name.split(/\s+/)[0].toLowerCase();
+              for (const known of localNames) {
+                if (known.toLowerCase().startsWith(firstName) || firstName.startsWith(known.split(/\s+/)[0].toLowerCase())) {
+                  return true;
+                }
+              }
+              return false;
+            });
             if (hasKnown) {
               for (const p of players) {
                 // Add co-players from small sessions if they share a name prefix with a known name
@@ -291,7 +480,11 @@ export interface TrackStats {
   sessionCount: number;
   totalLaps: number;
   bestLapTime: number | null;
+  bestS1: number | null;
+  bestS2: number | null;
+  bestS3: number | null;
   bestCar: string;
+  bestCarClass: CarClass;
   classes: CarClass[];
 }
 
@@ -304,26 +497,39 @@ export function getTrackStats(files: RaceFile[], driverNames: string | string[])
       const driver = session.drivers.find(d => names.includes(d.name));
       if (!driver) continue;
 
-      const existing = map.get(file.trackVenue);
-      if (existing) {
-        existing.sessionCount++;
-        existing.totalLaps += driver.totalLaps;
-        if (driver.bestLapTime && (!existing.bestLapTime || driver.bestLapTime < existing.bestLapTime)) {
-          existing.bestLapTime = driver.bestLapTime;
-          existing.bestCar = driver.carType;
-        }
-        if (!existing.classes.includes(driver.carClass)) {
-          existing.classes.push(driver.carClass);
-        }
-      } else {
-        map.set(file.trackVenue, {
+      let existing = map.get(file.trackVenue);
+      if (!existing) {
+        existing = {
           trackVenue: file.trackVenue,
-          sessionCount: 1,
-          totalLaps: driver.totalLaps,
-          bestLapTime: driver.bestLapTime,
-          bestCar: driver.carType,
-          classes: [driver.carClass],
-        });
+          sessionCount: 0,
+          totalLaps: 0,
+          bestLapTime: null,
+          bestS1: null,
+          bestS2: null,
+          bestS3: null,
+          bestCar: '',
+          bestCarClass: driver.carClass,
+          classes: [],
+        };
+        map.set(file.trackVenue, existing);
+      }
+
+      existing.sessionCount++;
+      existing.totalLaps += driver.totalLaps;
+      if (!existing.classes.includes(driver.carClass)) {
+        existing.classes.push(driver.carClass);
+      }
+
+      for (const lap of driver.laps) {
+        if (!lap.lapTime || lap.lapTime <= 0) continue;
+        if (!existing.bestLapTime || lap.lapTime < existing.bestLapTime) {
+          existing.bestLapTime = lap.lapTime;
+          existing.bestS1 = lap.sector1;
+          existing.bestS2 = lap.sector2;
+          existing.bestS3 = lap.sector3;
+          existing.bestCar = driver.carType;
+          existing.bestCarClass = driver.carClass;
+        }
       }
     }
   }
@@ -336,8 +542,7 @@ export interface CarStats {
   carClass: CarClass;
   sessionCount: number;
   totalLaps: number;
-  bestLapTime: number | null;
-  bestTrack: string;
+  totalDistanceKm: number;
   tracks: string[];
 }
 
@@ -354,10 +559,7 @@ export function getCarStats(files: RaceFile[], driverNames: string | string[]): 
       if (existing) {
         existing.sessionCount++;
         existing.totalLaps += driver.totalLaps;
-        if (driver.bestLapTime && (!existing.bestLapTime || driver.bestLapTime < existing.bestLapTime)) {
-          existing.bestLapTime = driver.bestLapTime;
-          existing.bestTrack = file.trackVenue;
-        }
+        existing.totalDistanceKm += (driver.totalLaps * file.trackLength) / 1000;
         if (!existing.tracks.includes(file.trackVenue)) {
           existing.tracks.push(file.trackVenue);
         }
@@ -367,8 +569,7 @@ export function getCarStats(files: RaceFile[], driverNames: string | string[]): 
           carClass: driver.carClass,
           sessionCount: 1,
           totalLaps: driver.totalLaps,
-          bestLapTime: driver.bestLapTime,
-          bestTrack: file.trackVenue,
+          totalDistanceKm: (driver.totalLaps * file.trackLength) / 1000,
           tracks: [file.trackVenue],
         });
       }
@@ -521,4 +722,189 @@ export function getRaceResults(files: RaceFile[], driverNames: string | string[]
   }
 
   return results.sort((a, b) => b.file.timeString.localeCompare(a.file.timeString));
+}
+
+export interface TrackBest {
+  trackVenue: string;
+  totalLaps: number;
+  bestLapTime: number;
+  bestS1: number | null;
+  bestS2: number | null;
+  bestS3: number | null;
+  bestCar: string;
+  bestCarClass: CarClass;
+  theoreticalBest: number | null;
+  theoS1: number | null;
+  theoS2: number | null;
+  theoS3: number | null;
+}
+
+export interface RaceStats {
+  races: number;
+  wins: number;
+  podiums: number;
+  classWins: number;
+  classPodiums: number;
+  dnfs: number;
+  fastestLaps: number;
+  poles: number;
+}
+
+export interface DriverProfileStats {
+  driverName: string;
+  total: RaceStats;
+  online: RaceStats;
+  rated: RaceStats;
+  totalLaps: number;
+  totalDistanceKm: number;
+  totalSessions: number;
+  tracksVisited: number;
+  carsUsed: number;
+  trackBests: TrackBest[];
+}
+
+export function getDriverProfileStats(files: RaceFile[], driverNames: string | string[]): DriverProfileStats {
+  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+
+  const total: RaceStats = { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
+  const online: RaceStats = { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
+  const rated: RaceStats = { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
+  let totalLaps = 0;
+  let totalDistanceKm = 0;
+  let totalSessions = 0;
+  const tracks = new Set<string>();
+  const cars = new Set<string>();
+
+  const trackBestMap = new Map<string, { lapTime: number; s1: number | null; s2: number | null; s3: number | null; car: string; carClass: CarClass }>();
+  const trackLapsMap = new Map<string, number>();
+
+  for (const file of files) {
+    for (const session of file.sessions) {
+      const driver = session.drivers.find(d => names.includes(d.name));
+      if (!driver) continue;
+
+      totalSessions++;
+      totalLaps += driver.totalLaps;
+      totalDistanceKm += (driver.totalLaps * file.trackLength) / 1000;
+      tracks.add(file.trackVenue);
+      cars.add(driver.carType);
+      trackLapsMap.set(file.trackVenue, (trackLapsMap.get(file.trackVenue) ?? 0) + driver.totalLaps);
+
+      if (session.type === 'Race') {
+        const isOnline = file.setting === 'Multiplayer';
+        const isDnf = driver.finishStatus !== '' && driver.finishStatus !== 'Finished Normally'
+            && driver.finishStatus !== 'None';
+
+        // Fastest lap: check if this driver had the best lap in their class
+        const classDrivers = session.drivers.filter(d => d.carClass === driver.carClass);
+        const classBestLap = Math.min(...classDrivers.map(d => d.bestLapTime ?? Infinity));
+        const hasFastestLap = driver.bestLapTime !== null && driver.bestLapTime > 0
+          && Math.abs(driver.bestLapTime - classBestLap) < 0.001;
+
+        // Pole position: started P1 in class
+        const hasPole = driver.classGridPosition === 1;
+
+        total.races++;
+        if (driver.position === 1) total.wins++;
+        if (driver.position <= 3) total.podiums++;
+        if (driver.classPosition === 1) total.classWins++;
+        if (driver.classPosition <= 3) total.classPodiums++;
+        if (isDnf) total.dnfs++;
+        if (hasFastestLap) total.fastestLaps++;
+        if (hasPole) total.poles++;
+
+        if (isOnline) {
+          online.races++;
+          if (driver.position === 1) online.wins++;
+          if (driver.position <= 3) online.podiums++;
+          if (driver.classPosition === 1) online.classWins++;
+          if (driver.classPosition <= 3) online.classPodiums++;
+          if (isDnf) online.dnfs++;
+          if (hasFastestLap) online.fastestLaps++;
+          if (hasPole) online.poles++;
+        }
+
+        if (isRatedRace(file)) {
+          rated.races++;
+          if (driver.position === 1) rated.wins++;
+          if (driver.position <= 3) rated.podiums++;
+          if (driver.classPosition === 1) rated.classWins++;
+          if (driver.classPosition <= 3) rated.classPodiums++;
+          if (isDnf) rated.dnfs++;
+          if (hasFastestLap) rated.fastestLaps++;
+          if (hasPole) rated.poles++;
+        }
+      }
+
+      for (const lap of driver.laps) {
+        if (!lap.lapTime || lap.lapTime <= 0) continue;
+        const existing = trackBestMap.get(file.trackVenue);
+        if (!existing || lap.lapTime < existing.lapTime) {
+          trackBestMap.set(file.trackVenue, {
+            lapTime: lap.lapTime,
+            s1: lap.sector1,
+            s2: lap.sector2,
+            s3: lap.sector3,
+            car: driver.carType,
+            carClass: driver.carClass,
+          });
+        }
+      }
+    }
+  }
+
+  // Build theoretical bests in a single pass (instead of calling getTheoreticalBest per track)
+  const theoMap = new Map<string, { s1: number | null; s2: number | null; s3: number | null }>();
+  for (const file of files) {
+    for (const session of file.sessions) {
+      const driver = session.drivers.find(d => names.includes(d.name));
+      if (!driver) continue;
+      const best = trackBestMap.get(file.trackVenue);
+      if (!best || driver.carType !== best.car) continue;
+      const key = file.trackVenue;
+      let entry = theoMap.get(key);
+      if (!entry) { entry = { s1: null, s2: null, s3: null }; theoMap.set(key, entry); }
+      for (const lap of driver.laps) {
+        if (lap.sector1 !== null && (entry.s1 === null || lap.sector1 < entry.s1)) entry.s1 = lap.sector1;
+        if (lap.sector2 !== null && (entry.s2 === null || lap.sector2 < entry.s2)) entry.s2 = lap.sector2;
+        if (lap.sector3 !== null && (entry.s3 === null || lap.sector3 < entry.s3)) entry.s3 = lap.sector3;
+      }
+    }
+  }
+
+  // Build track bests with theoretical times
+  const trackBests: TrackBest[] = [];
+  for (const [trackVenue, best] of trackBestMap) {
+    const theo = theoMap.get(trackVenue);
+    const theoTotal = theo?.s1 != null && theo?.s2 != null && theo?.s3 != null
+      ? theo.s1 + theo.s2 + theo.s3 : null;
+    trackBests.push({
+      trackVenue,
+      totalLaps: trackLapsMap.get(trackVenue) ?? 0,
+      bestLapTime: best.lapTime,
+      bestS1: best.s1,
+      bestS2: best.s2,
+      bestS3: best.s3,
+      bestCar: best.car,
+      bestCarClass: best.carClass,
+      theoreticalBest: theoTotal,
+      theoS1: theo?.s1 ?? null,
+      theoS2: theo?.s2 ?? null,
+      theoS3: theo?.s3 ?? null,
+    });
+  }
+  trackBests.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
+
+  return {
+    driverName: names.join(', '),
+    total,
+    online,
+    rated,
+    totalLaps,
+    totalDistanceKm,
+    totalSessions,
+    tracksVisited: tracks.size,
+    carsUsed: cars.size,
+    trackBests,
+  };
 }

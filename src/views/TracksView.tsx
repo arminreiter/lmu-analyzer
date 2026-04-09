@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable } from '../components/SortableTable';
@@ -8,39 +8,44 @@ import type { RaceFile, PersonalBest } from '../lib/types';
 interface TracksViewProps {
   files: RaceFile[];
   driverNames: string[];
+  initialTrack?: string | null;
 }
 
-export function TracksView({ files, driverNames }: TracksViewProps) {
-  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+export const TracksView = memo(function TracksView({ files, driverNames, initialTrack }: TracksViewProps) {
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(initialTrack ?? null);
   const [showAll, setShowAll] = useState(false);
-  const tracks = getTrackStats(files, driverNames);
-  const bests = getPersonalBests(files, driverNames);
-  const allBests = getAllSessionBests(files, driverNames);
+  const tracks = useMemo(() => getTrackStats(files, driverNames), [files, driverNames]);
+  const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const allBests = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
 
   const track = selectedTrack ?? tracks[0]?.trackVenue;
-  const trackBests = (showAll ? allBests : bests).filter(b => b.trackVenue === track);
-  const trackSessions = getDriverSessions(files, driverNames).filter(s => s.file.trackVenue === track);
+  const trackBests = useMemo(() => (showAll ? allBests : bests).filter(b => b.trackVenue === track), [showAll, allBests, bests, track]);
+  const trackSessions = useMemo(() => allSessions.filter(s => s.file.trackVenue === track), [allSessions, track]);
 
   // Lap time progression over sessions for this track
-  const progressionData: Array<{ session: string; lapTime: number; car: string }> = [];
-  for (const { file, driver } of trackSessions) {
-    if (driver.bestLapTime && driver.bestLapTime > 0) {
-      progressionData.push({
-        session: file.timeString.slice(5, 16),
-        lapTime: driver.bestLapTime,
-        car: driver.carType,
-      });
+  const progressionData = useMemo(() => {
+    const data: Array<{ session: string; lapTime: number; car: string }> = [];
+    for (const { file, driver } of trackSessions) {
+      if (driver.bestLapTime && driver.bestLapTime > 0) {
+        data.push({
+          session: file.timeString.slice(5, 16),
+          lapTime: driver.bestLapTime,
+          car: driver.carType,
+        });
+      }
     }
-  }
+    return data;
+  }, [trackSessions]);
 
   // Top speed progression
-  const speedData = trackSessions.map(({ file, driver }) => {
+  const speedData = useMemo(() => trackSessions.map(({ file, driver }) => {
     const maxSpeed = Math.max(...driver.laps.map(l => l.topSpeed));
     return {
       session: file.timeString.slice(5, 16),
       topSpeed: maxSpeed > 0 ? maxSpeed : null,
     };
-  }).filter(d => d.topSpeed);
+  }).filter(d => d.topSpeed), [trackSessions]);
 
   return (
     <div className="space-y-6">
@@ -171,4 +176,4 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
       )}
     </div>
   );
-}
+});

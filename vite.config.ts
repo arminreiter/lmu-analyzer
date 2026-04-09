@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'LMU Analyzer',
         short_name: 'LMU Analyzer',
-        description: 'Analyze Le Mans Ultimate race data — sessions, personal bests, tracks, cars, and race results',
+        description: 'Analyze your Le Mans Ultimate race data — driver stats, best lap times, sector analysis, tire wear, fuel usage, race results and personal bests across all LMU car classes.',
         theme_color: '#0a0a0f',
         background_color: '#0a0a0f',
         display: 'standalone',
@@ -21,20 +21,20 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'pwa-192x192.svg',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
           {
-            src: 'pwa-512x512.svg',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
           {
-            src: 'pwa-512x512.svg',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

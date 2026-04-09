@@ -219,6 +219,7 @@ export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
     damageMult: getNum(root, 'DamageMult'),
     fuelMult: getNum(root, 'FuelMult'),
     tireMult: getNum(root, 'TireMult'),
+    freeSettings: getNum(root, 'FreeSettings'),
     vehiclesAllowed,
     sessions,
   };
