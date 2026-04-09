@@ -8,7 +8,10 @@ export function AboutView() {
       <div className="animate-in animate-in-1">
         <div className="data-card carbon-fiber overflow-hidden">
           <div className="px-6 py-5 border-b border-racing-border">
-            <h2 className="font-racing text-lg text-white tracking-wide">LMU Analyzer</h2>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-racing text-lg text-white tracking-wide">LMU Analyzer</h2>
+              <span className="text-racing-muted/50 text-[10px] font-mono">Build {new Date(__BUILD_TIME__).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date(__BUILD_TIME__).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
             <p className="text-racing-muted text-sm mt-1">Race data analysis for Le Mans Ultimate</p>
           </div>
           <div className="px-6 py-5 space-y-4 text-sm text-racing-text leading-relaxed">
