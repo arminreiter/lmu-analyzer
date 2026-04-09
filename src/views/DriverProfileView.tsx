@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo, memo } from 'react';
-import { Trophy, Flag, Route, Gauge, MapPin, Car, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
+import { Trophy, Flag, Route, Gauge, MapPin, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, formatSector, getDriverProfileStats, type TrackBest } from '../lib/analytics';
 import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar } from '../lib/storage';
 import type { RaceFile } from '../lib/types';
@@ -398,10 +399,10 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
 
       {/* Best Laps per Track */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-4">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center gap-2 checkered">
-          <Car className="w-3.5 h-3.5 text-racing-muted/50" />
+        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
           <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAP PER CIRCUIT</h3>
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{visibleTrackBests.length} tracks</span>
+          <ExportButton columns={trackColumns} data={visibleTrackBests} filename="lmu-driver-best-per-circuit" />
         </div>
         <SortableTable<TrackBest>
           columns={trackColumns}

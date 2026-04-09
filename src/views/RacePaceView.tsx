@@ -3,6 +3,7 @@ import { Loader2, ExternalLink } from 'lucide-react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getPersonalBests, formatDelta } from '../lib/analytics';
 import {
   fetchBenchmarks,
@@ -268,6 +269,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                 <span className={`inline-flex px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${getRatingColor(bestItem.rating)} ${getRatingBgColor(bestItem.rating)}`}>
                   Best: {bestItem.rating}
                 </span>
+                <ExportButton columns={columns} data={sorted} filename={`lmu-pace-${track.toLowerCase().replace(/\s+/g, '-')}`} />
               </div>
             </div>
             <SortableTable

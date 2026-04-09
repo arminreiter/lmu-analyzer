@@ -3,6 +3,7 @@ import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
 import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
 
@@ -143,6 +144,8 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           <div key={track} className="data-card carbon-fiber overflow-hidden">
             <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
               <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">{track.toUpperCase()}</h3>
+              <span className="ml-auto" />
+              <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track.toLowerCase().replace(/\s+/g, '-')}`} />
             </div>
             <SortableTable
               columns={columns}

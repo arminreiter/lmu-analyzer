@@ -1,6 +1,7 @@
 import { useState, useMemo, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
-import { SortableTable } from '../components/SortableTable';
+import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getCarStats, getPersonalBests, getAllSessionBests, getAllLaps } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
@@ -32,6 +33,32 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
 
   const lapSource = lapMode === 'all' ? allLaps : lapMode === 'session' ? bestPerSession : bestPerTrack;
   const carLaps = useMemo(() => lapSource.filter(b => b.carType === car), [lapSource, car]);
+
+  const lapColumns: Column<PersonalBest>[] = useMemo(() => [
+    { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackVenue,
+      render: r => <span className="text-white">{r.trackVenue}</span> },
+    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
+      render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
+    { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
+      render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
+    { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
+      render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
+    { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
+      render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
+    { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
+      render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)} km/h</span> },
+    { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
+      render: r => onNavigate
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+        : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
+    { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
+      render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
+  ], [onNavigate]);
+
+  const sortedCarLaps = useMemo(() =>
+    [...carLaps].sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime),
+    [carLaps]
+  );
 
   return (
     <div className="space-y-6">
@@ -96,7 +123,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
 
           {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between checkered">
               <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
                 {MODE_LABELS[lapMode]}
               </h3>
@@ -113,29 +140,11 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                   </button>
                 ))}
               </div>
+              <ExportButton columns={lapColumns} data={sortedCarLaps} filename={`lmu-car-${(car ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
             </div>
             <SortableTable<PersonalBest>
-              columns={[
-                { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackVenue,
-                  render: r => <span className="text-white">{r.trackVenue}</span> },
-                { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
-                  render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
-                { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
-                  render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
-                { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
-                  render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
-                { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
-                  render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
-                { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-                  render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)} km/h</span> },
-                { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-                  render: r => onNavigate
-                    ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
-                    : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
-                { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
-                  render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
-              ]}
-              data={carLaps.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime)}
+              columns={lapColumns}
+              data={sortedCarLaps}
               rowKey={(r, i) => `${r.trackVenue}-${r.fileName}-${r.lapNumber}-${i}`}
             />
           </div>

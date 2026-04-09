@@ -3,6 +3,7 @@ import { ArrowLeft, Info, Timer, BarChart3, AlertTriangle, Ban, ShieldAlert } fr
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, formatEventTime, isDriverIncident, CHART_TOOLTIP_STYLE } from '../lib/analytics';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
@@ -265,6 +266,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             {session.drivers.length} drivers
             {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
           </span>
+          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackVenue.toLowerCase().replace(/\s+/g, '-')}-${session.type.toLowerCase()}`} />
         </div>
         <SortableTable<DriverResult>
           columns={standingsColumns}
@@ -385,6 +387,7 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
       <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
         <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">LAP DETAILS</h3>
         <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{driver.laps.length} laps</span>
+        <ExportButton columns={columns} data={driver.laps} filename="lmu-lap-details" />
       </div>
       <SortableTable<LapData>
         columns={columns}
@@ -553,10 +556,12 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center">
+      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
         <h3 className="section-stripe font-racing text-xs font-bold text-racing-orange tracking-[0.1em]">
           INCIDENTS ({incidents.length})
         </h3>
+        <span className="ml-auto" />
+        <ExportButton columns={columns} data={incidents} filename="lmu-incidents" />
       </div>
       <SortableTable columns={columns} data={incidents} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-orange/[0.02]'} />
@@ -589,10 +594,12 @@ function PenaltiesTab({ penalties }: { penalties: SessionDetailViewProps['sessio
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center">
+      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
         <h3 className="section-stripe font-racing text-xs font-bold text-racing-red tracking-[0.1em]">
           PENALTIES ({penalties.length})
         </h3>
+        <span className="ml-auto" />
+        <ExportButton columns={columns} data={penalties} filename="lmu-penalties" />
       </div>
       <SortableTable columns={columns} data={penalties} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-red/[0.02]'} />
@@ -627,10 +634,12 @@ function TrackLimitsTab({ trackLimits }: { trackLimits: SessionDetailViewProps['
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center">
+      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
         <h3 className="section-stripe font-racing text-xs font-bold text-racing-yellow tracking-[0.1em]">
           TRACK LIMITS ({trackLimits.length})
         </h3>
+        <span className="ml-auto" />
+        <ExportButton columns={columns} data={trackLimits} filename="lmu-track-limits" />
       </div>
       <SortableTable columns={columns} data={trackLimits} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-yellow/[0.02]'} />

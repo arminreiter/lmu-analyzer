@@ -3,6 +3,7 @@ import { Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, CHART_TOOLTIP_STYLE, type RaceResult } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
@@ -156,8 +157,10 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
 
       {/* Race List */}
       <div className="data-card carbon-fiber overflow-hidden">
-        <div className="px-5 py-3 border-b border-racing-border">
+        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
           <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">RACE HISTORY</h3>
+          <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{results.length} races</span>
+          <ExportButton columns={raceColumns} data={results} filename="lmu-race-results" />
         </div>
         <SortableTable<RaceResult>
           columns={raceColumns}

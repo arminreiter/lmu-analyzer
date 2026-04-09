@@ -2,6 +2,7 @@ import { useMemo, useState, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getDriverSessions, isRatedRace } from '../lib/analytics';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
@@ -128,6 +129,11 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
       </div>
 
       <div className="data-card carbon-fiber overflow-hidden">
+        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
+          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">SESSION HISTORY</h3>
+          <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{filtered.length} sessions</span>
+          <ExportButton columns={columns} data={filtered} filename="lmu-sessions" />
+        </div>
         <SortableTable<SessionRow>
           columns={columns}
           data={filtered}

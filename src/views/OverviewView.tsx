@@ -3,6 +3,7 @@ import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route, ShieldAlert, Troph
 import { StatCard } from '../components/StatCard';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, formatSector, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
@@ -150,6 +151,7 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
           {onNavigate && (
             <button onClick={() => onNavigate('tracks')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
+          <ExportButton columns={trackColumns} data={tracks} filename="lmu-track-statistics" />
         </div>
         <SortableTable<TrackStats>
           columns={trackColumns}
@@ -167,6 +169,7 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
           {onNavigate && (
             <button onClick={() => onNavigate('cars')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
+          <ExportButton columns={carColumns} data={cars} filename="lmu-cars-used" />
         </div>
         <SortableTable<CarStats>
           columns={carColumns}

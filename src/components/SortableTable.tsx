@@ -8,6 +8,7 @@ export interface Column<T> {
   mono?: boolean;
   sortable?: boolean;
   sortValue?: (row: T) => number | string | null;
+  exportValue?: (row: T, index: number) => string | number | null;
   render: (row: T, index: number) => ReactNode;
   headerClass?: string;
   width?: string; // e.g. '40px', '15%', '8rem'

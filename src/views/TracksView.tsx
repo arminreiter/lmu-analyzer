@@ -1,7 +1,8 @@
 import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
-import { SortableTable } from '../components/SortableTable';
+import { SortableTable, type Column } from '../components/SortableTable';
+import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, CHART_TOOLTIP_STYLE } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
@@ -51,6 +52,33 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
   }, [trackSessions]);
 
   // Top speed progression
+  const lapColumns: Column<PersonalBest>[] = useMemo(() => [
+    { key: 'pos', label: '#', width: '35px', sortValue: r => r.lapTime,
+      render: (_, i) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
+    { key: 'car', label: 'Car', width: '18%', sortValue: r => r.carType,
+      render: r => <span className="text-white">{r.carType}</span> },
+    { key: 'class', label: 'Class', width: '70px', sortValue: r => r.carClass,
+      render: r => <ClassBadge carClass={r.carClass} /> },
+    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
+      render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
+    { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
+      render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
+    { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
+      render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
+    { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
+      render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
+    { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
+      render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
+    { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
+      render: r => onNavigate
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+        : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
+    { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
+      render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
+  ], [onNavigate]);
+
+  const sortedTrackLaps = useMemo(() => [...trackLaps].sort((a, b) => a.lapTime - b.lapTime), [trackLaps]);
+
   const speedData = useMemo(() => trackSessions.map(({ file, driver }) => {
     const maxSpeed = Math.max(...driver.laps.map(l => l.topSpeed));
     return {
@@ -123,7 +151,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
 
           {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between checkered">
               <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
                 {MODE_LABELS[lapMode]}
               </h3>
@@ -140,33 +168,11 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   </button>
                 ))}
               </div>
+              <ExportButton columns={lapColumns} data={sortedTrackLaps} filename={`lmu-track-${(track ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
             </div>
             <SortableTable<PersonalBest>
-              columns={[
-                { key: 'pos', label: '#', width: '35px', sortValue: r => r.lapTime,
-                  render: (_, i) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
-                { key: 'car', label: 'Car', width: '18%', sortValue: r => r.carType,
-                  render: r => <span className="text-white">{r.carType}</span> },
-                { key: 'class', label: 'Class', width: '70px', sortValue: r => r.carClass,
-                  render: r => <ClassBadge carClass={r.carClass} /> },
-                { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
-                  render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
-                { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
-                  render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
-                { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
-                  render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
-                { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
-                  render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
-                { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-                  render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
-                { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-                  render: r => onNavigate
-                    ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
-                    : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
-                { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
-                  render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
-              ]}
-              data={trackLaps.sort((a, b) => a.lapTime - b.lapTime)}
+              columns={lapColumns}
+              data={sortedTrackLaps}
               rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
             />
           </div>
