@@ -11,6 +11,7 @@ export interface Column<T> {
   exportValue?: (row: T, index: number) => string | number | null;
   render: (row: T, index: number) => ReactNode;
   headerClass?: string;
+  cellClass?: string; // extra classes for th/td (e.g. override padding)
   width?: string; // e.g. '40px', '15%', '8rem'
 }
 
@@ -79,7 +80,7 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, 
               return (
                 <th
                   key={col.key}
-                  className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}
+                  className={`${col.cellClass ?? 'px-4'} py-2.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}
                     ${col.mono ? 'font-mono' : ''} ${col.headerClass ?? ''}
                     ${canSort ? 'cursor-pointer select-none hover:text-racing-text transition-colors group' : ''}`}
                   onClick={canSort ? () => handleSort(col.key) : undefined}
@@ -112,7 +113,7 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, 
               {columns.map(col => (
                 <td
                   key={col.key}
-                  className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}
+                  className={`${col.cellClass ?? 'px-4'} py-2 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}
                     ${col.mono ? 'font-mono' : ''} ${!col.align || col.align === 'left' ? 'truncate' : ''}`}
                 >
                   {col.render(row, i)}

@@ -125,13 +125,13 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   type ComparisonRow = typeof filtered[number];
 
   const columns: Column<ComparisonRow>[] = [
-    { key: 'car', label: 'Car', width: '12%',
+    { key: 'car', label: 'Car', width: '14%', cellClass: 'pl-4 pr-1',
       sortValue: r => r.best.carType,
       render: r => <span className="text-white text-xs">{r.best.carType}</span> },
-    { key: 'class', label: 'Class', width: '60px',
+    { key: 'class', label: 'Class', width: '4%', cellClass: 'px-0',
       sortValue: r => r.best.carClass,
       render: r => <ClassBadge carClass={r.best.carClass} /> },
-    { key: 'lapTime', label: 'Your Best', align: 'right', mono: true, width: '9%',
+    { key: 'lapTime', label: 'Your Best', align: 'right', mono: true, width: '8%',
       sortValue: r => r.best.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.best.lapTime)}</span> },
     { key: 'rating', label: 'Rating', width: '10%',
@@ -145,7 +145,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
         </span>
       ),
     },
-    { key: 'target', label: 'Next Target', align: 'right', mono: true, width: '9%',
+    { key: 'target', label: 'Next Target', width: '13%',
       sortValue: r => {
         const t = getNextTarget(r.best.lapTime, r.rating, r.benchmark);
         return t ? t.time : 0;
@@ -154,9 +154,9 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
         const t = getNextTarget(r.best.lapTime, r.rating, r.benchmark);
         if (!t) return <span className="text-racing-purple text-xs">--</span>;
         return (
-          <span className="text-racing-muted">
-            {formatLapTime(t.time)}
-            <span className="text-racing-muted/50 text-[10px] ml-1">({t.label.replace('Above ', '')})</span>
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-racing-muted font-mono">{formatLapTime(t.time)}</span>
+            <span className="text-racing-muted/50 text-[10px]">({t.label.replace('Above ', '')})</span>
           </span>
         );
       },
@@ -193,7 +193,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
       render: r => onNavigate
         ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.best.fileName}::${r.best.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.best.sessionType} L{r.best.lapNumber}</button>
         : <span className="text-racing-muted text-xs">{r.best.sessionType} L{r.best.lapNumber}</span> },
-    { key: 'date', label: 'Date', width: '10%',
+    { key: 'date', label: 'Date', width: '13%',
       sortValue: r => r.best.date,
       render: r => <span className="text-racing-muted/60 text-xs">{r.best.date}</span> },
   ];
