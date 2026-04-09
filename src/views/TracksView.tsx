@@ -2,8 +2,16 @@ import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable } from '../components/SortableTable';
-import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getDriverSessions, CHART_TOOLTIP_STYLE } from '../lib/analytics';
+import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, CHART_TOOLTIP_STYLE } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
+
+type LapMode = 'car' | 'session' | 'all';
+
+const MODE_LABELS: Record<LapMode, string> = {
+  car: 'BEST LAP PER CAR',
+  session: 'BEST LAP PER SESSION',
+  all: 'ALL LAPS',
+};
 
 interface TracksViewProps {
   files: RaceFile[];
@@ -14,14 +22,17 @@ interface TracksViewProps {
 
 export const TracksView = memo(function TracksView({ files, driverNames, initialTrack, onNavigate }: TracksViewProps) {
   const [selectedTrack, setSelectedTrack] = useState<string | null>(initialTrack ?? null);
-  const [showAll, setShowAll] = useState(false);
+  const [lapMode, setLapMode] = useState<LapMode>('car');
   const tracks = useMemo(() => getTrackStats(files, driverNames), [files, driverNames]);
-  const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
-  const allBests = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const bestPerCar = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const allLaps = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
   const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
 
   const track = selectedTrack ?? tracks[0]?.trackVenue;
-  const trackBests = useMemo(() => (showAll ? allBests : bests).filter(b => b.trackVenue === track), [showAll, allBests, bests, track]);
+
+  const lapSource = lapMode === 'all' ? allLaps : lapMode === 'session' ? bestPerSession : bestPerCar;
+  const trackLaps = useMemo(() => lapSource.filter(b => b.trackVenue === track), [lapSource, track]);
   const trackSessions = useMemo(() => allSessions.filter(s => s.file.trackVenue === track), [allSessions, track]);
 
   // Lap time progression over sessions for this track
@@ -71,39 +82,63 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
           {/* Track Stats */}
           <div className="data-card carbon-fiber p-6">
             <h2 className="font-racing text-xl font-bold text-white tracking-wider mb-4">{track}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Sessions</p>
-                <p className="text-white text-lg font-bold">{trackSessions.length}</p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Total Laps</p>
-                <p className="text-white text-lg font-bold">
-                  {trackSessions.reduce((sum, s) => sum + s.driver.totalLaps, 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Best Lap</p>
-                <p className="text-white text-lg font-bold font-mono">
-                  {formatLapTime(trackBests[0]?.lapTime ?? null)}
-                </p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Track Length</p>
-                <p className="text-white text-lg font-bold">
-                  {((files.find(f => f.trackVenue === track)?.trackLength ?? 0) / 1000).toFixed(2)} km
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const totalLaps = trackSessions.reduce((sum, s) => sum + s.driver.totalLaps, 0);
+              const validLaps = trackSessions.reduce((sum, s) => sum + s.driver.laps.filter(l => l.lapTime && l.lapTime > 0).length, 0);
+              const invalidLaps = totalLaps - validLaps;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Sessions</p>
+                    <p className="text-white text-lg font-bold">{trackSessions.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Total Laps</p>
+                    <p className="text-white text-lg font-bold">{totalLaps}</p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Valid / Invalid</p>
+                    <p className="text-lg font-bold">
+                      <span className="text-racing-green">{validLaps}</span>
+                      <span className="text-racing-muted mx-1">/</span>
+                      <span className={invalidLaps > 0 ? 'text-racing-muted' : 'text-racing-green'}>{invalidLaps}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Best Lap</p>
+                    <p className="text-white text-lg font-bold font-mono">
+                      {formatLapTime(trackLaps[0]?.lapTime ?? null)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Track Length</p>
+                    <p className="text-white text-lg font-bold">
+                      {((files.find(f => f.trackVenue === track)?.trackLength ?? 0) / 1000).toFixed(2)} km
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
-          {/* Personal Bests at this track */}
+          {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
             <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAPS BY CAR</h3>
+              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
+                {MODE_LABELS[lapMode]}
+              </h3>
+              <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{trackLaps.length} laps</span>
               <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
-                <button onClick={() => setShowAll(false)} className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>Best</button>
-                <button onClick={() => setShowAll(true)} className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>All</button>
+                {(['car', 'session', 'all'] as LapMode[]).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setLapMode(mode)}
+                    className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
+                      ${lapMode === mode ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+                  >
+                    {mode === 'car' ? 'Per Car' : mode === 'session' ? 'Per Session' : 'All Laps'}
+                  </button>
+                ))}
               </div>
             </div>
             <SortableTable<PersonalBest>
@@ -131,7 +166,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                 { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
                   render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
               ]}
-              data={trackBests.sort((a, b) => a.lapTime - b.lapTime)}
+              data={trackLaps.sort((a, b) => a.lapTime - b.lapTime)}
               rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
             />
           </div>

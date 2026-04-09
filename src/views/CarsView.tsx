@@ -1,8 +1,16 @@
 import { useState, useMemo, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable } from '../components/SortableTable';
-import { formatLapTime, getCarStats, getPersonalBests, getAllSessionBests } from '../lib/analytics';
+import { formatLapTime, getCarStats, getPersonalBests, getAllSessionBests, getAllLaps } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
+
+type LapMode = 'track' | 'session' | 'all';
+
+const MODE_LABELS: Record<LapMode, string> = {
+  track: 'BEST LAP PER TRACK',
+  session: 'BEST LAP PER SESSION',
+  all: 'ALL LAPS',
+};
 
 interface CarsViewProps {
   files: RaceFile[];
@@ -13,14 +21,17 @@ interface CarsViewProps {
 
 export const CarsView = memo(function CarsView({ files, driverNames, initialCar, onNavigate }: CarsViewProps) {
   const [selectedCar, setSelectedCar] = useState<string | null>(initialCar ?? null);
-  const [showAll, setShowAll] = useState(false);
+  const [lapMode, setLapMode] = useState<LapMode>('track');
   const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
-  const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
-  const allBests = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const bestPerTrack = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const allLaps = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
 
   const car = selectedCar ?? cars[0]?.carType;
   const carInfo = cars.find(c => c.carType === car);
-  const carBests = useMemo(() => (showAll ? allBests : bests).filter(b => b.carType === car), [showAll, allBests, bests, car]);
+
+  const lapSource = lapMode === 'all' ? allLaps : lapMode === 'session' ? bestPerSession : bestPerTrack;
+  const carLaps = useMemo(() => lapSource.filter(b => b.carType === car), [lapSource, car]);
 
   return (
     <div className="space-y-6">
@@ -49,33 +60,58 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
               <h2 className="font-racing text-xl font-bold text-white tracking-wider">{car}</h2>
               <ClassBadge carClass={carInfo.carClass} />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Sessions</p>
-                <p className="text-white text-lg font-bold">{carInfo.sessionCount}</p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Total Laps</p>
-                <p className="text-white text-lg font-bold">{carInfo.totalLaps}</p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Distance</p>
-                <p className="text-white text-lg font-bold font-mono">{Math.round(carInfo.totalDistanceKm).toLocaleString()} km</p>
-              </div>
-              <div>
-                <p className="text-racing-muted text-xs uppercase">Tracks</p>
-                <p className="text-white text-lg font-bold">{carInfo.tracks.length}</p>
-              </div>
-            </div>
+            {(() => {
+              const validLaps = allLaps.filter(l => l.carType === car).length;
+              const invalidLaps = carInfo.totalLaps - validLaps;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Sessions</p>
+                    <p className="text-white text-lg font-bold">{carInfo.sessionCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Total Laps</p>
+                    <p className="text-white text-lg font-bold">{carInfo.totalLaps}</p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Valid / Invalid</p>
+                    <p className="text-lg font-bold">
+                      <span className="text-racing-green">{validLaps}</span>
+                      <span className="text-racing-muted mx-1">/</span>
+                      <span className={invalidLaps > 0 ? 'text-racing-muted' : 'text-racing-green'}>{invalidLaps}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Distance</p>
+                    <p className="text-white text-lg font-bold font-mono">{Math.round(carInfo.totalDistanceKm).toLocaleString()} km</p>
+                  </div>
+                  <div>
+                    <p className="text-racing-muted text-xs uppercase">Tracks</p>
+                    <p className="text-white text-lg font-bold">{carInfo.tracks.length}</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
-          {/* Best by Track */}
+          {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
             <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAPS BY TRACK</h3>
+              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
+                {MODE_LABELS[lapMode]}
+              </h3>
+              <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{carLaps.length} laps</span>
               <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
-                <button onClick={() => setShowAll(false)} className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>Best</button>
-                <button onClick={() => setShowAll(true)} className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>All</button>
+                {(['track', 'session', 'all'] as LapMode[]).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setLapMode(mode)}
+                    className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
+                      ${lapMode === mode ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+                  >
+                    {mode === 'track' ? 'Per Track' : mode === 'session' ? 'Per Session' : 'All Laps'}
+                  </button>
+                ))}
               </div>
             </div>
             <SortableTable<PersonalBest>
@@ -99,8 +135,8 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                 { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
                   render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
               ]}
-              data={carBests.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue))}
-              rowKey={r => `${r.trackVenue}-${r.fileName}-${r.lapNumber}`}
+              data={carLaps.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime)}
+              rowKey={(r, i) => `${r.trackVenue}-${r.fileName}-${r.lapNumber}-${i}`}
             />
           </div>
         </>

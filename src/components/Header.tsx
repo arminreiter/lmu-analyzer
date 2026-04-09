@@ -1,4 +1,4 @@
-import { FolderOpen, User, Layers, RefreshCw } from 'lucide-react';
+import { FolderOpen, User, Layers, RefreshCw, Gauge } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
 import { getClassColor } from '../lib/analytics';
@@ -15,6 +15,8 @@ interface HeaderProps {
   refreshing?: boolean;
   activeView: string;
   onViewChange: (view: string) => void;
+  racePaceEnabled: boolean;
+  onToggleRacePace: () => void;
 }
 
 const VIEWS = [
@@ -25,10 +27,12 @@ const VIEWS = [
   { id: 'cars', label: 'Cars' },
   { id: 'races', label: 'Race Results' },
   { id: 'profile', label: 'Driver Profile' },
+  { id: 'separator', label: '' },
+  { id: 'benchmarks', label: 'Benchmark Times' },
   { id: 'about', label: 'About' },
 ];
 
-export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace }: HeaderProps) {
   const driverOptions = drivers.map(d => ({
     value: d.name,
     label: d.name,
@@ -77,6 +81,14 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
               icon={<User className="w-3.5 h-3.5 text-racing-muted" />}
             />
 
+            <button
+              onClick={onToggleRacePace}
+              className={`p-2 transition-colors cursor-pointer ${racePaceEnabled ? 'text-racing-green' : 'text-racing-muted/50 hover:text-racing-green'}`}
+              title={racePaceEnabled ? 'Disable benchmark times' : 'Enable benchmark times (ohne_speed)'}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+            </button>
+
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -99,19 +111,26 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
         </div>
 
         <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
-          {VIEWS.map(v => (
-            <button
-              key={v.id}
-              onClick={() => onViewChange(v.id)}
-              className={`nav-tab relative px-5 py-2.5 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer
-                ${activeView === v.id
-                  ? 'nav-tab-active text-white font-semibold'
-                  : 'text-racing-muted hover:text-racing-text hover:bg-white/[0.02]'
-                }`}
-            >
-              {v.label}
-            </button>
-          ))}
+          {VIEWS.map(v => {
+            if (v.id === 'separator') {
+              if (!racePaceEnabled) return null;
+              return <div key="sep" className="w-px bg-racing-border/50 mx-1 my-1.5 self-stretch" />;
+            }
+            if (v.id === 'benchmarks' && !racePaceEnabled) return null;
+            return (
+              <button
+                key={v.id}
+                onClick={() => onViewChange(v.id)}
+                className={`nav-tab relative px-5 py-2.5 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer
+                  ${activeView === v.id
+                    ? 'nav-tab-active text-white font-semibold'
+                    : 'text-racing-muted hover:text-racing-text hover:bg-white/[0.02]'
+                  }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
     </header>

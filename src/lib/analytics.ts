@@ -466,6 +466,41 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
   return results;
 }
 
+export function getAllLaps(files: RaceFile[], driverNames: string | string[]): PersonalBest[] {
+  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const results: PersonalBest[] = [];
+
+  for (const file of files) {
+    for (const session of file.sessions) {
+      const drivers = session.drivers.filter(d => names.includes(d.name));
+      for (const driver of drivers) {
+        for (const lap of driver.laps) {
+          if (!lap.lapTime || lap.lapTime <= 0) continue;
+          results.push({
+            lapTime: lap.lapTime,
+            sector1: lap.sector1,
+            sector2: lap.sector2,
+            sector3: lap.sector3,
+            topSpeed: lap.topSpeed,
+            trackVenue: file.trackVenue,
+            carType: driver.carType,
+            carClass: driver.carClass,
+            sessionType: session.type,
+            sessionIndex: session.sessionIndex,
+            date: file.timeString,
+            fileName: file.fileName,
+            lapNumber: lap.num,
+            driverName: driver.name,
+          });
+        }
+      }
+    }
+  }
+
+  results.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime);
+  return results;
+}
+
 export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackVenue: string, carType: string): {
   s1: number | null; s2: number | null; s3: number | null; total: number | null;
 } {

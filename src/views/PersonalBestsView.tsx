@@ -3,8 +3,10 @@ import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getPersonalBests, getAllSessionBests, getTheoreticalBest } from '../lib/analytics';
+import { formatLapTime, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
 import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
+
+type LapMode = 'car' | 'session' | 'all';
 
 interface PersonalBestsViewProps {
   files: RaceFile[];
@@ -16,11 +18,12 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const [filterClass, setFilterClass] = useState<CarClass | 'All'>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [lapMode, setLapMode] = useState<LapMode>('car');
 
-  const bestOnly = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
-  const allSessions = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
-  const allBests = showAll ? allSessions : bestOnly;
+  const bestPerCar = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
+  const everyLap = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
+  const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
   const classes = Array.from(new Set(allBests.map(b => b.carClass)));
   const tracks = Array.from(new Set(allBests.map(b => b.trackVenue))).sort();
 
@@ -52,14 +55,16 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           <SearchableSelect value={filterTrack} options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(t => ({ value: t, label: t }))]} onChange={setFilterTrack} />
         </div>
         <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
-          <button
-            onClick={() => setShowAll(false)}
-            className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-          >Best per Car</button>
-          <button
-            onClick={() => setShowAll(true)}
-            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-          >All Sessions</button>
+          {(['car', 'session', 'all'] as LapMode[]).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setLapMode(mode)}
+              className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
+                ${lapMode === mode ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+            >
+              {mode === 'car' ? 'Per Car' : mode === 'session' ? 'Per Session' : 'All Laps'}
+            </button>
+          ))}
         </div>
         <button onClick={() => setShowTheoretical(!showTheoretical)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
@@ -142,7 +147,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             <SortableTable
               columns={columns}
               data={defaultSorted}
-              rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
+              rowKey={(r, i) => `${r.carType}-${r.fileName}-${r.lapNumber}-${i}`}
               rowClass={r => r.lapTime === fastestLap ? 'bg-racing-gold/[0.03]' : ''}
               stickyRows={<>{theoreticalRows}</>}
             />
