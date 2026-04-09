@@ -157,20 +157,24 @@ function OverviewTab({ file, session, driver, stats, standings }: {
   const driverIdx = standings.findIndex(d => d.name === driver.name);
 
   const standingsColumns: Column<DriverResult>[] = useMemo(() => [
-    { key: 'pos', label: 'Pos', width: '45px', sortValue: r => session.type === 'Race' ? r.position : (r.bestLapTime ?? Infinity),
-      render: (_, i) => <span className={`font-bold ${i === 0 ? 'text-racing-gold' : i <= 2 ? 'text-racing-orange' : 'text-racing-muted'}`}>{i + 1}</span> },
-    { key: 'name', label: 'Driver', sortValue: r => r.name,
-      render: r => <span className={r.name === driver.name ? 'text-racing-green font-bold' : 'text-white'}>{r.name}</span> },
-    { key: 'car', label: 'Car', sortValue: r => r.carType,
-      render: r => <div className="flex items-center gap-1.5"><span className="text-racing-muted text-xs">{r.carType}</span><ClassBadge carClass={r.carClass} /></div> },
-    { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '95px', sortValue: r => r.bestLapTime ?? Infinity,
+    { key: 'pos', label: 'Pos', width: '50px', sortValue: r => session.type === 'Race' ? r.position : (r.bestLapTime ?? Infinity),
+      render: (_r: DriverResult, i: number) => <span className={`font-bold ${i === 0 ? 'text-racing-gold' : i <= 2 ? 'text-racing-orange' : 'text-racing-muted'}`}>{i + 1}</span> },
+    { key: 'name', label: 'Driver', width: '15%', sortValue: r => r.name,
+      render: r => <span className={`truncate block ${r.name === driver.name ? 'text-racing-green font-bold' : 'text-white'}`}>{r.name}</span> },
+    { key: 'car', label: 'Car', width: '15%', sortValue: r => r.carType,
+      render: r => <div className="flex items-center gap-1.5 truncate"><span className="text-racing-muted text-xs truncate">{r.carType}</span><ClassBadge carClass={r.carClass} /></div> },
+    { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px', sortValue: r => r.bestLapTime ?? Infinity,
       render: r => <span className="text-racing-green">{formatLapTime(r.bestLapTime)}</span> },
-    { key: 'laps', label: 'Laps', align: 'right', width: '50px', sortValue: r => r.totalLaps,
+    { key: 'laps', label: 'Laps', align: 'right', width: '55px', sortValue: r => r.totalLaps,
       render: r => <span className="text-racing-muted">{r.totalLaps}</span> },
     ...(session.type === 'Race' ? [
-      { key: 'pits', label: 'Pits', align: 'right' as const, width: '45px', sortValue: (r: DriverResult) => r.pitstops,
+      { key: 'time', label: 'Total Time', align: 'right' as const, mono: true, width: '120px', sortValue: (r: DriverResult) => r.finishTime ?? Infinity,
+        render: (r: DriverResult) => <span className="text-racing-muted">{r.finishTime ? formatEventTime(r.finishTime) : '--'}</span> },
+      { key: 'pits', label: 'Pits', align: 'right' as const, width: '50px', sortValue: (r: DriverResult) => r.pitstops,
         render: (r: DriverResult) => <span className="text-racing-muted">{r.pitstops}</span> },
-      { key: 'status', label: 'Status', width: '100px', sortValue: (r: DriverResult) => r.finishStatus,
+      { key: 'strategy', label: 'Strategy', width: '180px', sortValue: (r: DriverResult) => r.pitstops,
+        render: (r: DriverResult) => <TireStrategy laps={r.laps} /> },
+      { key: 'status', label: 'Status', width: '120px', sortValue: (r: DriverResult) => r.finishStatus,
         render: (r: DriverResult) => <span className={`text-xs ${r.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
     ] : []),
   ], [session.type, driver.name]);
@@ -269,6 +273,53 @@ function OverviewTab({ file, session, driver, stats, standings }: {
           rowClass={r => r.name === driver.name ? 'bg-racing-green/[0.06]' : ''}
         />
       </div>
+    </div>
+  );
+}
+
+const COMPOUND_STYLE: Record<string, { label: string; bg: string; text: string }> = {
+  Soft: { label: 'S', bg: 'bg-red-600', text: 'text-white' },
+  Medium: { label: 'M', bg: 'bg-yellow-500', text: 'text-black' },
+  Hard: { label: 'H', bg: 'bg-white', text: 'text-black' },
+  Wet: { label: 'W', bg: 'bg-blue-500', text: 'text-white' },
+  Inter: { label: 'I', bg: 'bg-green-500', text: 'text-black' },
+  Intermediate: { label: 'I', bg: 'bg-green-500', text: 'text-black' },
+};
+
+function TireStrategy({ laps }: { laps: LapData[] }) {
+  if (!laps.length) return <span className="text-racing-muted">--</span>;
+
+  const stints: { compound: string; startLap: number; endLap: number }[] = [];
+  let current = laps[0].frontCompound || 'N/A';
+  let start = 1;
+
+  for (let i = 1; i < laps.length; i++) {
+    const c = laps[i].frontCompound || 'N/A';
+    if (c !== current && c !== 'N/A') {
+      stints.push({ compound: current, startLap: start, endLap: i });
+      current = c;
+      start = i + 1;
+    }
+  }
+  stints.push({ compound: current, startLap: start, endLap: laps.length });
+
+  if (stints.length === 1 && stints[0].compound === 'N/A') {
+    return <span className="text-racing-muted">--</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {stints.map((stint, i) => {
+        const style = COMPOUND_STYLE[stint.compound] ?? { label: stint.compound[0] ?? '?', bg: 'bg-racing-muted/30', text: 'text-white' };
+        return (
+          <div key={i} className="flex items-center gap-0.5">
+            {i > 0 && <span className="text-racing-muted/40 text-[9px] font-mono">{stint.startLap}</span>}
+            <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${style.bg} ${style.text}`} title={`${stint.compound} (L${stint.startLap}–${stint.endLap})`}>
+              {style.label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

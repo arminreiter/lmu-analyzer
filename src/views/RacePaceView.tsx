@@ -124,7 +124,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   type ComparisonRow = typeof filtered[number];
 
   const columns: Column<ComparisonRow>[] = [
-    { key: 'car', label: 'Car', width: '16%',
+    { key: 'car', label: 'Car', width: '12%',
       sortValue: r => r.best.carType,
       render: r => <span className="text-white text-xs">{r.best.carType}</span> },
     { key: 'class', label: 'Class', width: '60px',

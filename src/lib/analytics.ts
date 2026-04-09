@@ -193,8 +193,9 @@ export function formatEventTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  const ms = String(Math.floor((seconds % 1) * 1000)).padStart(3, '0');
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+  return `${m}:${String(s).padStart(2, '0')}.${ms}`;
 }
 
 export const CHART_TOOLTIP_STYLE = {
