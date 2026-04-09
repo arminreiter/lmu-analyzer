@@ -29,7 +29,7 @@ export interface PaceBenchmark {
   fastestLapTime: number;
 }
 
-export type PaceRating = 'Above Alien' | 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
+export type PaceRating = 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
 
 // ---------------------------------------------------------------------------
 // Spreadsheet class → app CarClass mapping
@@ -249,12 +249,11 @@ export function rateLapTime(lapTime: number, benchmark: PaceBenchmark): { rating
   const percent = (lapTime / racePace.alien) * 100;
 
   let rating: PaceRating;
-  if (lapTime <= racePace.alien) rating = 'Above Alien';
-  else if (lapTime <= racePace.competitive) rating = 'Alien';
-  else if (lapTime <= racePace.good) rating = 'Competitive';
-  else if (lapTime <= racePace.midpack) rating = 'Good';
-  else if (lapTime <= racePace.tailEnder) rating = 'Midpack';
-  else if (lapTime <= racePace.offline) rating = 'Tail-ender';
+  if (lapTime <= racePace.alien) rating = 'Alien';
+  else if (lapTime <= racePace.competitive) rating = 'Competitive';
+  else if (lapTime <= racePace.good) rating = 'Good';
+  else if (lapTime <= racePace.midpack) rating = 'Midpack';
+  else if (lapTime <= racePace.tailEnder) rating = 'Tail-ender';
   else rating = 'Offline';
 
   return { rating, delta: lapTime - racePace.alien, percent };
@@ -264,31 +263,21 @@ export function rateLapTime(lapTime: number, benchmark: PaceBenchmark): { rating
 export function getNextTarget(lapTime: number, rating: PaceRating, benchmark: PaceBenchmark): { label: PaceRating; time: number; gap: number } | null {
   const { racePace } = benchmark;
   // Map each rating to the tier boundary the user needs to beat to reach it
-  const targets: Array<{ label: PaceRating; time: number }> = [
-    { label: 'Alien', time: racePace.competitive },        // beat competitive to become Alien
-    { label: 'Competitive', time: racePace.good },          // beat good to become Competitive
-    { label: 'Good', time: racePace.midpack },              // beat midpack to become Good
-    { label: 'Midpack', time: racePace.tailEnder },         // beat tail-ender to become Midpack
-    { label: 'Tail-ender', time: racePace.offline },        // beat offline to become Tail-ender
-  ];
-
   switch (rating) {
-    case 'Above Alien': return null; // already at the top
-    case 'Alien': return { label: 'Above Alien', time: racePace.alien, gap: lapTime - racePace.alien };
-    case 'Competitive': return { ...targets[0], gap: lapTime - targets[0].time };
-    case 'Good': return { ...targets[1], gap: lapTime - targets[1].time };
-    case 'Midpack': return { ...targets[2], gap: lapTime - targets[2].time };
-    case 'Tail-ender': return { ...targets[3], gap: lapTime - targets[3].time };
-    case 'Offline': return { ...targets[4], gap: lapTime - targets[4].time };
+    case 'Alien': return null; // already at the top
+    case 'Competitive': return { label: 'Alien', time: racePace.alien, gap: lapTime - racePace.alien };
+    case 'Good': return { label: 'Competitive', time: racePace.competitive, gap: lapTime - racePace.competitive };
+    case 'Midpack': return { label: 'Good', time: racePace.good, gap: lapTime - racePace.good };
+    case 'Tail-ender': return { label: 'Midpack', time: racePace.midpack, gap: lapTime - racePace.midpack };
+    case 'Offline': return { label: 'Tail-ender', time: racePace.tailEnder, gap: lapTime - racePace.tailEnder };
   }
 }
 
 export function getRatingColor(rating: PaceRating): string {
   switch (rating) {
-    case 'Above Alien': return 'text-racing-purple';
-    case 'Alien': return 'text-racing-green';
-    case 'Competitive': return 'text-racing-green/80';
-    case 'Good': return 'text-white';
+    case 'Alien': return 'text-racing-purple';
+    case 'Competitive': return 'text-racing-green';
+    case 'Good': return 'text-racing-green/80';
     case 'Midpack': return 'text-racing-yellow';
     case 'Tail-ender': return 'text-racing-orange';
     case 'Offline': return 'text-racing-red';
@@ -297,13 +286,12 @@ export function getRatingColor(rating: PaceRating): string {
 
 export function getRatingBgColor(rating: PaceRating): string {
   switch (rating) {
-    case 'Above Alien': return 'bg-racing-purple/15 border-racing-purple/30';
-    case 'Alien': return 'bg-racing-green/15 border-racing-green/30';
-    case 'Competitive': return 'bg-racing-green/10 border-racing-green/20';
-    case 'Good': return 'bg-white/5 border-white/10';
-    case 'Midpack': return 'bg-racing-yellow/10 border-racing-yellow/20';
-    case 'Tail-ender': return 'bg-racing-orange/10 border-racing-orange/20';
-    case 'Offline': return 'bg-racing-red/10 border-racing-red/20';
+    case 'Alien': return 'bg-racing-purple/15 border-racing-purple/30';
+    case 'Competitive': return 'bg-racing-green/15 border-racing-green/30';
+    case 'Good': return 'bg-racing-green/10 border-racing-green/20';
+    case 'Midpack': return 'bg-white/5 border-white/10';
+    case 'Tail-ender': return 'bg-racing-yellow/10 border-racing-yellow/20';
+    case 'Offline': return 'bg-racing-orange/10 border-racing-orange/20';
   }
 }
 

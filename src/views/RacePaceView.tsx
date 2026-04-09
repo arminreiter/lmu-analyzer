@@ -136,7 +136,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
       render: r => <span className="text-white font-bold">{formatLapTime(r.best.lapTime)}</span> },
     { key: 'rating', label: 'Rating', width: '10%',
       sortValue: r => {
-        const order: Record<PaceRating, number> = { 'Above Alien': 0, 'Alien': 1, 'Competitive': 2, 'Good': 3, 'Midpack': 4, 'Tail-ender': 5, 'Offline': 6 };
+        const order: Record<PaceRating, number> = { 'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5 };
         return order[r.rating];
       },
       render: r => (
@@ -245,7 +245,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
       <div className="data-card carbon-fiber px-5 py-3">
         <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase tracking-wider">
           <span className="text-racing-muted font-medium">Pace Tiers:</span>
-          {(['Above Alien', 'Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline'] as PaceRating[]).map(r => (
+          {(['Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline'] as PaceRating[]).map(r => (
             <span key={r} className={`${getRatingColor(r)} font-semibold`}>{r}</span>
           ))}
         </div>
@@ -256,7 +256,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
         const sorted = [...items].sort((a, b) => a.best.lapTime - b.best.lapTime);
 
         // Best rating achieved at this track
-        const ratingOrder: Record<PaceRating, number> = { 'Above Alien': 0, 'Alien': 1, 'Competitive': 2, 'Good': 3, 'Midpack': 4, 'Tail-ender': 5, 'Offline': 6 };
+        const ratingOrder: Record<PaceRating, number> = { 'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5 };
         const bestItem = sorted.reduce((best, cur) => ratingOrder[cur.rating] < ratingOrder[best.rating] ? cur : best, sorted[0]);
         const classes = [...new Set(sorted.map(r => r.best.carClass))];
 
@@ -277,8 +277,8 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
               data={sorted}
               rowKey={r => `${r.best.carType}-${r.best.fileName}-${r.best.lapNumber}`}
               rowClass={r => {
-                if (r.rating === 'Above Alien') return 'bg-racing-purple/[0.04]';
-                if (r.rating === 'Alien') return 'bg-racing-green/[0.03]';
+                if (r.rating === 'Alien') return 'bg-racing-purple/[0.04]';
+                if (r.rating === 'Competitive') return 'bg-racing-green/[0.03]';
                 return '';
               }}
             />
