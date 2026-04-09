@@ -113,6 +113,7 @@ export interface PersonalBest {
   carType: string;
   carClass: CarClass;
   sessionType: SessionType;
+  sessionIndex: number;
   date: string;
   fileName: string;
   lapNumber: number;
@@ -126,10 +127,3 @@ export interface DriverSummary {
   isPlayer: boolean;
 }
 
-export interface AppState {
-  files: RaceFile[];
-  selectedDriver: string | null;
-  allDrivers: DriverSummary[];
-  loading: boolean;
-  error: string | null;
-}

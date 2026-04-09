@@ -9,9 +9,10 @@ import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
 interface PersonalBestsViewProps {
   files: RaceFile[];
   driverNames: string[];
+  onNavigate?: (view: string, context?: string) => void;
 }
 
-export const PersonalBestsView = memo(function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps) {
+export const PersonalBestsView = memo(function PersonalBestsView({ files, driverNames, onNavigate }: PersonalBestsViewProps) {
   const [filterClass, setFilterClass] = useState<CarClass | 'All'>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
@@ -102,7 +103,9 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
           { key: 'session', label: 'Session', width: '10%',
             sortValue: r => r.sessionType,
-            render: r => <span className="text-racing-muted text-xs">{r.sessionType} &mdash; L{r.lapNumber}</span> },
+            render: r => onNavigate
+              ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} &mdash; L{r.lapNumber}</button>
+              : <span className="text-racing-muted text-xs">{r.sessionType} &mdash; L{r.lapNumber}</span> },
           { key: 'date', label: 'Date', width: '12%',
             sortValue: r => r.date,
             render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },

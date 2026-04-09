@@ -2,16 +2,17 @@ import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable } from '../components/SortableTable';
-import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getDriverSessions } from '../lib/analytics';
+import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getDriverSessions, CHART_TOOLTIP_STYLE } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 interface TracksViewProps {
   files: RaceFile[];
   driverNames: string[];
   initialTrack?: string | null;
+  onNavigate?: (view: string, context?: string) => void;
 }
 
-export const TracksView = memo(function TracksView({ files, driverNames, initialTrack }: TracksViewProps) {
+export const TracksView = memo(function TracksView({ files, driverNames, initialTrack, onNavigate }: TracksViewProps) {
   const [selectedTrack, setSelectedTrack] = useState<string | null>(initialTrack ?? null);
   const [showAll, setShowAll] = useState(false);
   const tracks = useMemo(() => getTrackStats(files, driverNames), [files, driverNames]);
@@ -124,7 +125,9 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                 { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
                   render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
                 { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-                  render: r => <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
+                  render: r => onNavigate
+                    ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+                    : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
                 { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
                   render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
               ]}
@@ -143,7 +146,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
                   <Tooltip
-                    contentStyle={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
                     labelStyle={{ color: '#fff' }}
                     formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { car: string } }).payload.car]}
                   />
@@ -164,7 +167,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
                   <Tooltip
-                    contentStyle={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
                     formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Top Speed']}
                   />
                   <Line type="monotone" dataKey="topSpeed" stroke="#ff6d00" strokeWidth={2} dot={{ fill: '#ff6d00', r: 3 }} name="Top Speed" />

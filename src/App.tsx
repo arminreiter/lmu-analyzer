@@ -5,6 +5,7 @@ import { Footer } from './components/Footer';
 import { OverviewView } from './views/OverviewView';
 import { PersonalBestsView } from './views/PersonalBestsView';
 import { SessionsView } from './views/SessionsView';
+import { SessionDetailView } from './views/SessionDetailView';
 import { TracksView } from './views/TracksView';
 import { CarsView } from './views/CarsView';
 import { RaceResultsView } from './views/RaceResultsView';
@@ -40,7 +41,7 @@ function App() {
   // Persist filters whenever they change (skip initial empty state)
   useEffect(() => {
     if (loaded) {
-      storage.saveFilters(selectedDrivers, selectedClasses, activeView);
+      storage.saveFilters(selectedDrivers, selectedClasses, activeView === 'session' ? 'sessions' : activeView);
     }
   }, [selectedDrivers, selectedClasses, activeView, loaded]);
 
@@ -151,7 +152,14 @@ function App() {
     setHasCachedData(false);
   }, []);
 
+  const [prevView, setPrevView] = useState<{ view: string; context: string | null } | null>(null);
+  const currentViewRef = useRef({ view: activeView, context: viewContext });
+  currentViewRef.current = { view: activeView, context: viewContext };
+
   const navigateTo = useCallback((view: string, context?: string) => {
+    if (view === 'session') {
+      setPrevView(currentViewRef.current);
+    }
     setActiveView(view);
     setViewContext(context ?? null);
   }, []);
@@ -160,6 +168,31 @@ function App() {
     () => filterFilesByClasses(files, selectedClasses),
     [files, selectedClasses]
   );
+
+  // Resolve session detail from viewContext "fileName::sessionIndex"
+  const sessionDetail = useMemo(() => {
+    if (activeView !== 'session' || !viewContext) return null;
+    const [fileName, idxStr] = viewContext.split('::');
+    const sessionIndex = Number(idxStr);
+    const file = filteredFiles.find(f => f.fileName === fileName);
+    if (!file) return null;
+    const session = file.sessions.find(s => s.sessionIndex === sessionIndex);
+    if (!session) return null;
+    const driver = session.drivers.find(d => selectedDrivers.includes(d.name));
+    if (!driver) return null;
+    return { file, session, driver };
+  }, [activeView, viewContext, filteredFiles, selectedDrivers]);
+
+  const handleSessionBack = useCallback(() => {
+    if (prevView) {
+      setActiveView(prevView.view);
+      setViewContext(prevView.context);
+      setPrevView(null);
+    } else {
+      setActiveView('sessions');
+      setViewContext(null);
+    }
+  }, [prevView]);
 
   if (!loaded) {
     return (
@@ -185,8 +218,8 @@ function App() {
         onReload={handleReload}
         onRefresh={dirHandleRef.current ? handleRefresh : undefined}
         refreshing={loading}
-        activeView={activeView}
-        onViewChange={setActiveView}
+        activeView={activeView === 'session' ? 'sessions' : activeView}
+        onViewChange={(view: string) => { setActiveView(view); setViewContext(null); setPrevView(null); }}
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 py-6">
@@ -200,11 +233,14 @@ function App() {
         ) : (
           <>
             {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
-            {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} />}
-            {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} />}
-            {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} />}
-            {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} />}
-            {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} />}
+            {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
+            {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
+            {activeView === 'session' && sessionDetail && (
+              <SessionDetailView file={sessionDetail.file} session={sessionDetail.session} driver={sessionDetail.driver} onBack={handleSessionBack} />
+            )}
+            {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} />}
+            {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} onNavigate={navigateTo} />}
+            {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
           </>
         )}

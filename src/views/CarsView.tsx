@@ -8,9 +8,10 @@ interface CarsViewProps {
   files: RaceFile[];
   driverNames: string[];
   initialCar?: string | null;
+  onNavigate?: (view: string, context?: string) => void;
 }
 
-export const CarsView = memo(function CarsView({ files, driverNames, initialCar }: CarsViewProps) {
+export const CarsView = memo(function CarsView({ files, driverNames, initialCar, onNavigate }: CarsViewProps) {
   const [selectedCar, setSelectedCar] = useState<string | null>(initialCar ?? null);
   const [showAll, setShowAll] = useState(false);
   const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
@@ -92,7 +93,9 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar 
                 { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
                   render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)} km/h</span> },
                 { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-                  render: r => <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
+                  render: r => onNavigate
+                    ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+                    : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
                 { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
                   render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
               ]}

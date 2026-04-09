@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { Trophy, Flag, Route, Gauge, MapPin, Car, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getDriverProfileStats, type TrackBest } from '../lib/analytics';
+import { formatLapTime, formatSector, getDriverProfileStats, type TrackBest } from '../lib/analytics';
 import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar } from '../lib/storage';
 import type { RaceFile } from '../lib/types';
 
@@ -43,10 +43,6 @@ interface DriverProfileViewProps {
   driverNames: string[];
 }
 
-function fmtSector(v: number | null) {
-  if (v === null) return '--';
-  return v.toFixed(3);
-}
 
 const circuitColumn: Column<TrackBest> = {
   key: 'track', label: 'Circuit',
@@ -79,7 +75,7 @@ const bestLapColumns: Column<TrackBest>[] = [
     sortValue: t => t.bestS1,
     render: t => {
       const isTheoMatch = t.theoS1 !== null && t.bestS1 !== null && Math.abs(t.bestS1 - t.theoS1) < 0.0005;
-      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{fmtSector(t.bestS1)}</span>;
+      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{formatSector(t.bestS1)}</span>;
     },
   },
   {
@@ -87,7 +83,7 @@ const bestLapColumns: Column<TrackBest>[] = [
     sortValue: t => t.bestS2,
     render: t => {
       const isTheoMatch = t.theoS2 !== null && t.bestS2 !== null && Math.abs(t.bestS2 - t.theoS2) < 0.0005;
-      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{fmtSector(t.bestS2)}</span>;
+      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{formatSector(t.bestS2)}</span>;
     },
   },
   {
@@ -95,7 +91,7 @@ const bestLapColumns: Column<TrackBest>[] = [
     sortValue: t => t.bestS3,
     render: t => {
       const isTheoMatch = t.theoS3 !== null && t.bestS3 !== null && Math.abs(t.bestS3 - t.theoS3) < 0.0005;
-      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{fmtSector(t.bestS3)}</span>;
+      return <span className={`whitespace-nowrap ${isTheoMatch ? 'text-racing-purple' : 'text-racing-muted'}`}>{formatSector(t.bestS3)}</span>;
     },
   },
 ];
@@ -112,19 +108,19 @@ const theoTrackColumns: Column<TrackBest>[] = [
     key: 'theoS1', label: 'S1', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.theoS1,
     headerClass: 'text-racing-purple/60',
-    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{fmtSector(t.theoS1)}</span>,
+    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{formatSector(t.theoS1)}</span>,
   },
   {
     key: 'theoS2', label: 'S2', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.theoS2,
     headerClass: 'text-racing-purple/60',
-    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{fmtSector(t.theoS2)}</span>,
+    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{formatSector(t.theoS2)}</span>,
   },
   {
     key: 'theoS3', label: 'S3', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.theoS3,
     headerClass: 'text-racing-purple/60',
-    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{fmtSector(t.theoS3)}</span>,
+    render: t => <span className="text-racing-purple/60 whitespace-nowrap">{formatSector(t.theoS3)}</span>,
   },
 ];
 

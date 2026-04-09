@@ -3,13 +3,8 @@ import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route, ShieldAlert, Troph
 import { StatCard } from '../components/StatCard';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
+import { formatLapTime, formatSector, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
-
-function fmtSector(v: number | null) {
-  if (v === null) return '--';
-  return v.toFixed(3);
-}
 
 const trackColumns: Column<TrackStats>[] = [
   {
@@ -35,17 +30,17 @@ const trackColumns: Column<TrackStats>[] = [
   {
     key: 's1', label: 'S1', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.bestS1,
-    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS1)}</span>,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{formatSector(t.bestS1)}</span>,
   },
   {
     key: 's2', label: 'S2', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.bestS2,
-    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS2)}</span>,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{formatSector(t.bestS2)}</span>,
   },
   {
     key: 's3', label: 'S3', align: 'right', mono: true, width: '5.5rem',
     sortValue: t => t.bestS3,
-    render: t => <span className="text-racing-muted whitespace-nowrap">{fmtSector(t.bestS3)}</span>,
+    render: t => <span className="text-racing-muted whitespace-nowrap">{formatSector(t.bestS3)}</span>,
   },
 ];
 

@@ -197,6 +197,22 @@ export function formatEventTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+export const CHART_TOOLTIP_STYLE = {
+  background: '#1a1a24',
+  border: '1px solid #2a2a3a',
+  borderRadius: 8,
+  fontSize: 12,
+} as const;
+
+export function formatSector(v: number | null): string {
+  if (v === null) return '--';
+  return v.toFixed(3);
+}
+
+export function isDriverIncident(incident: { driver1: string; description: string }, driverName: string): boolean {
+  return incident.driver1 === driverName || incident.description.includes(driverName);
+}
+
 export function getClassColor(carClass: CarClass): string {
   switch (carClass) {
     case 'Hyper': return 'var(--color-hyper)';
@@ -393,6 +409,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
               carType: driver.carType,
               carClass: driver.carClass,
               sessionType: session.type,
+              sessionIndex: session.sessionIndex,
               date: file.timeString,
               fileName: file.fileName,
               lapNumber: lap.num,
@@ -434,6 +451,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
             carType: driver.carType,
             carClass: driver.carClass,
             sessionType: session.type,
+            sessionIndex: session.sessionIndex,
             date: file.timeString,
             fileName: file.fileName,
             lapNumber: l.num,
@@ -632,7 +650,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
       else if (session.type === 'Qualifying') totalQualifying++;
 
       totalIncidents += session.incidents.filter(
-        i => names.some(n => i.description.includes(n) || i.driver1 === n)
+        i => names.some(n => isDriverIncident(i, n))
       ).length;
       const driverPenalties = session.penalties.filter(p => names.includes(p.driver));
       totalPenalties += driverPenalties.length;
@@ -657,6 +675,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
               carType: driver.carType,
               carClass: driver.carClass,
               sessionType: session.type,
+              sessionIndex: session.sessionIndex,
               date: file.timeString,
               fileName: file.fileName,
               lapNumber: lap.num,

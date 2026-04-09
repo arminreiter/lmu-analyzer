@@ -3,15 +3,16 @@ import { Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
-import { formatLapTime, getRaceResults, isRatedRace, type RaceResult } from '../lib/analytics';
+import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, CHART_TOOLTIP_STYLE, type RaceResult } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
 interface RaceResultsViewProps {
   files: RaceFile[];
   driverNames: string[];
+  onNavigate?: (view: string, context?: string) => void;
 }
 
-export const RaceResultsView = memo(function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
+export const RaceResultsView = memo(function RaceResultsView({ files, driverNames, onNavigate }: RaceResultsViewProps) {
   const [filter, setFilter] = useState<'all' | 'online' | 'rated'>('all');
   const allResults = useMemo(() => getRaceResults(files, driverNames), [files, driverNames]);
   const results = useMemo(() => {
@@ -64,9 +65,9 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
     { key: 'pits', label: 'Pits', align: 'right', width: '45px', sortValue: r => r.driver.pitstops,
       render: r => <span className="text-racing-muted">{r.driver.pitstops}</span> },
     { key: 'incidents', label: 'Inc', align: 'center', width: '45px',
-      sortValue: r => r.session.incidents.filter(i => i.driver1 === r.driver.name || i.description.includes(r.driver.name)).length,
+      sortValue: r => r.session.incidents.filter(i => isDriverIncident(i, r.driver.name)).length,
       render: r => {
-        const count = r.session.incidents.filter(i => i.driver1 === r.driver.name || i.description.includes(r.driver.name)).length;
+        const count = r.session.incidents.filter(i => isDriverIncident(i, r.driver.name)).length;
         return count > 0 ? <span className="text-racing-orange font-mono">{count}</span> : <span className="text-racing-muted/30">0</span>;
       } },
     { key: 'penalties', label: 'Pen', align: 'center', width: '45px',
@@ -137,7 +138,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
               <XAxis dataKey="race" tick={{ fill: '#6b7280', fontSize: 9 }} angle={-45} textAnchor="end" height={80} />
               <YAxis reversed tick={{ fill: '#6b7280', fontSize: 11 }} domain={[1, 'auto']} allowDecimals={false} />
               <Tooltip
-                contentStyle={{ background: '#1a1a24', border: '1px solid #2a2a3a', borderRadius: 8, fontSize: 12 }}
+                contentStyle={CHART_TOOLTIP_STYLE}
                 formatter={(v: unknown, _: unknown, entry: unknown) => [`P${v} / ${(entry as { payload: { total: number } }).payload.total}`, 'Position']}
               />
               <Bar dataKey="position" radius={[4, 4, 0, 0]}>
@@ -162,6 +163,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
           columns={raceColumns}
           data={results}
           rowKey={(r, i) => `${r.file.fileName}-${i}`}
+          onRowClick={onNavigate ? (row) => onNavigate('session', `${row.file.fileName}::${row.session.sessionIndex}`) : undefined}
         />
       </div>
 
