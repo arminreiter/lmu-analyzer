@@ -86,7 +86,7 @@ function SessionDetail({ file, session, driver }: { file: RaceFile; session: Ses
   }));
 
   return (
-    <div className="bg-racing-card border border-racing-border rounded-xl overflow-hidden">
+    <div className="data-card carbon-fiber overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 py-3 grid hover:bg-racing-highlight/20 transition-colors cursor-pointer"

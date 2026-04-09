@@ -382,6 +382,7 @@ export interface OverviewStats {
   totalSessions: number;
   totalLaps: number;
   totalRaces: number;
+  totalRaceLaps: number;
   totalPractice: number;
   totalQualifying: number;
   tracksVisited: number;
@@ -400,6 +401,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
   let totalSessions = 0;
   let totalLaps = 0;
   let totalRaces = 0;
+  let totalRaceLaps = 0;
   let totalPractice = 0;
   let totalQualifying = 0;
   let totalIncidents = 0;
@@ -424,7 +426,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
       tracks.add(file.trackVenue);
       cars.add(driver.carType);
 
-      if (session.type === 'Race') totalRaces++;
+      if (session.type === 'Race') { totalRaces++; totalRaceLaps += driver.totalLaps; }
       else if (session.type === 'Practice') totalPractice++;
       else if (session.type === 'Qualifying') totalQualifying++;
 
@@ -469,6 +471,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
     totalSessions,
     totalLaps,
     totalRaces,
+    totalRaceLaps,
     totalPractice,
     totalQualifying,
     tracksVisited: tracks.size,

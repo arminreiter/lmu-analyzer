@@ -8,6 +8,7 @@ import { SessionsView } from './views/SessionsView';
 import { TracksView } from './views/TracksView';
 import { CarsView } from './views/CarsView';
 import { RaceResultsView } from './views/RaceResultsView';
+import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses } from './lib/analytics';
 import * as storage from './lib/storage';
@@ -181,14 +182,16 @@ function App() {
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 py-6">
-        {selectedDrivers.length === 0 ? (
+        {activeView === 'about' ? (
+          <AboutView />
+        ) : selectedDrivers.length === 0 ? (
           <div className="text-center py-20 text-racing-muted">
             <p className="text-lg">No drivers selected</p>
             <p className="text-sm mt-1">Select at least one driver from the dropdown above.</p>
           </div>
         ) : (
           <>
-            {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} />}
+            {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onViewChange={setActiveView} />}
             {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} />}
             {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} />}
             {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} />}

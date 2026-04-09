@@ -18,12 +18,13 @@ interface SortableTableProps<T> {
   data: T[];
   rowKey: (row: T, index: number) => string;
   rowClass?: (row: T, index: number) => string;
+  onRowClick?: (row: T, index: number) => void;
   stickyRows?: ReactNode;
 }
 
 type SortDir = 'asc' | 'desc';
 
-export function SortableTable<T>({ columns, data, rowKey, rowClass, stickyRows }: SortableTableProps<T>) {
+export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, stickyRows }: SortableTableProps<T>) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -70,7 +71,7 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, stickyRows }
           </colgroup>
         )}
         <thead>
-          <tr className="text-racing-muted text-[10px] uppercase tracking-wider border-b border-racing-border">
+          <tr className="text-racing-muted text-[10px] uppercase tracking-wider border-b-2 border-racing-red/20 bg-racing-dark/50">
             {columns.map(col => {
               const isSorted = sortCol === col.key;
               const canSort = col.sortable !== false && col.sortValue;
@@ -104,7 +105,8 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, stickyRows }
           {sorted.map((row, i) => (
             <tr
               key={rowKey(row, i)}
-              className={`border-b border-racing-border/20 hover:bg-racing-highlight/10 transition-colors ${rowClass?.(row, i) ?? ''}`}
+              className={`border-b border-racing-border/20 hover:bg-racing-highlight/10 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${rowClass?.(row, i) ?? ''}`}
+              onClick={onRowClick ? () => onRowClick(row, i) : undefined}
             >
               {columns.map(col => (
                 <td

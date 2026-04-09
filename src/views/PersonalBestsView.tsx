@@ -129,10 +129,9 @@ export function PersonalBestsView({ files, driverNames }: PersonalBestsViewProps
         })() : null;
 
         return (
-          <div key={track} className="data-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center gap-2">
-              <div className="w-1 h-3 bg-racing-red rounded-full" />
-              <h3 className="font-racing text-xs font-bold text-white tracking-[0.1em]">{track.toUpperCase()}</h3>
+          <div key={track} className="data-card carbon-fiber overflow-hidden">
+            <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
+              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">{track.toUpperCase()}</h3>
             </div>
             <SortableTable
               columns={columns}

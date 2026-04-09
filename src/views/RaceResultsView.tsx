@@ -78,27 +78,27 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
     <div className="space-y-6">
       {/* Race Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">Races</p>
           <p className="text-2xl font-bold text-white">{totalRaces}</p>
         </div>
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">Wins</p>
           <p className="text-2xl font-bold text-racing-gold">{wins}</p>
         </div>
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">Podiums</p>
           <p className="text-2xl font-bold text-racing-orange">{podiums}</p>
         </div>
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">Top 5</p>
           <p className="text-2xl font-bold text-racing-blue">{top5}</p>
         </div>
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">Avg Pos</p>
           <p className="text-2xl font-bold text-white">{avgPosition}</p>
         </div>
-        <div className="bg-racing-card border border-racing-border rounded-lg p-4 text-center">
+        <div className="data-card carbon-fiber p-4 text-center">
           <p className="text-racing-muted text-xs uppercase">DNFs</p>
           <p className={`text-2xl font-bold ${dnfs > 0 ? 'text-racing-red' : 'text-racing-green'}`}>{dnfs}</p>
         </div>
@@ -106,7 +106,7 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
 
       {/* Position Chart */}
       {positionData.length > 0 && (
-        <div className="bg-racing-card border border-racing-border rounded-xl p-4">
+        <div className="data-card carbon-fiber p-4">
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">CLASS POSITION HISTORY</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={positionData}>
@@ -131,9 +131,9 @@ export function RaceResultsView({ files, driverNames }: RaceResultsViewProps) {
       )}
 
       {/* Race List */}
-      <div className="data-card overflow-hidden">
+      <div className="data-card carbon-fiber overflow-hidden">
         <div className="px-5 py-3 border-b border-racing-border">
-          <h3 className="font-racing text-xs font-bold text-white tracking-[0.1em]">RACE HISTORY</h3>
+          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">RACE HISTORY</h3>
         </div>
         <SortableTable<RaceResult>
           columns={raceColumns}

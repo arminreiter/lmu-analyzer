@@ -24,6 +24,7 @@ const VIEWS = [
   { id: 'tracks', label: 'Tracks' },
   { id: 'cars', label: 'Cars' },
   { id: 'races', label: 'Race Results' },
+  { id: 'about', label: 'About' },
 ];
 
 export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange }: HeaderProps) {
@@ -42,12 +43,13 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
 
   return (
     <header className="bg-racing-dark/95 backdrop-blur-md border-b border-racing-border sticky top-0 z-50">
-      <div className="h-[2px] bg-gradient-to-r from-racing-red via-racing-red/50 to-transparent" />
+      <div className="h-[2px] bg-gradient-to-r from-racing-red via-racing-red/60 to-racing-red/10" />
 
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6">
         <div className="flex items-center justify-between h-12">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-racing-red rounded flex items-center justify-center">
+            <div className="w-7 h-7 bg-racing-red flex items-center justify-center"
+              style={{ clipPath: 'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))' }}>
               <span className="font-racing text-[9px] font-black text-white tracking-wider">LMU</span>
             </div>
             <span className="font-racing text-xs font-bold text-white tracking-[0.15em] hidden sm:block">
@@ -95,21 +97,18 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
           </div>
         </div>
 
-        <nav className="flex gap-0.5 -mb-px overflow-x-auto scrollbar-none">
+        <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {VIEWS.map(v => (
             <button
               key={v.id}
               onClick={() => onViewChange(v.id)}
-              className={`relative px-4 py-2.5 text-xs font-medium tracking-wide whitespace-nowrap transition-all cursor-pointer
+              className={`nav-tab relative px-5 py-2.5 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer
                 ${activeView === v.id
-                  ? 'text-white'
-                  : 'text-racing-muted hover:text-racing-text'
+                  ? 'nav-tab-active text-white font-semibold'
+                  : 'text-racing-muted hover:text-racing-text hover:bg-white/[0.02]'
                 }`}
             >
               {v.label}
-              {activeView === v.id && (
-                <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-racing-red rounded-full" />
-              )}
             </button>
           ))}
         </nav>

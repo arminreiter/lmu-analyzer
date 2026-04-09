@@ -49,18 +49,28 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden scanline-overlay">
       {/* Background */}
       <div className="absolute inset-0 bg-racing-black" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle, #e10600, transparent 70%)' }}
+      <div className="absolute inset-0 checkered opacity-40" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.05]"
+        style={{ background: 'radial-gradient(circle, #e10600, transparent 60%)' }}
       />
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-racing-red via-transparent to-transparent" />
-      <div className="absolute bottom-0 right-0 w-full h-[2px] bg-gradient-to-l from-racing-red via-transparent to-transparent" />
+      {/* Top racing stripe */}
+      <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-racing-red via-racing-red/60 to-racing-red/10" />
+      {/* Bottom racing stripe */}
+      <div className="absolute bottom-0 right-0 w-full h-[3px] bg-gradient-to-l from-racing-red via-racing-red/60 to-racing-red/10" />
+      {/* Diagonal racing stripes — left */}
+      <div className="absolute top-0 left-[10%] w-[2px] h-full opacity-[0.03] bg-racing-red" style={{ transform: 'rotate(15deg)', transformOrigin: 'top' }} />
+      <div className="absolute top-0 left-[12%] w-[1px] h-full opacity-[0.02] bg-racing-red" style={{ transform: 'rotate(15deg)', transformOrigin: 'top' }} />
+      {/* Diagonal racing stripes — right */}
+      <div className="absolute top-0 right-[10%] w-[2px] h-full opacity-[0.03] bg-racing-red" style={{ transform: 'rotate(-15deg)', transformOrigin: 'top' }} />
+      <div className="absolute top-0 right-[12%] w-[1px] h-full opacity-[0.02] bg-racing-red" style={{ transform: 'rotate(-15deg)', transformOrigin: 'top' }} />
 
       <div className="max-w-md w-full text-center relative z-10">
         {/* Logo */}
         <div className="mb-10 animate-in animate-in-1">
           <div className="inline-flex items-center justify-center mb-5">
-            <div className="w-16 h-16 bg-racing-red rounded-xl flex items-center justify-center
-              shadow-[0_0_40px_rgba(225,6,0,0.2)]">
+            <div className="w-16 h-16 bg-racing-red flex items-center justify-center
+              shadow-[0_0_50px_rgba(225,6,0,0.3)]"
+              style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
               <span className="font-racing text-xl font-black text-white tracking-wider">LMU</span>
             </div>
           </div>
@@ -75,7 +85,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
         </div>
 
         {/* Main Card */}
-        <div className="data-card p-8 animate-in animate-in-2">
+        <div className="data-card carbon-fiber p-8 animate-in animate-in-2">
           <div className="mb-7">
             <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5
               bg-racing-dark border border-racing-border">
@@ -96,10 +106,11 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
                 onClick={handleFolderClick}
                 disabled={loading}
                 className="px-6 py-3 bg-racing-red hover:bg-racing-red-dark disabled:opacity-50
-                  text-white font-racing font-bold text-sm tracking-[0.1em] rounded-lg
-                  transition-all shadow-[0_0_20px_rgba(225,6,0,0.2)]
-                  hover:shadow-[0_0_30px_rgba(225,6,0,0.35)]
+                  text-white font-racing font-bold text-sm tracking-[0.1em]
+                  transition-all shadow-[0_0_25px_rgba(225,6,0,0.25)]
+                  hover:shadow-[0_0_40px_rgba(225,6,0,0.4)]
                   disabled:cursor-not-allowed cursor-pointer"
+                style={{ clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)' }}
               >
                 {loading ? spinner : (
                   <span className="flex items-center gap-2">
@@ -116,12 +127,13 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
-              className={`px-6 py-3 disabled:opacity-50 font-racing font-bold text-sm tracking-[0.1em] rounded-lg
+              className={`px-6 py-3 disabled:opacity-50 font-racing font-bold text-sm tracking-[0.1em]
                 transition-all disabled:cursor-not-allowed cursor-pointer
                 ${isSupported
                   ? 'bg-racing-card border border-racing-border text-racing-muted hover:border-racing-red/30 hover:text-white'
-                  : 'bg-racing-red hover:bg-racing-red-dark text-white shadow-[0_0_20px_rgba(225,6,0,0.2)]'
+                  : 'bg-racing-red hover:bg-racing-red-dark text-white shadow-[0_0_25px_rgba(225,6,0,0.25)]'
                 }`}
+              style={{ clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)' }}
             >
               {loading && !isSupported ? spinner : (
                 <span className="flex items-center gap-2">
@@ -138,8 +150,9 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
                 onClick={onResumeCached}
                 disabled={loading}
                 className="px-6 py-3 bg-racing-card border border-racing-border text-racing-text hover:border-racing-green/30 hover:text-white
-                  disabled:opacity-50 font-racing font-bold text-sm tracking-[0.1em] rounded-lg
+                  disabled:opacity-50 font-racing font-bold text-sm tracking-[0.1em]
                   transition-all disabled:cursor-not-allowed cursor-pointer"
+                style={{ clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)' }}
               >
                 <span className="flex items-center gap-2">
                   <RotateCcw className="w-4 h-4" />

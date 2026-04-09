@@ -89,24 +89,84 @@ body {
 .glow-red    { text-shadow: 0 0 10px rgba(225,6,0,0.5), 0 0 25px rgba(225,6,0,0.15); }
 .glow-yellow { text-shadow: 0 0 8px rgba(251,191,36,0.5), 0 0 20px rgba(251,191,36,0.1); }
 
-/* Card component */
+/* Carbon fiber texture — repeating diagonal weave */
+.carbon-fiber {
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.012) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,0.012) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.012) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.012) 75%);
+  background-size: 4px 4px;
+  background-position: 0 0, 0 2px, 2px -2px, -2px 0;
+}
+
+/* Checkered flag pattern */
+.checkered {
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,0.03) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.03) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.03) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* Card component — angular racing aesthetic */
 .data-card {
   background: var(--color-racing-card);
   border: 1px solid var(--color-racing-border);
-  border-radius: 8px;
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
   position: relative;
   overflow: hidden;
   transition: border-color 0.2s ease;
 }
 .data-card:hover {
-  border-color: rgba(225,6,0,0.2);
+  border-color: rgba(225,6,0,0.25);
 }
 .data-card::before {
   content: '';
   position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--color-racing-red);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.data-card:hover::before {
+  opacity: 1;
+}
+.data-card::after {
+  content: '';
+  position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background: linear-gradient(90deg, var(--color-racing-red), rgba(255,255,255,0.04) 40%, transparent);
+}
+
+/* Racing stripe accent (used on stat cards) */
+.racing-stripe {
+  position: relative;
+}
+.racing-stripe::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--color-racing-red);
+}
+
+/* Diagonal hazard stripes */
+.hazard-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(225,6,0,0.06) 3px,
+    rgba(225,6,0,0.06) 6px
+  );
 }
 
 /* Scrollbar */
@@ -122,6 +182,39 @@ select {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px;
+}
+
+/* Racing nav tab — clipped active indicator */
+.nav-tab {
+  position: relative;
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 100%, 0 100%);
+}
+.nav-tab-active {
+  background: linear-gradient(180deg, rgba(225,6,0,0.12), transparent 80%);
+}
+.nav-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 8px; right: 8px;
+  height: 2px;
+  background: var(--color-racing-red);
+}
+
+/* Section header accent stripe */
+.section-stripe {
+  position: relative;
+  padding-left: 14px;
+}
+.section-stripe::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 60%;
+  min-height: 14px;
+  background: var(--color-racing-red);
+  clip-path: polygon(0 0, 100% 2px, 100% calc(100% - 2px), 0 100%);
 }
 
 /* Staggered entrance */

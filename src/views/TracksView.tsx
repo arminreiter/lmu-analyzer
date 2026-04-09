@@ -63,7 +63,7 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
       {track && (
         <>
           {/* Track Stats */}
-          <div className="bg-racing-card border border-racing-border rounded-xl p-6">
+          <div className="data-card carbon-fiber p-6">
             <h2 className="font-racing text-xl font-bold text-white tracking-wider mb-4">{track}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
@@ -92,9 +92,9 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
           </div>
 
           {/* Personal Bests at this track */}
-          <div className="data-card overflow-hidden">
+          <div className="data-card carbon-fiber overflow-hidden">
             <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between">
-              <h3 className="font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAPS BY CAR</h3>
+              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAPS BY CAR</h3>
               <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
                 <button onClick={() => setShowAll(false)} className={`px-3 py-1.5 transition-colors cursor-pointer ${!showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>Best</button>
                 <button onClick={() => setShowAll(true)} className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${showAll ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}>All</button>
@@ -130,7 +130,7 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
 
           {/* Lap Time Progression */}
           {progressionData.length > 1 && (
-            <div className="bg-racing-card border border-racing-border rounded-xl p-4">
+            <div className="data-card carbon-fiber p-4">
               <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">LAP TIME PROGRESSION</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={progressionData}>
@@ -151,7 +151,7 @@ export function TracksView({ files, driverNames }: TracksViewProps) {
 
           {/* Top Speed Progression */}
           {speedData.length > 1 && (
-            <div className="bg-racing-card border border-racing-border rounded-xl p-4">
+            <div className="data-card carbon-fiber p-4">
               <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TOP SPEED TREND</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={speedData}>

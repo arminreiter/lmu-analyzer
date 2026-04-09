@@ -6,7 +6,8 @@ export function Footer() {
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-5">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-5 h-5 bg-racing-red rounded flex items-center justify-center">
+            <div className="w-5 h-5 bg-racing-red flex items-center justify-center"
+              style={{ clipPath: 'polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 3px 100%, 0 calc(100% - 3px))' }}>
               <span className="font-racing text-[6px] font-black text-white">LMU</span>
             </div>
             <span className="text-racing-muted/60 text-xs">
