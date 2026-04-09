@@ -72,7 +72,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
             onClick={() => setSelectedCar(c.carType)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 cursor-pointer
               ${c.carType === car
-                ? 'bg-racing-red text-white'
+                ? 'bg-racing-red text-[#fff]'
                 : 'bg-racing-card border border-racing-border text-racing-muted hover:text-white hover:border-racing-highlight'}`}
           >
             {c.carType}
@@ -136,7 +136,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                     key={mode}
                     onClick={() => setLapMode(mode)}
                     className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
-                      ${lapMode === mode ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+                      ${lapMode === mode ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
                   >
                     {mode === 'track' ? 'Per Track' : mode === 'session' ? 'Per Session' : 'All Laps'}
                   </button>

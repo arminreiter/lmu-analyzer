@@ -94,15 +94,15 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
         <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
           <button
             onClick={() => setFilterSetting('all')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer ${filterSetting === 'all' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+            className={`px-3 py-1.5 transition-colors cursor-pointer ${filterSetting === 'all' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
           >All</button>
           <button
             onClick={() => setFilterSetting('online')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'online' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'online' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
           >Online</button>
           <button
             onClick={() => setFilterSetting('rated')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'rated' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'rated' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
           >Rated</button>
         </div>
         <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
@@ -110,7 +110,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
             <button
               key={t}
               onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 transition-colors cursor-pointer ${i > 0 ? 'border-l border-racing-border' : ''} ${filterType === t ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+              className={`px-3 py-1.5 transition-colors cursor-pointer ${i > 0 ? 'border-l border-racing-border' : ''} ${filterType === t ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
             >{t}</button>
           ))}
         </div>

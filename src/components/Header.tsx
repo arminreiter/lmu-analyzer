@@ -1,4 +1,4 @@
-import { FolderOpen, User, Layers, RefreshCw, Gauge, Download } from 'lucide-react';
+import { FolderOpen, User, Layers, RefreshCw, Gauge, Download, Sun, Moon } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
 import { getClassColor } from '../lib/analytics';
@@ -18,6 +18,8 @@ interface HeaderProps {
   onViewChange: (view: string) => void;
   racePaceEnabled: boolean;
   onToggleRacePace: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 const VIEWS = [
@@ -33,7 +35,7 @@ const VIEWS = [
   { id: 'about', label: 'About' },
 ];
 
-export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
   const { canInstall, install } = useInstallPrompt();
   const driverOptions = drivers.map(d => ({
     value: d.name,
@@ -57,7 +59,7 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 bg-racing-red flex items-center justify-center"
               style={{ clipPath: 'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))' }}>
-              <span className="font-racing text-[9px] font-black text-white tracking-wider">LMU</span>
+              <span className="font-racing text-[9px] font-black text-[#fff] tracking-wider">LMU</span>
             </div>
             <span className="font-racing text-xs font-bold text-white tracking-[0.15em] hidden sm:block">
               ANALYZER
@@ -101,6 +103,14 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
             )}
+
+            <button
+              onClick={onToggleTheme}
+              className="p-2 text-racing-muted/50 hover:text-racing-yellow transition-colors cursor-pointer"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
 
             <button
               onClick={onReload}

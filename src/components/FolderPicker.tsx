@@ -71,7 +71,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
             <div className="w-16 h-16 bg-racing-red flex items-center justify-center
               shadow-[0_0_50px_rgba(225,6,0,0.3)]"
               style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}>
-              <span className="font-racing text-xl font-black text-white tracking-wider">LMU</span>
+              <span className="font-racing text-xl font-black text-[#fff] tracking-wider">LMU</span>
             </div>
           </div>
           <h1 className="font-racing text-3xl md:text-4xl font-black text-white mb-1 tracking-[0.15em]">
@@ -106,7 +106,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
                 onClick={handleFolderClick}
                 disabled={loading}
                 className="px-6 py-3 bg-racing-red hover:bg-racing-red-dark disabled:opacity-50
-                  text-white font-racing font-bold text-sm tracking-[0.1em]
+                  text-[#fff] font-racing font-bold text-sm tracking-[0.1em]
                   transition-all shadow-[0_0_25px_rgba(225,6,0,0.25)]
                   hover:shadow-[0_0_40px_rgba(225,6,0,0.4)]
                   disabled:cursor-not-allowed cursor-pointer"
@@ -131,7 +131,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
                 transition-all disabled:cursor-not-allowed cursor-pointer
                 ${isSupported
                   ? 'bg-racing-card border border-racing-border text-racing-muted hover:border-racing-red/30 hover:text-white'
-                  : 'bg-racing-red hover:bg-racing-red-dark text-white shadow-[0_0_25px_rgba(225,6,0,0.25)]'
+                  : 'bg-racing-red hover:bg-racing-red-dark text-[#fff] shadow-[0_0_25px_rgba(225,6,0,0.25)]'
                 }`}
               style={{ clipPath: 'polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)' }}
             >

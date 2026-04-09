@@ -290,7 +290,7 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
               onClick={() => fileInputRef.current?.click()}
               className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
             >
-              <Camera className="w-4 h-4 text-white" />
+              <Camera className="w-4 h-4 text-[#fff]" />
             </button>
             {avatar && (
               <button
@@ -448,7 +448,7 @@ function SettingsToggle({ label, checked, onChange }: { label: string; checked: 
     >
       <span className="text-racing-text text-left truncate mr-3">{label}</span>
       <div className={`w-8 shrink-0 h-4.5 rounded-full relative transition-colors ${checked ? 'bg-racing-red' : 'bg-racing-muted/20'}`}>
-        <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-[#fff] transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
       </div>
     </button>
   );

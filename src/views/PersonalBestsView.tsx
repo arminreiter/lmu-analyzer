@@ -61,7 +61,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
               key={mode}
               onClick={() => setLapMode(mode)}
               className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
-                ${lapMode === mode ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+                ${lapMode === mode ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
             >
               {mode === 'car' ? 'Per Car' : mode === 'session' ? 'Per Session' : 'All Laps'}
             </button>

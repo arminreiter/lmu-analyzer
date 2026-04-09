@@ -117,7 +117,7 @@ export function SearchableMultiSelect({ values, options, onChange, placeholder =
                   <span className="flex items-center gap-2">
                     <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0
                       ${selected ? 'bg-racing-red border-racing-red' : 'border-racing-border'}`}>
-                      {selected && <Check className="w-3 h-3 text-white" />}
+                      {selected && <Check className="w-3 h-3 text-[#fff]" />}
                     </span>
                     {o.badge}
                     <span className={selected ? 'text-racing-red' : 'text-racing-text'}>{o.label}</span>

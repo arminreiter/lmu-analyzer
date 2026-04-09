@@ -89,15 +89,15 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
       <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
         <button
           onClick={() => setFilter('all')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer ${filter === 'all' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+          className={`px-3 py-1.5 transition-colors cursor-pointer ${filter === 'all' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
         >All Races</button>
         <button
           onClick={() => setFilter('online')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'online' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'online' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
         >Online</button>
         <button
           onClick={() => setFilter('rated')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'rated' ? 'bg-racing-red text-white' : 'bg-racing-card text-racing-muted hover:text-white'}`}
+          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'rated' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
         >Rated</button>
       </div>
 

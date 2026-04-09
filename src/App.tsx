@@ -15,6 +15,7 @@ import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateRaces } from './lib/analytics';
 import * as storage from './lib/storage';
+import { useTheme } from './lib/useTheme';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
     try { const v = localStorage.getItem('lmu-analyzer-benchmarks'); return v === null || v === '1'; } catch { return true; }
   });
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   // Auto-restore cached data on mount
   useEffect(() => {
@@ -253,6 +255,8 @@ function App() {
         onViewChange={(view: string) => { setActiveView(view); setViewContext(null); setPrevView(null); }}
         racePaceEnabled={racePaceEnabled}
         onToggleRacePace={handleToggleRacePace}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 py-6">
