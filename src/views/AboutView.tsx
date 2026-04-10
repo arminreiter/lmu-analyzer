@@ -20,7 +20,7 @@ export function AboutView() {
               personal bests, lap times, track and car breakdowns, and race results — all in one place.
             </p>
             <p>
-              Simply point it at your LMU results folder (or upload files manually) and start exploring your racing history.
+              Simply point it at your LMU results folder (or import files manually) and start exploring your racing history.
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export function AboutView() {
             <ol className="space-y-3 list-none">
               <li className="flex gap-3">
                 <span className="text-racing-red font-mono font-bold shrink-0">01</span>
-                <span>Select your LMU results folder using the File System Access API, or upload XML files manually (for browsers that don't support folder access).</span>
+                <span>Select your LMU results folder using the File System Access API, or import XML files manually (for browsers that don't support folder access).</span>
               </li>
               <li className="flex gap-3">
                 <span className="text-racing-red font-mono font-bold shrink-0">02</span>

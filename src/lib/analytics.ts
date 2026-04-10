@@ -198,13 +198,16 @@ export function formatEventTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}.${ms}`;
 }
 
-export const CHART_TOOLTIP_STYLE = {
-  background: '#1a1a24',
-  border: '1px solid #2a2a3a',
-  borderRadius: 8,
-  fontSize: 12,
-} as const;
-
+export function getChartTooltipStyle() {
+  const isLight = document.documentElement.classList.contains('light');
+  return {
+    background: isLight ? '#ffffff' : '#1a1a24',
+    border: isLight ? '1px solid #d1d5db' : '1px solid #2a2a3a',
+    borderRadius: 8,
+    fontSize: 12,
+    color: isLight ? '#1f2937' : '#e5e7eb',
+  };
+}
 export function formatSector(v: number | null): string {
   if (v === null) return '--';
   return v.toFixed(3);

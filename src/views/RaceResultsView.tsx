@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, CHART_TOOLTIP_STYLE, type RaceResult } from '../lib/analytics';
+import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, getChartTooltipStyle, type RaceResult } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
 interface RaceResultsViewProps {
@@ -139,7 +139,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
               <XAxis dataKey="race" tick={{ fill: '#6b7280', fontSize: 9 }} angle={-45} textAnchor="end" height={80} />
               <YAxis reversed tick={{ fill: '#6b7280', fontSize: 11 }} domain={[1, 'auto']} allowDecimals={false} />
               <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
+                contentStyle={getChartTooltipStyle()}
                 formatter={(v: unknown, _: unknown, entry: unknown) => [`P${v} / ${(entry as { payload: { total: number } }).payload.total}`, 'Position']}
               />
               <Bar dataKey="position" radius={[4, 4, 0, 0]}>

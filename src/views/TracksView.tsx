@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, CHART_TOOLTIP_STYLE } from '../lib/analytics';
+import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -189,8 +189,8 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
                   <Tooltip
-                    contentStyle={CHART_TOOLTIP_STYLE}
-                    labelStyle={{ color: '#fff' }}
+                    contentStyle={getChartTooltipStyle()}
+                    labelStyle={{ color: document.documentElement.classList.contains('light') ? '#1f2937' : '#e5e7eb' }}
                     formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { car: string } }).payload.car]}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -210,7 +210,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
                   <Tooltip
-                    contentStyle={CHART_TOOLTIP_STYLE}
+                    contentStyle={getChartTooltipStyle()}
                     formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Top Speed']}
                   />
                   <Line type="monotone" dataKey="topSpeed" stroke="#ff6d00" strokeWidth={2} dot={{ fill: '#ff6d00', r: 3 }} name="Top Speed" />

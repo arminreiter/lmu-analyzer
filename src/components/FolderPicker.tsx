@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { FolderOpen, Upload, Shield, Zap, RotateCcw } from 'lucide-react';
+import { FolderOpen, Import, Shield, Zap, RotateCcw } from 'lucide-react';
 
 interface FolderPickerProps {
   onFolderSelected: (handle: FileSystemDirectoryHandle) => void;
@@ -94,8 +94,8 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
             <h2 className="text-lg font-semibold text-white mb-2">Load Race Data</h2>
             <p className="text-racing-text text-sm leading-relaxed">
               {isSupported
-                ? 'Select your results folder or upload XML files.'
-                : 'Upload your LMU race result XML files.'}
+                ? 'Select your results folder or import XML files.'
+                : 'Import your LMU race result XML files.'}
             </p>
             <p className="text-racing-muted text-xs mt-1">All processing happens locally in your browser.</p>
           </div>
@@ -137,8 +137,8 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
             >
               {loading && !isSupported ? spinner : (
                 <span className="flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  UPLOAD FILES
+                  <Import className="w-4 h-4" />
+                  IMPORT FILES
                 </span>
               )}
             </button>

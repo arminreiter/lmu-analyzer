@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatEventTime, isDriverIncident, CHART_TOOLTIP_STYLE } from '../lib/analytics';
+import { formatLapTime, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
@@ -440,7 +440,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} label={{ value: 'Lap', fill: '#6b7280', fontSize: 11, position: 'bottom' }} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} labelStyle={{ color: '#fff' }}
+              <Tooltip contentStyle={getChartTooltipStyle()}
                 formatter={(v: unknown) => formatLapTime(v as number)} />
               <Line type="monotone" dataKey="time" stroke="#e10600" strokeWidth={2} dot={{ fill: '#e10600', r: 3 }} name="Lap Time" />
             </LineChart>
@@ -457,7 +457,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: unknown) => `${Number(v).toFixed(3)}s`} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${Number(v).toFixed(3)}s`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="s1" fill="#9c27b0" name="S1" stackId="a" />
               <Bar dataKey="s2" fill="#2196f3" name="S2" stackId="a" />
@@ -476,7 +476,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Speed']} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Speed']} />
               <Line type="monotone" dataKey="speed" stroke="#ff6d00" strokeWidth={2} dot={{ fill: '#ff6d00', r: 3 }} name="Top Speed" />
             </LineChart>
           </ResponsiveContainer>
@@ -492,7 +492,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[0, 100]} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: unknown) => `${v}%`} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="FL" stroke="#e10600" strokeWidth={1.5} dot={false} name="Front Left" />
               <Line type="monotone" dataKey="FR" stroke="#ff6d00" strokeWidth={1.5} dot={false} name="Front Right" />
@@ -512,7 +512,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[0, 100]} />
-              <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v: unknown) => `${v}%`} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="fuel" stroke="#ffd600" strokeWidth={2} dot={false} name="Fuel Level %" />
               <Line type="monotone" dataKey="used" stroke="#ff9800" strokeWidth={1.5} dot={false} name="Used per Lap %" />
@@ -551,7 +551,7 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
     { key: 'driver2', label: 'Other Driver', width: '150px', sortValue: r => r.driver2 ?? '',
       render: r => r.driver2 ? <span className="text-racing-muted">{r.driver2}</span> : <span className="text-racing-muted/30">--</span> },
     { key: 'severity', label: 'Severity', align: 'right', width: '90px', mono: true, sortValue: r => r.severity,
-      render: r => <span className="text-racing-orange font-bold">{r.severity > 0 ? r.severity.toFixed(0) : '--'}</span> },
+      render: r => <span className="text-racing-orange font-bold">{r.severity > 0 ? r.severity.toFixed(2) : '--'}</span> },
   ];
 
   return (

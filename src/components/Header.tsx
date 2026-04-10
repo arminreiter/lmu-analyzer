@@ -30,7 +30,6 @@ const VIEWS = [
   { id: 'cars', label: 'Cars' },
   { id: 'races', label: 'Race Results' },
   { id: 'profile', label: 'Driver Profile' },
-  { id: 'separator', label: '' },
   { id: 'benchmarks', label: 'Benchmark Times' },
   { id: 'about', label: 'About' },
 ];
@@ -134,10 +133,6 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
 
         <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {VIEWS.map(v => {
-            if (v.id === 'separator') {
-              if (!racePaceEnabled) return null;
-              return <div key="sep" className="w-px bg-racing-border/50 mx-1 my-1.5 self-stretch" />;
-            }
             if (v.id === 'benchmarks' && !racePaceEnabled) return null;
             return (
               <button

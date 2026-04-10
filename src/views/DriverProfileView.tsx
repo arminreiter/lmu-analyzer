@@ -413,7 +413,7 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
 
       {/* Shareable footer badge */}
       <div className="text-center py-3 animate-in animate-in-5">
-        <p className="text-racing-muted/30 text-[10px] tracking-widest uppercase font-mono">LMU Analyzer &middot; lmu-analyzer.pages.dev</p>
+        <p className="text-racing-muted/30 text-[10px] tracking-widest uppercase font-mono">LMU Analyzer &middot; lmu.a31.at</p>
       </div>
     </div>
   );
