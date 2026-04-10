@@ -550,8 +550,8 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
       render: r => <span className="text-racing-text">{r.description}</span> },
     { key: 'driver2', label: 'Other Driver', width: '150px', sortValue: r => r.driver2 ?? '',
       render: r => r.driver2 ? <span className="text-racing-muted">{r.driver2}</span> : <span className="text-racing-muted/30">--</span> },
-    { key: 'severity', label: 'Severity', align: 'right', width: '70px', mono: true, sortValue: r => r.severity,
-      render: r => <span className="text-racing-orange font-bold">{r.severity > 0 ? r.severity : '--'}</span> },
+    { key: 'severity', label: 'Severity', align: 'right', width: '90px', mono: true, sortValue: r => r.severity,
+      render: r => <span className="text-racing-orange font-bold">{r.severity > 0 ? r.severity.toFixed(0) : '--'}</span> },
   ];
 
   return (

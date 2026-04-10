@@ -126,7 +126,7 @@ function parseStreamEvents(streamEl: Element | null) {
     const text = child.textContent?.trim() ?? '';
 
     if (tag === 'Incident') {
-      const severityMatch = text.match(/\((\d+\.?\d*)\)/);
+      const severityMatch = text.match(/contact\s+\((\d+\.?\d*)\)/);
       incidents.push({
         time: et,
         description: text,
