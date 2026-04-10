@@ -13,7 +13,7 @@ import { DriverProfileView } from './views/DriverProfileView';
 import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
-import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateRaces } from './lib/analytics';
+import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateSessions } from './lib/analytics';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
@@ -77,7 +77,7 @@ function App() {
       setLoading(false);
       return;
     }
-    const parsed = deduplicateRaces(rawParsed);
+    const parsed = deduplicateSessions(rawParsed);
     setFiles(parsed);
     const classes = getAllClasses(parsed);
     setAllClasses(classes);

@@ -1,32 +1,8 @@
 import type { RaceFile, PersonalBest, DriverSummary, DriverResult, LapData, SessionData, CarClass } from './types';
 
 // ---------------------------------------------------------------------------
-// Race deduplication / merging
+// Session deduplication / merging
 // ---------------------------------------------------------------------------
-
-function parseTime(ts: string): number {
-  // "2026/04/06 13:29:27" → epoch ms
-  return new Date(ts.replace(/\//g, '-')).getTime();
-}
-
-function hasOverlappingDriverLaps(s1: SessionData, s2: SessionData): boolean {
-  for (const d1 of s1.drivers) {
-    const d2 = s2.drivers.find(d => d.name === d1.name);
-    if (!d2) continue;
-    let matches = 0;
-    for (const l1 of d1.laps) {
-      if (l1.lapTime === null || l1.lapTime <= 0) continue;
-      for (const l2 of d2.laps) {
-        if (l2.num === l1.num && l2.lapTime !== null && Math.abs(l1.lapTime - l2.lapTime) < 0.001) {
-          matches++;
-          if (matches >= 2) return true;
-          break;
-        }
-      }
-    }
-  }
-  return false;
-}
 
 function mergeDriverResult(entries: DriverResult[]): DriverResult {
   // Pick the entry with the best finish as the base for metadata
@@ -59,7 +35,7 @@ function mergeDriverResult(entries: DriverResult[]): DriverResult {
   return base;
 }
 
-function mergeRaceSessions(sessions: SessionData[]): SessionData {
+function mergeSessions(sessions: SessionData[]): SessionData {
   // Use the most complete session as the base
   const sorted = [...sessions].sort((a, b) => b.mostLapsCompleted - a.mostLapsCompleted);
   const base = { ...sorted[0] };
@@ -107,72 +83,51 @@ function mergeRaceSessions(sessions: SessionData[]): SessionData {
 }
 
 /**
- * Detects and merges duplicate Race sessions across files.
- * Two Race sessions are considered the same event when they share the same track,
- * occur within 60 minutes of each other, and have at least one driver with
- * identical lap times at the same lap number.
- *
- * Merged sessions combine driver laps (union by lap number) and keep the
- * best finish metadata (Finished > DNF, more laps > fewer).
+ * Merges rejoin fragments: when LMU writes multiple XML files for the same
+ * server session (same timeString + trackCourse + session type), combine them
+ * into a single session with merged laps, drivers, and stream events.
  */
-export function deduplicateRaces(files: RaceFile[]): RaceFile[] {
-  interface RaceRef { fileIdx: number; sessionIdx: number }
+export function deduplicateSessions(files: RaceFile[]): RaceFile[] {
+  interface SessionRef { fileIdx: number; sessionIdx: number }
 
-  const refs: RaceRef[] = [];
+  // Group sessions by server identity: timeString + trackCourse + type
+  const groups = new Map<string, SessionRef[]>();
+
   for (let fi = 0; fi < files.length; fi++) {
-    for (let si = 0; si < files[fi].sessions.length; si++) {
-      if (files[fi].sessions[si].type === 'Race') refs.push({ fileIdx: fi, sessionIdx: si });
+    const file = files[fi];
+    for (let si = 0; si < file.sessions.length; si++) {
+      const sess = file.sessions[si];
+      const key = file.timeString
+        ? `${file.timeString}|${file.trackCourse}|${sess.type}`
+        : `__ungrouped_${fi}_${si}`;
+      const group = groups.get(key);
+      if (group) group.push({ fileIdx: fi, sessionIdx: si });
+      else groups.set(key, [{ fileIdx: fi, sessionIdx: si }]);
     }
-  }
-
-  // Group refs that belong to the same physical race
-  const used = new Set<number>();
-  const groups: RaceRef[][] = [];
-
-  for (let i = 0; i < refs.length; i++) {
-    if (used.has(i)) continue;
-    const group = [refs[i]];
-    used.add(i);
-    const fileI = files[refs[i].fileIdx];
-    const sessI = fileI.sessions[refs[i].sessionIdx];
-    const tI = parseTime(sessI.dateTime || fileI.timeString);
-
-    for (let j = i + 1; j < refs.length; j++) {
-      if (used.has(j)) continue;
-      const fileJ = files[refs[j].fileIdx];
-      const sessJ = fileJ.sessions[refs[j].sessionIdx];
-      if (fileI.trackCourse !== fileJ.trackCourse) continue;
-      const tJ = parseTime(sessJ.dateTime || fileJ.timeString);
-      if (Math.abs(tI - tJ) > 60 * 60 * 1000) continue;
-      if (hasOverlappingDriverLaps(sessI, sessJ)) {
-        group.push(refs[j]);
-        used.add(j);
-      }
-    }
-    groups.push(group);
   }
 
   // Nothing to merge
-  if (groups.every(g => g.length === 1)) return files;
+  if ([...groups.values()].every(g => g.length === 1)) return files;
 
-  // Clone files so we can mutate
+  // Track which sessions to remove after merging
+  const removeSet = new Set<string>();
+
   const cloned: RaceFile[] = files.map(f => ({ ...f, sessions: [...f.sessions] }));
 
-  for (const group of groups) {
+  for (const group of groups.values()) {
     if (group.length === 1) continue;
     const sessions = group.map(r => cloned[r.fileIdx].sessions[r.sessionIdx]);
-    const merged = mergeRaceSessions(sessions);
-
-    // Keep merged session in the first file, mark others for removal
-    cloned[group[0].fileIdx].sessions[group[0].sessionIdx] = merged;
+    cloned[group[0].fileIdx].sessions[group[0].sessionIdx] = mergeSessions(sessions);
     for (let k = 1; k < group.length; k++) {
-      cloned[group[k].fileIdx].sessions[group[k].sessionIdx] = null as unknown as SessionData;
+      removeSet.add(`${group[k].fileIdx}_${group[k].sessionIdx}`);
     }
   }
 
-  // Remove null sessions and empty files
   return cloned
-    .map(f => ({ ...f, sessions: f.sessions.filter(Boolean) }))
+    .map((f, fi) => ({
+      ...f,
+      sessions: f.sessions.filter((_, si) => !removeSet.has(`${fi}_${si}`)),
+    }))
     .filter(f => f.sessions.length > 0);
 }
 
