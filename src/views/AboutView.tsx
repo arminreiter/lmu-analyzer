@@ -159,7 +159,7 @@ export function AboutView() {
                 href="https://buymeacoffee.com/axrider"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all
+                className="bmac-link inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all
                   bg-[#ffdd00]/8 border border-[#ffdd00]/20 text-[#ffdd00]/80
                   hover:bg-[#ffdd00]/15 hover:text-[#ffdd00] hover:border-[#ffdd00]/35"
               >
