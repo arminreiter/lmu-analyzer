@@ -23,7 +23,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   }, [allResults, filter]);
 
   const positionData = useMemo(() => results.map((r, i) => ({
-    race: `${r.file.trackVenue.slice(0, 12)} ${r.file.timeString.slice(5, 10)}`,
+    race: `${r.file.trackCourse.slice(0, 12)} ${r.file.timeString.slice(5, 10)}`,
     position: r.classPosition,
     total: r.classDrivers,
     idx: i,
@@ -42,8 +42,8 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   const raceColumns: Column<RaceResult>[] = [
     { key: 'date', label: 'Date', width: '13%', sortValue: r => r.file.timeString,
       render: r => <span className="text-racing-muted text-xs">{r.file.timeString}</span> },
-    { key: 'track', label: 'Track', width: '18%', sortValue: r => r.file.trackVenue,
-      render: r => <span className="text-white">{r.file.trackVenue}</span> },
+    { key: 'track', label: 'Track', width: '18%', sortValue: r => r.file.trackCourse,
+      render: r => <span className="text-white">{r.file.trackCourse}</span> },
     { key: 'car', label: 'Car', width: '18%', sortValue: r => r.driver.carType,
       render: r => <div className="flex items-center gap-2"><span className="text-racing-text text-xs">{r.driver.carType}</span><ClassBadge carClass={r.driver.carClass} /></div> },
     { key: 'grid', label: 'Grid', align: 'center', width: '55px', sortValue: r => r.driver.classGridPosition ?? 999,

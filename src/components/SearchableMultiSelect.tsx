@@ -71,7 +71,7 @@ export function SearchableMultiSelect({ values, options, onChange, placeholder =
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-72 bg-racing-card border border-racing-border
+        <div className="absolute right-0 top-full mt-1 min-w-72 w-max max-w-[400px] bg-racing-card border border-racing-border
           rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Search */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-racing-border">

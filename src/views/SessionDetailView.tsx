@@ -94,7 +94,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
                 'bg-racing-blue/20 text-racing-blue'}`}>
               {session.type}
             </span>
-            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{file.trackVenue}</h1>
+            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{file.trackCourse}</h1>
             <ClassBadge carClass={driver.carClass} />
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
@@ -266,7 +266,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             {session.drivers.length} drivers
             {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
           </span>
-          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackVenue.toLowerCase().replace(/\s+/g, '-')}-${session.type.toLowerCase()}`} />
+          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse.toLowerCase().replace(/\s+/g, '-')}-${session.type.toLowerCase()}`} />
         </div>
         <SortableTable<DriverResult>
           columns={standingsColumns}

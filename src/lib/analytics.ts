@@ -141,7 +141,7 @@ export function deduplicateRaces(files: RaceFile[]): RaceFile[] {
       if (used.has(j)) continue;
       const fileJ = files[refs[j].fileIdx];
       const sessJ = fileJ.sessions[refs[j].sessionIdx];
-      if (fileI.trackVenue !== fileJ.trackVenue) continue;
+      if (fileI.trackCourse !== fileJ.trackCourse) continue;
       const tJ = parseTime(sessJ.dateTime || fileJ.timeString);
       if (Math.abs(tI - tJ) > 60 * 60 * 1000) continue;
       if (hasOverlappingDriverLaps(sessI, sessJ)) {
@@ -396,7 +396,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
         for (const lap of driver.laps) {
           if (!lap.lapTime || lap.lapTime <= 0) continue;
 
-          const key = `${file.trackVenue}|${driver.carType}`;
+          const key = `${file.trackCourse}|${driver.carType}`;
           const existing = bests.get(key);
 
           if (!existing || lap.lapTime < existing.lapTime) {
@@ -407,6 +407,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
               sector3: lap.sector3,
               topSpeed: lap.topSpeed,
               trackVenue: file.trackVenue,
+              trackCourse: file.trackCourse,
               carType: driver.carType,
               carClass: driver.carClass,
               sessionType: session.type,
@@ -423,7 +424,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
   }
 
   const result = Array.from(bests.values());
-  result.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime);
+  result.sort((a, b) => a.trackCourse.localeCompare(b.trackCourse) || a.lapTime - b.lapTime);
   return result;
 }
 
@@ -449,6 +450,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
             sector3: l.sector3,
             topSpeed: l.topSpeed,
             trackVenue: file.trackVenue,
+            trackCourse: file.trackCourse,
             carType: driver.carType,
             carClass: driver.carClass,
             sessionType: session.type,
@@ -463,7 +465,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
     }
   }
 
-  results.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime);
+  results.sort((a, b) => a.trackCourse.localeCompare(b.trackCourse) || a.lapTime - b.lapTime);
   return results;
 }
 
@@ -484,6 +486,7 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
             sector3: lap.sector3,
             topSpeed: lap.topSpeed,
             trackVenue: file.trackVenue,
+            trackCourse: file.trackCourse,
             carType: driver.carType,
             carClass: driver.carClass,
             sessionType: session.type,
@@ -498,11 +501,11 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
     }
   }
 
-  results.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime);
+  results.sort((a, b) => a.trackCourse.localeCompare(b.trackCourse) || a.lapTime - b.lapTime);
   return results;
 }
 
-export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackVenue: string, carType: string): {
+export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackCourse: string, carType: string): {
   s1: number | null; s2: number | null; s3: number | null; total: number | null;
 } {
   const names = Array.isArray(driverNames) ? driverNames : [driverNames];
@@ -511,7 +514,7 @@ export function getTheoreticalBest(files: RaceFile[], driverNames: string | stri
   let bestS3: number | null = null;
 
   for (const file of files) {
-    if (file.trackVenue !== trackVenue) continue;
+    if (file.trackCourse !== trackCourse) continue;
     for (const session of file.sessions) {
       const driver = session.drivers.find(d => names.includes(d.name) && d.carType === carType);
       if (!driver) continue;
@@ -531,6 +534,7 @@ export function getTheoreticalBest(files: RaceFile[], driverNames: string | stri
 
 export interface TrackStats {
   trackVenue: string;
+  trackCourse: string;
   sessionCount: number;
   totalLaps: number;
   bestLapTime: number | null;
@@ -551,10 +555,11 @@ export function getTrackStats(files: RaceFile[], driverNames: string | string[])
       const driver = session.drivers.find(d => names.includes(d.name));
       if (!driver) continue;
 
-      let existing = map.get(file.trackVenue);
+      let existing = map.get(file.trackCourse);
       if (!existing) {
         existing = {
           trackVenue: file.trackVenue,
+          trackCourse: file.trackCourse,
           sessionCount: 0,
           totalLaps: 0,
           bestLapTime: null,
@@ -565,7 +570,7 @@ export function getTrackStats(files: RaceFile[], driverNames: string | string[])
           bestCarClass: driver.carClass,
           classes: [],
         };
-        map.set(file.trackVenue, existing);
+        map.set(file.trackCourse, existing);
       }
 
       existing.sessionCount++;
@@ -614,8 +619,8 @@ export function getCarStats(files: RaceFile[], driverNames: string | string[]): 
         existing.sessionCount++;
         existing.totalLaps += driver.totalLaps;
         existing.totalDistanceKm += (driver.totalLaps * file.trackLength) / 1000;
-        if (!existing.tracks.includes(file.trackVenue)) {
-          existing.tracks.push(file.trackVenue);
+        if (!existing.tracks.includes(file.trackCourse)) {
+          existing.tracks.push(file.trackCourse);
         }
       } else {
         map.set(driver.carType, {
@@ -624,7 +629,7 @@ export function getCarStats(files: RaceFile[], driverNames: string | string[]): 
           sessionCount: 1,
           totalLaps: driver.totalLaps,
           totalDistanceKm: (driver.totalLaps * file.trackLength) / 1000,
-          tracks: [file.trackVenue],
+          tracks: [file.trackCourse],
         });
       }
     }
@@ -678,7 +683,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
       totalSessions++;
       totalLaps += driver.totalLaps;
       totalDistanceKm += (driver.totalLaps * file.trackLength) / 1000;
-      tracks.add(file.trackVenue);
+      tracks.add(file.trackCourse);
       cars.add(driver.carType);
 
       if (session.type === 'Race') { totalRaces++; totalRaceLaps += driver.totalLaps; }
@@ -708,6 +713,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
               sector3: lap.sector3,
               topSpeed: lap.topSpeed,
               trackVenue: file.trackVenue,
+              trackCourse: file.trackCourse,
               carType: driver.carType,
               carClass: driver.carClass,
               sessionType: session.type,
@@ -781,6 +787,7 @@ export function getRaceResults(files: RaceFile[], driverNames: string | string[]
 
 export interface TrackBest {
   trackVenue: string;
+  trackCourse: string;
   totalLaps: number;
   bestLapTime: number;
   bestS1: number | null;
@@ -841,9 +848,9 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
       totalSessions++;
       totalLaps += driver.totalLaps;
       totalDistanceKm += (driver.totalLaps * file.trackLength) / 1000;
-      tracks.add(file.trackVenue);
+      tracks.add(file.trackCourse);
       cars.add(driver.carType);
-      trackLapsMap.set(file.trackVenue, (trackLapsMap.get(file.trackVenue) ?? 0) + driver.totalLaps);
+      trackLapsMap.set(file.trackCourse, (trackLapsMap.get(file.trackCourse) ?? 0) + driver.totalLaps);
 
       if (session.type === 'Race') {
         const isOnline = file.setting === 'Multiplayer';
@@ -893,9 +900,9 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
 
       for (const lap of driver.laps) {
         if (!lap.lapTime || lap.lapTime <= 0) continue;
-        const existing = trackBestMap.get(file.trackVenue);
+        const existing = trackBestMap.get(file.trackCourse);
         if (!existing || lap.lapTime < existing.lapTime) {
-          trackBestMap.set(file.trackVenue, {
+          trackBestMap.set(file.trackCourse, {
             lapTime: lap.lapTime,
             s1: lap.sector1,
             s2: lap.sector2,
@@ -914,9 +921,9 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
     for (const session of file.sessions) {
       const driver = session.drivers.find(d => names.includes(d.name));
       if (!driver) continue;
-      const best = trackBestMap.get(file.trackVenue);
+      const best = trackBestMap.get(file.trackCourse);
       if (!best || driver.carType !== best.car) continue;
-      const key = file.trackVenue;
+      const key = file.trackCourse;
       let entry = theoMap.get(key);
       if (!entry) { entry = { s1: null, s2: null, s3: null }; theoMap.set(key, entry); }
       for (const lap of driver.laps) {
@@ -929,13 +936,16 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
 
   // Build track bests with theoretical times
   const trackBests: TrackBest[] = [];
-  for (const [trackVenue, best] of trackBestMap) {
-    const theo = theoMap.get(trackVenue);
+  for (const [trackCourse, best] of trackBestMap) {
+    const theo = theoMap.get(trackCourse);
     const theoTotal = theo?.s1 != null && theo?.s2 != null && theo?.s3 != null
       ? theo.s1 + theo.s2 + theo.s3 : null;
+    // Find the trackVenue for this course
+    const trackVenue = files.find(f => f.trackCourse === trackCourse)?.trackVenue ?? trackCourse;
     trackBests.push({
       trackVenue,
-      totalLaps: trackLapsMap.get(trackVenue) ?? 0,
+      trackCourse,
+      totalLaps: trackLapsMap.get(trackCourse) ?? 0,
       bestLapTime: best.lapTime,
       bestS1: best.s1,
       bestS2: best.s2,
@@ -948,7 +958,7 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
       theoS3: theo?.s3 ?? null,
     });
   }
-  trackBests.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
+  trackBests.sort((a, b) => a.trackCourse.localeCompare(b.trackCourse));
 
   return {
     driverName: names.join(', '),

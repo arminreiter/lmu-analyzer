@@ -20,7 +20,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
   const [filterTrack, setFilterTrack] = useState<string>('All');
 
   const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
-  const tracks = useMemo(() => Array.from(new Set(allSessions.map(s => s.file.trackVenue))).sort(), [allSessions]);
+  const tracks = useMemo(() => Array.from(new Set(allSessions.map(s => s.file.trackCourse))).sort(), [allSessions]);
 
   const filtered = useMemo(() => allSessions
     .filter(s => {
@@ -29,7 +29,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
       return true;
     })
     .filter(s => filterType === 'All' || s.session.type === filterType)
-    .filter(s => filterTrack === 'All' || s.file.trackVenue === filterTrack)
+    .filter(s => filterTrack === 'All' || s.file.trackCourse === filterTrack)
     .sort((a, b) => b.file.timeString.localeCompare(a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
 
   const columns: Column<SessionRow>[] = useMemo(() => [
@@ -45,8 +45,8 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
       ),
     },
     { key: 'track', label: 'Track', width: '25%',
-      sortValue: r => r.file.trackVenue,
-      render: r => <span className="text-white text-sm font-medium">{r.file.trackVenue}</span>,
+      sortValue: r => r.file.trackCourse,
+      render: r => <span className="text-white text-sm font-medium">{r.file.trackCourse}</span>,
     },
     { key: 'class', label: 'Class', width: '70px',
       sortValue: r => r.driver.carClass,

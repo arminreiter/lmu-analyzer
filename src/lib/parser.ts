@@ -209,7 +209,7 @@ export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
     dateTime: getText(root, 'DateTime'),
     timeString: getText(root, 'TimeString'),
     trackVenue: getText(root, 'TrackVenue'),
-    trackCourse: getText(root, 'TrackCourse'),
+    trackCourse: getText(root, 'TrackCourse') || getText(root, 'TrackVenue'),
     trackEvent: getText(root, 'TrackEvent'),
     trackLength: getNum(root, 'TrackLength'),
     gameVersion: getText(root, 'GameVersion'),

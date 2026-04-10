@@ -35,10 +35,10 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
   const carLaps = useMemo(() => lapSource.filter(b => b.carType === car), [lapSource, car]);
 
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
-    { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackVenue,
+    { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackCourse,
       render: r => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackVenue); }} className="text-white cursor-pointer">{r.trackVenue}</button>
-        : <span className="text-white">{r.trackVenue}</span> },
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackCourse); }} className="text-white cursor-pointer">{r.trackCourse}</button>
+        : <span className="text-white">{r.trackCourse}</span> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
     { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
@@ -58,7 +58,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
   ], [onNavigate]);
 
   const sortedCarLaps = useMemo(() =>
-    [...carLaps].sort((a, b) => a.trackVenue.localeCompare(b.trackVenue) || a.lapTime - b.lapTime),
+    [...carLaps].sort((a, b) => a.trackCourse.localeCompare(b.trackCourse) || a.lapTime - b.lapTime),
     [carLaps]
   );
 
@@ -147,7 +147,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
             <SortableTable<PersonalBest>
               columns={lapColumns}
               data={sortedCarLaps}
-              rowKey={(r, i) => `${r.trackVenue}-${r.fileName}-${r.lapNumber}-${i}`}
+              rowKey={(r, i) => `${r.trackCourse}-${r.fileName}-${r.lapNumber}-${i}`}
             />
           </div>
         </>

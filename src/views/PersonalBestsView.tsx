@@ -25,11 +25,11 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
   const everyLap = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
   const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
-  const tracks = Array.from(new Set(allBests.map(b => b.trackVenue))).sort();
+  const tracks = Array.from(new Set(allBests.map(b => b.trackCourse))).sort();
   const cars = Array.from(new Set(allBests.map(b => b.carType))).sort();
 
   const filtered = useMemo(() => allBests.filter(b => {
-    if (filterTrack !== 'All' && b.trackVenue !== filterTrack) return false;
+    if (filterTrack !== 'All' && b.trackCourse !== filterTrack) return false;
     if (filterCar !== 'All' && b.carType !== filterCar) return false;
     return true;
   }), [allBests, filterTrack, filterCar]);
@@ -37,9 +37,9 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const grouped = useMemo(() => {
     const map = new Map<string, PersonalBest[]>();
     for (const b of filtered) {
-      const arr = map.get(b.trackVenue) ?? [];
+      const arr = map.get(b.trackCourse) ?? [];
       arr.push(b);
-      map.set(b.trackVenue, arr);
+      map.set(b.trackCourse, arr);
     }
     return map;
   }, [filtered]);

@@ -110,6 +110,7 @@ export interface PersonalBest {
   sector3: number | null;
   topSpeed: number;
   trackVenue: string;
+  trackCourse: string;
   carType: string;
   carClass: CarClass;
   sessionType: SessionType;

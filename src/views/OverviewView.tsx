@@ -10,8 +10,8 @@ import type { RaceFile } from '../lib/types';
 const trackColumns: Column<TrackStats>[] = [
   {
     key: 'track', label: 'Circuit',
-    sortValue: t => t.trackVenue,
-    render: t => <span className="text-racing-text">{t.trackVenue}</span>,
+    sortValue: t => t.trackCourse,
+    render: t => <span className="text-racing-text">{t.trackCourse}</span>,
   },
   {
     key: 'car', label: 'Car',
@@ -156,8 +156,8 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
         <SortableTable<TrackStats>
           columns={trackColumns}
           data={tracks}
-          rowKey={t => t.trackVenue}
-          onRowClick={onNavigate ? (row) => onNavigate('tracks', row.trackVenue) : undefined}
+          rowKey={t => t.trackCourse}
+          onRowClick={onNavigate ? (row) => onNavigate('tracks', row.trackCourse) : undefined}
         />
       </div>
 

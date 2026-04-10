@@ -30,11 +30,11 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
   const allLaps = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
   const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
 
-  const track = selectedTrack ?? tracks[0]?.trackVenue;
+  const track = selectedTrack ?? tracks[0]?.trackCourse;
 
   const lapSource = lapMode === 'all' ? allLaps : lapMode === 'session' ? bestPerSession : bestPerCar;
-  const trackLaps = useMemo(() => lapSource.filter(b => b.trackVenue === track), [lapSource, track]);
-  const trackSessions = useMemo(() => allSessions.filter(s => s.file.trackVenue === track), [allSessions, track]);
+  const trackLaps = useMemo(() => lapSource.filter(b => b.trackCourse === track), [lapSource, track]);
+  const trackSessions = useMemo(() => allSessions.filter(s => s.file.trackCourse === track), [allSessions, track]);
 
   // Lap time progression over sessions for this track
   const progressionData = useMemo(() => {
@@ -95,14 +95,14 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
       <div className="flex gap-2 flex-wrap">
         {tracks.map(t => (
           <button
-            key={t.trackVenue}
-            onClick={() => setSelectedTrack(t.trackVenue)}
+            key={t.trackCourse}
+            onClick={() => setSelectedTrack(t.trackCourse)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer
-              ${t.trackVenue === track
+              ${t.trackCourse === track
                 ? 'bg-racing-red text-[#fff]'
                 : 'bg-racing-card border border-racing-border text-racing-muted hover:text-white hover:border-racing-highlight'}`}
           >
-            {t.trackVenue}
+            {t.trackCourse}
           </button>
         ))}
       </div>
@@ -143,7 +143,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <div>
                     <p className="text-racing-muted text-xs uppercase">Track Length</p>
                     <p className="text-white text-lg font-bold">
-                      {((files.find(f => f.trackVenue === track)?.trackLength ?? 0) / 1000).toFixed(2)} km
+                      {((files.find(f => f.trackCourse === track)?.trackLength ?? 0) / 1000).toFixed(2)} km
                     </p>
                   </div>
                 </div>

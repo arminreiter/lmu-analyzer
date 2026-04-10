@@ -48,7 +48,7 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Sele
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-full min-w-[180px] bg-racing-card border border-racing-border
+        <div className="absolute left-0 top-full mt-1 min-w-full w-max max-w-[400px] bg-racing-card border border-racing-border
           rounded-lg shadow-xl z-50 overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b border-racing-border">
             <Search className="w-3 h-3 text-racing-muted shrink-0" />

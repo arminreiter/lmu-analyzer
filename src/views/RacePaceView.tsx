@@ -41,13 +41,6 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
   const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
 
-  // Build fileName → trackCourse lookup from files
-  const courseByFile = useMemo(() => {
-    const map = new Map<string, { course: string; venue: string }>();
-    for (const f of files) map.set(f.fileName, { course: f.trackCourse, venue: f.trackVenue });
-    return map;
-  }, [files]);
-
   // Build comparison data: match each personal best to a benchmark
   const comparisons = useMemo(() => {
     if (!benchmarks || benchmarks.length === 0) return [];
@@ -61,8 +54,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     }> = [];
 
     for (const best of bests) {
-      const fileInfo = courseByFile.get(best.fileName);
-      const mappedTrack = mapTrackName(fileInfo?.course ?? best.trackVenue, fileInfo?.venue ?? best.trackVenue);
+      const mappedTrack = mapTrackName(best.trackCourse, best.trackVenue);
       if (!mappedTrack) continue;
       const benchmark = benchmarks.find(b => b.track === mappedTrack && b.carClass === best.carClass);
       if (!benchmark) continue;
@@ -71,24 +63,24 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     }
 
     return results;
-  }, [bests, benchmarks, courseByFile]);
+  }, [bests, benchmarks]);
 
   // Filter options
   const tracks = useMemo(() => {
-    const set = new Set(comparisons.map(c => c.best.trackVenue));
+    const set = new Set(comparisons.map(c => c.best.trackCourse));
     return [...set].sort();
   }, [comparisons]);
 
   const cars = useMemo(() => {
     let items = comparisons;
-    if (selectedTrack !== 'All') items = items.filter(c => c.best.trackVenue === selectedTrack);
+    if (selectedTrack !== 'All') items = items.filter(c => c.best.trackCourse === selectedTrack);
     const set = new Set(items.map(c => c.best.carType));
     return [...set].sort();
   }, [comparisons, selectedTrack]);
 
   const filtered = useMemo(() => {
     let items = comparisons;
-    if (selectedTrack !== 'All') items = items.filter(c => c.best.trackVenue === selectedTrack);
+    if (selectedTrack !== 'All') items = items.filter(c => c.best.trackCourse === selectedTrack);
     if (selectedCar !== 'All') items = items.filter(c => c.best.carType === selectedCar);
     return items.sort((a, b) => a.percent - b.percent);
   }, [comparisons, selectedTrack, selectedCar]);
@@ -97,9 +89,9 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>();
     for (const item of filtered) {
-      const arr = map.get(item.best.trackVenue) ?? [];
+      const arr = map.get(item.best.trackCourse) ?? [];
       arr.push(item);
-      map.set(item.best.trackVenue, arr);
+      map.set(item.best.trackCourse, arr);
     }
     return map;
   }, [filtered]);

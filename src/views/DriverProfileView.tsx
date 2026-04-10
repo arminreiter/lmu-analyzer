@@ -47,10 +47,10 @@ interface DriverProfileViewProps {
 
 const circuitColumn: Column<TrackBest> = {
   key: 'track', label: 'Circuit',
-  sortValue: t => t.trackVenue,
+  sortValue: t => t.trackCourse,
   render: t => (
     <div>
-      <span className="text-white font-medium">{t.trackVenue}</span>
+      <span className="text-white font-medium">{t.trackCourse}</span>
       <div className="flex items-center gap-1.5 mt-0.5">
         <span className="text-racing-muted text-[10px]">{t.bestCar}</span>
         <ClassBadge carClass={t.bestCarClass} />
@@ -151,11 +151,11 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
     });
   }
 
-  function toggleCircuit(trackVenue: string) {
+  function toggleCircuit(trackCourse: string) {
     setSettings(prev => {
-      const hidden = prev.hiddenCircuits.includes(trackVenue)
-        ? prev.hiddenCircuits.filter(c => c !== trackVenue)
-        : [...prev.hiddenCircuits, trackVenue];
+      const hidden = prev.hiddenCircuits.includes(trackCourse)
+        ? prev.hiddenCircuits.filter(c => c !== trackCourse)
+        : [...prev.hiddenCircuits, trackCourse];
       const next = { ...prev, hiddenCircuits: hidden };
       saveSettings(next);
       return next;
@@ -181,7 +181,7 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
   }, [settings.showTheoreticalBest, settings.showLapCount]);
 
   const visibleTrackBests = useMemo(() =>
-    profile.trackBests.filter(t => !settings.hiddenCircuits.includes(t.trackVenue)),
+    profile.trackBests.filter(t => !settings.hiddenCircuits.includes(t.trackCourse)),
     [profile.trackBests, settings.hiddenCircuits]
   );
 
@@ -258,10 +258,10 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
                 <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-racing-muted/50 font-medium">Circuits</div>
                 {profile.trackBests.map(t => (
                   <SettingsToggle
-                    key={t.trackVenue}
-                    label={t.trackVenue}
-                    checked={!settings.hiddenCircuits.includes(t.trackVenue)}
-                    onChange={() => toggleCircuit(t.trackVenue)}
+                    key={t.trackCourse}
+                    label={t.trackCourse}
+                    checked={!settings.hiddenCircuits.includes(t.trackCourse)}
+                    onChange={() => toggleCircuit(t.trackCourse)}
                   />
                 ))}
               </>
@@ -407,7 +407,7 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
         <SortableTable<TrackBest>
           columns={trackColumns}
           data={visibleTrackBests}
-          rowKey={t => t.trackVenue}
+          rowKey={t => t.trackCourse}
         />
       </div>
 
