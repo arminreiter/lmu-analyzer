@@ -52,11 +52,13 @@ const COURSE_MAP: Record<string, string> = {
   // Monza layouts
   'Autodromo Nazionale Monza': 'Monza',
   'Monza Curva Grande Variant': 'Monza (curvagrande)',
+  'Monza Curva Grande Circuit': 'Monza (curvagrande)',
   // Spa
   'Circuit de Spa-Francorchamps': 'Spa',
   // Le Mans layouts
   'Circuit de la Sarthe': 'Circuit de la Sarthe',
   'Circuit de la Sarthe without chicanes': 'Circuit de la Sarthe (straight)',
+  'Circuit de la Sarthe Mulsanne': 'Circuit de la Sarthe (straight)',
   // Barcelona
   'Circuit de Barcelona': 'Barcelona',
   // Imola
