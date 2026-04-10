@@ -8,7 +8,7 @@ export function Footer() {
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 bg-racing-red flex items-center justify-center"
               style={{ clipPath: 'polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 3px 100%, 0 calc(100% - 3px))' }}>
-              <span className="font-racing text-[6px] font-black text-white">LMU</span>
+              <span className="font-racing text-[6px] font-black" style={{ color: '#ffffff' }}>LMU</span>
             </div>
             <span className="text-racing-muted/60 text-xs">
               Built by{' '}
@@ -28,7 +28,7 @@ export function Footer() {
               href="https://buymeacoffee.com/axrider"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer
+              className="bmac-link flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer
                 bg-[#ffdd00]/8 border border-[#ffdd00]/20 text-[#ffdd00]/80
                 hover:bg-[#ffdd00]/15 hover:text-[#ffdd00] hover:border-[#ffdd00]/35"
             >

@@ -28,11 +28,11 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const tracks = Array.from(new Set(allBests.map(b => b.trackCourse))).sort();
   const cars = Array.from(new Set(allBests.map(b => b.carType))).sort();
 
-  const filtered = useMemo(() => allBests.filter(b => {
+  const filtered = allBests.filter(b => {
     if (filterTrack !== 'All' && b.trackCourse !== filterTrack) return false;
     if (filterCar !== 'All' && b.carType !== filterCar) return false;
     return true;
-  }), [allBests, filterTrack, filterCar]);
+  });
 
   const grouped = useMemo(() => {
     const map = new Map<string, PersonalBest[]>();
