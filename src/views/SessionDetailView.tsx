@@ -544,14 +544,19 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
   }
 
   const columns: Column<typeof incidents[0]>[] = [
-    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
+    { key: 'time', label: 'Time', width: '65px', mono: true, sortValue: r => r.time,
       render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
-    { key: 'desc', label: 'Description', sortValue: r => r.description,
-      render: r => <span className="text-racing-text">{r.description}</span> },
+    { key: 'desc', label: 'Description', width: '60%', sortValue: r => r.description,
+      render: r => <span className="text-racing-text truncate block">{r.description}</span> },
     { key: 'driver2', label: 'Other Driver', width: '150px', sortValue: r => r.driver2 ?? '',
       render: r => r.driver2 ? <span className="text-racing-muted">{r.driver2}</span> : <span className="text-racing-muted/30">--</span> },
-    { key: 'severity', label: 'Severity', align: 'right', width: '90px', mono: true, sortValue: r => r.severity,
-      render: r => <span className="text-racing-orange font-bold">{r.severity > 0 ? r.severity.toFixed(2) : '--'}</span> },
+    { key: 'severity', label: 'Severity', align: 'right', width: '160px', mono: true, sortValue: r => r.severity,
+      render: r => {
+        if (r.severity <= 0) return <span className="text-racing-muted/30">--</span>;
+        const color = r.severity >= 4000 ? 'text-racing-red' : r.severity >= 1000 ? 'text-racing-orange' : 'text-racing-green';
+        const label = r.severity >= 4000 ? 'high' : r.severity >= 1000 ? 'medium' : 'low';
+        return <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap"><span className={`${color} font-bold`}>{r.severity.toFixed(2)}</span><span className={`${color} text-[10px] w-10 text-right cursor-default`} title={"Low: < 1000\nMedium: 1000–4000\nHigh: > 4000"}>{label}</span></span>;
+      } },
   ];
 
   return (
