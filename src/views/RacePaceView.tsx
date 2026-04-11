@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect, memo } from 'react';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { Loader2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getPersonalBests, formatDelta } from '../lib/analytics';
+import { formatLapTime, getPersonalBests, formatDelta, CLASS_SPEED_ORDER } from '../lib/analytics';
 import {
   fetchBenchmarks,
   mapTrackName,
@@ -15,7 +15,7 @@ import {
   type PaceBenchmark,
   type PaceRating,
 } from '../lib/racepace';
-import type { RaceFile, PersonalBest } from '../lib/types';
+import type { RaceFile, PersonalBest, CarClass } from '../lib/types';
 
 interface RacePaceViewProps {
   files: RaceFile[];
@@ -28,6 +28,12 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   const [error, setError] = useState<string | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<string>('All');
   const [selectedCar, setSelectedCar] = useState<string>('All');
+
+  // Aggregate filter state
+  const [aggFiltersOpen, setAggFiltersOpen] = useState(false);
+  const [aggRemoveOutliers, setAggRemoveOutliers] = useState(true);
+  const [aggExcludedCars, setAggExcludedCars] = useState<Set<string>>(new Set());
+  const [aggExcludedTracks, setAggExcludedTracks] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +70,173 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
     return results;
   }, [bests, benchmarks]);
+
+  // Compute race pace: average race lap time per track/class
+  const racePaceComparisons = useMemo(() => {
+    if (!benchmarks || benchmarks.length === 0) return [];
+    const results: Array<{
+      carClass: CarClass;
+      carType: string;
+      trackCourse: string;
+      mappedTrack: string;
+      avgLapTime: number;
+      lapCount: number;
+      benchmark: PaceBenchmark;
+      percent: number;
+      rating: PaceRating;
+    }> = [];
+
+    // Group race laps by track+class+car
+    const raceGroups = new Map<string, { laps: number[]; benchmark: PaceBenchmark; carClass: CarClass; carType: string; trackCourse: string; mappedTrack: string }>();
+
+    for (const file of files) {
+      for (const session of file.sessions) {
+        if (session.type !== 'Race') continue;
+        for (const driver of session.drivers) {
+          if (!driverNames.some(n => n === driver.name)) continue;
+          const mappedTrack = mapTrackName(file.trackCourse, file.trackVenue);
+          if (!mappedTrack) continue;
+          const benchmark = benchmarks.find(b => b.track === mappedTrack && b.carClass === driver.carClass);
+          if (!benchmark) continue;
+
+          const key = `${driver.carClass}::${mappedTrack}`;
+          if (!raceGroups.has(key)) {
+            raceGroups.set(key, { laps: [], benchmark, carClass: driver.carClass, carType: driver.carType, trackCourse: file.trackCourse, mappedTrack });
+          }
+          const group = raceGroups.get(key)!;
+
+          for (const lap of driver.laps) {
+            if (!lap.lapTime || lap.lapTime <= 0) continue;
+            if (lap.isPit) continue;
+            if (lap.num <= 1) continue;
+            group.laps.push(lap.lapTime);
+          }
+        }
+      }
+    }
+
+    for (const [, group] of raceGroups) {
+      if (group.laps.length < 3) continue;
+      const sorted = [...group.laps].sort((a, b) => a - b);
+
+      let lapsToAvg: number[];
+      if (aggRemoveOutliers) {
+        const q1 = sorted[Math.floor(sorted.length * 0.25)];
+        const q3 = sorted[Math.floor(sorted.length * 0.75)];
+        const iqr = q3 - q1;
+        const lower = q1 - 1.5 * iqr;
+        const upper = q3 + 1.5 * iqr;
+        lapsToAvg = sorted.filter(t => t >= lower && t <= upper);
+      } else {
+        lapsToAvg = sorted;
+      }
+      if (lapsToAvg.length === 0) continue;
+
+      const avg = lapsToAvg.reduce((a, b) => a + b, 0) / lapsToAvg.length;
+      const { rating, percent } = rateLapTime(avg, group.benchmark);
+      results.push({
+        carClass: group.carClass,
+        carType: group.carType,
+        trackCourse: group.trackCourse,
+        mappedTrack: group.mappedTrack,
+        avgLapTime: avg,
+        lapCount: lapsToAvg.length,
+        benchmark: group.benchmark,
+        percent,
+        rating,
+      });
+    }
+
+    return results;
+  }, [files, driverNames, benchmarks, aggRemoveOutliers]);
+
+  // Available cars and tracks for aggregate filters
+  const aggAvailableCars = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of comparisons) set.add(c.best.carType);
+    for (const c of racePaceComparisons) set.add(c.carType);
+    return [...set].sort();
+  }, [comparisons, racePaceComparisons]);
+
+  const aggAvailableTracks = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of comparisons) set.add(c.best.trackCourse);
+    for (const c of racePaceComparisons) set.add(c.trackCourse);
+    return [...set].sort();
+  }, [comparisons, racePaceComparisons]);
+
+  const ratingFromPercent = (pct: number): PaceRating => {
+    if (pct <= 100) return 'Alien';
+    if (pct <= 101) return 'Competitive';
+    if (pct <= 102) return 'Good';
+    if (pct <= 104) return 'Midpack';
+    if (pct <= 106) return 'Tail-ender';
+    return 'Offline';
+  };
+
+  // Aggregate pace % by car class — best lap per track only
+  const classAggregates = useMemo(() => {
+    const filtered = comparisons.filter(c =>
+      !aggExcludedCars.has(c.best.carType) && !aggExcludedTracks.has(c.best.trackCourse)
+    );
+
+    // For each class+track, keep only the best (lowest percent) entry
+    const bestByTrackClass = new Map<string, typeof comparisons[number]>();
+    for (const c of filtered) {
+      const key = `${c.best.carClass}::${c.mappedTrack}`;
+      const existing = bestByTrackClass.get(key);
+      if (!existing || c.percent < existing.percent) {
+        bestByTrackClass.set(key, c);
+      }
+    }
+
+    // Group best-per-track entries by class
+    const classMap = new Map<string, typeof comparisons[number][]>();
+    for (const entry of bestByTrackClass.values()) {
+      const arr = classMap.get(entry.best.carClass) ?? [];
+      arr.push(entry);
+      classMap.set(entry.best.carClass, arr);
+    }
+
+    const results: Array<{ carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }> = [];
+    for (const [carClass, entries] of classMap as Map<CarClass, typeof comparisons[number][]>) {
+      const avg = entries.reduce((sum, e) => sum + e.percent, 0) / entries.length;
+      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg) });
+    }
+    return results.sort((a, b) => a.avgPercent - b.avgPercent);
+  }, [comparisons, aggExcludedCars, aggExcludedTracks]);
+
+  // Aggregate race pace % by car class — one entry per track
+  const racePaceAggregates = useMemo(() => {
+    const filtered = racePaceComparisons.filter(c =>
+      !aggExcludedCars.has(c.carType) && !aggExcludedTracks.has(c.trackCourse)
+    );
+
+    // Best race pace per track per class
+    const bestByTrackClass = new Map<string, typeof racePaceComparisons[number]>();
+    for (const c of filtered) {
+      const key = `${c.carClass}::${c.mappedTrack}`;
+      const existing = bestByTrackClass.get(key);
+      if (!existing || c.percent < existing.percent) {
+        bestByTrackClass.set(key, c);
+      }
+    }
+
+    const classMap = new Map<string, typeof racePaceComparisons[number][]>();
+    for (const entry of bestByTrackClass.values()) {
+      const arr = classMap.get(entry.carClass) ?? [];
+      arr.push(entry);
+      classMap.set(entry.carClass, arr);
+    }
+
+    const results: Array<{ carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating; totalLaps: number }> = [];
+    for (const [carClass, entries] of classMap as Map<CarClass, typeof racePaceComparisons[number][]>) {
+      const avg = entries.reduce((sum, e) => sum + e.percent, 0) / entries.length;
+      const totalLaps = entries.reduce((sum, e) => sum + e.lapCount, 0);
+      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg), totalLaps });
+    }
+    return results.sort((a, b) => a.avgPercent - b.avgPercent);
+  }, [racePaceComparisons, aggExcludedCars, aggExcludedTracks]);
 
   // Filter options
   const tracks = useMemo(() => {
@@ -192,6 +365,152 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
   return (
     <div className="space-y-5">
+      {/* Your Pace summary */}
+      {(classAggregates.length > 0 || racePaceAggregates.length > 0) && (
+        <div className="data-card carbon-fiber overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-racing-border checkered flex items-center justify-between">
+            <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">YOUR OVERALL PACE</h3>
+            <button
+              onClick={() => setAggFiltersOpen(o => !o)}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${aggFiltersOpen ? 'bg-racing-red/20 text-racing-red' : 'text-racing-muted hover:text-white hover:bg-white/5'}`}
+              title="Filter aggregate data"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {aggFiltersOpen && (
+            <div className="px-5 py-3 border-b border-racing-border/30 bg-racing-dark/30">
+              <div className="space-y-2.5 text-[11px]">
+                {/* Outlier removal */}
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={aggRemoveOutliers}
+                    onChange={e => setAggRemoveOutliers(e.target.checked)}
+                    className="accent-racing-red w-3.5 h-3.5 cursor-pointer"
+                  />
+                  <span className="text-racing-muted">Remove outliers</span>
+                  <span className="text-racing-muted/40 text-[9px]">(race pace)</span>
+                </label>
+
+                {/* Track filter */}
+                <div className="flex items-start gap-2">
+                  <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">Tracks:</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {aggAvailableTracks.map(t => (
+                      <label key={t} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!aggExcludedTracks.has(t)}
+                          onChange={() => setAggExcludedTracks(prev => {
+                            const next = new Set(prev);
+                            if (next.has(t)) next.delete(t); else next.add(t);
+                            return next;
+                          })}
+                          className="accent-racing-red w-3 h-3 cursor-pointer"
+                        />
+                        <span className="text-racing-muted">{t}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Car filter */}
+                <div className="flex items-start gap-2">
+                  <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">Cars:</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {aggAvailableCars.map(c => (
+                      <label key={c} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!aggExcludedCars.has(c)}
+                          onChange={() => setAggExcludedCars(prev => {
+                            const next = new Set(prev);
+                            if (next.has(c)) next.delete(c); else next.add(c);
+                            return next;
+                          })}
+                          className="accent-racing-red w-3 h-3 cursor-pointer"
+                        />
+                        <span className="text-racing-muted">{c}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '13%' }} />
+            </colgroup>
+            <thead>
+              <tr className="text-racing-muted text-[10px] uppercase tracking-wider border-b border-racing-border/30">
+                <th className="text-left font-medium pl-4 pr-1 py-2">Type</th>
+                <th className="text-left font-medium px-0 py-2">Class</th>
+                <th className="text-right font-medium px-4 py-2">Pace</th>
+                <th className="text-left font-medium px-4 py-2">Rating</th>
+                <th className="text-left font-medium px-4 py-2">Based On</th>
+                <th colSpan={5} />
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                // Collect all classes from both aggregates, ordered by speed
+                const classSet = new Set([
+                  ...classAggregates.map(a => a.carClass),
+                  ...racePaceAggregates.map(a => a.carClass),
+                ]);
+                const allClasses = CLASS_SPEED_ORDER.filter(c => classSet.has(c));
+
+                return allClasses.map(cls => {
+                  const best = classAggregates.find(a => a.carClass === cls);
+                  const race = racePaceAggregates.find(a => a.carClass === cls);
+                  return [
+                    best && (
+                      <tr key={`best-${cls}`} className="border-b border-racing-border/10">
+                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Best Lap</td>
+                        <td className="px-0 py-2"><ClassBadge carClass={best.carClass} /></td>
+                        <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{best.avgPercent.toFixed(1)}%</span></td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider border ${getRatingColor(best.avgRating)} ${getRatingBgColor(best.avgRating)}`}>
+                            {best.avgRating}
+                          </span>
+                        </td>
+                        <td className="text-racing-muted/50 text-[10px] px-4 py-2">{best.trackCount} {best.trackCount === 1 ? 'track' : 'tracks'}</td>
+                        <td colSpan={5} />
+                      </tr>
+                    ),
+                    race && (
+                      <tr key={`race-${cls}`} className="border-b border-racing-border/10">
+                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Race Pace</td>
+                        <td className="px-0 py-2"><ClassBadge carClass={race.carClass} /></td>
+                        <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{race.avgPercent.toFixed(1)}%</span></td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider border ${getRatingColor(race.avgRating)} ${getRatingBgColor(race.avgRating)}`}>
+                            {race.avgRating}
+                          </span>
+                        </td>
+                        <td className="text-racing-muted/50 text-[10px] px-4 py-2">{race.trackCount} {race.trackCount === 1 ? 'track' : 'tracks'}, {race.totalLaps} laps</td>
+                        <td colSpan={5} />
+                      </tr>
+                    ),
+                  ];
+                });
+              })()}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Filters + credit */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-3 items-center">
@@ -212,34 +531,33 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
             />
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-racing-muted/60">
-          <span>Data by</span>
-          <a
-            href="https://www.youtube.com/@ohne_speed"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-racing-muted hover:text-white transition-colors font-medium"
-          >ohne_speed</a>
-          <span>&middot;</span>
-          <a
-            href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-racing-muted hover:text-white transition-colors flex items-center gap-0.5"
-          >
-            <ExternalLink className="w-2.5 h-2.5" />
-            Spreadsheet
-          </a>
-        </div>
-      </div>
-
-      {/* Pace reference legend */}
-      <div className="data-card carbon-fiber px-5 py-3">
-        <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase tracking-wider">
-          <span className="text-racing-muted font-medium">Pace Tiers:</span>
-          {(['Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline'] as PaceRating[]).map(r => (
-            <span key={r} className={`${getRatingColor(r)} font-semibold`}>{r}</span>
-          ))}
+        <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-wider">
+            <span className="text-racing-muted font-medium">Pace Tiers:</span>
+            {(['Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline'] as PaceRating[]).map(r => (
+              <span key={r} className={`${getRatingColor(r)} font-semibold`}>{r}</span>
+            ))}
+          </div>
+          <span className="text-racing-border">|</span>
+          <div className="flex items-center gap-1.5 text-[10px] text-racing-muted/60">
+            <span>Data by</span>
+            <a
+              href="https://www.youtube.com/@ohne_speed"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-racing-muted hover:text-white transition-colors font-medium"
+            >ohne_speed</a>
+            <span>&middot;</span>
+            <a
+              href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-racing-muted hover:text-white transition-colors flex items-center gap-0.5"
+            >
+              <ExternalLink className="w-2.5 h-2.5" />
+              Spreadsheet
+            </a>
+          </div>
         </div>
       </div>
 
