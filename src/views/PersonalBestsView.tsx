@@ -138,7 +138,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           { key: 'session', label: 'Session', width: '10%',
             sortValue: r => r.sessionType,
             render: r => isTheoretical(r) ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : onNavigate
-              ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} onNavigate={onNavigate}>{r.sessionType} &mdash; L{r.lapNumber}</SessionLink>
+              ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} driverName={r.driverName} onNavigate={onNavigate}>{r.sessionType} &mdash; L{r.lapNumber}</SessionLink>
               : <span className="text-racing-muted text-xs">{r.sessionType} &mdash; L{r.lapNumber}</span> },
           { key: 'date', label: 'Date', width: '12%',
             sortValue: r => r.date,

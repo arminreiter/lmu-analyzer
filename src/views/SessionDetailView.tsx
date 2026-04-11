@@ -486,7 +486,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
             <LineChart data={tireData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[0, 100]} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="FL" stroke="#e10600" strokeWidth={1.5} dot={false} name="Front Left" />
@@ -506,7 +506,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
             <LineChart data={fuelData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
               <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[0, 100]} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="fuel" stroke="#ffd600" strokeWidth={2} dot={false} name="Fuel Level %" />

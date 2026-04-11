@@ -17,15 +17,20 @@ function mergeDriverResult(entries: DriverResult[]): DriverResult {
   });
   const base = { ...sorted[0] };
 
-  // Merge laps: union by lap number, keep the first occurrence
-  const lapMap = new Map<number, LapData>();
+  // Merge laps across rejoin fragments. Lap numbers can reset on rejoin,
+  // so we append each fragment's laps with renumbered offsets when overlaps
+  // are detected rather than deduplicating by lap number.
+  const allLaps: LapData[] = [];
+  let nextNum = 0;
   for (const entry of entries) {
     for (const lap of entry.laps) {
-      if (!lapMap.has(lap.num)) lapMap.set(lap.num, lap);
+      const num = lap.num <= nextNum ? nextNum + 1 : lap.num;
+      allLaps.push(num === lap.num ? lap : { ...lap, num });
+      nextNum = num;
     }
   }
-  base.laps = Array.from(lapMap.values()).sort((a, b) => a.num - b.num);
-  base.totalLaps = Math.max(base.totalLaps, base.laps.length);
+  base.laps = allLaps;
+  base.totalLaps = entries.reduce((sum, e) => sum + e.totalLaps, 0);
 
   // Recalculate best lap from merged data
   let best: number | null = null;
@@ -87,13 +92,14 @@ function mergeSessions(sessions: SessionData[]): SessionData {
 
 /**
  * Merges rejoin fragments: when LMU writes multiple XML files for the same
- * server session (same timeString + trackCourse + session type), combine them
+ * server session (same event + source session tag), combine them
  * into a single session with merged laps, drivers, and stream events.
  */
 export function deduplicateSessions(files: RaceFile[]): RaceFile[] {
   interface SessionRef { fileIdx: number; sessionIdx: number }
 
-  // Group sessions by server identity: timeString + trackCourse + type
+  // Group sessions by server identity. Use the original XML tag so
+  // Practice1/Practice2 or Race1/Race2 are never merged together.
   const groups = new Map<string, SessionRef[]>();
 
   for (let fi = 0; fi < files.length; fi++) {
@@ -101,7 +107,7 @@ export function deduplicateSessions(files: RaceFile[]): RaceFile[] {
     for (let si = 0; si < file.sessions.length; si++) {
       const sess = file.sessions[si];
       const key = file.timeString
-        ? `${file.timeString}|${file.trackCourse}|${sess.type}`
+        ? `${file.timeString}|${file.trackCourse}|${sess.sourceTag ?? sess.type}`
         : `__ungrouped_${fi}_${si}`;
       const group = groups.get(key);
       if (group) group.push({ fileIdx: fi, sessionIdx: si });

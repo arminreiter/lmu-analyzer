@@ -124,8 +124,8 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
         <SortableTable<SessionRow>
           columns={columns}
           data={filtered}
-          rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}`}
-          onRowClick={r => onNavigate?.('session', `${r.file.fileName}::${r.session.sessionIndex}`)}
+          rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}-${r.driver.name}`}
+          onRowClick={r => onNavigate?.('session', `${r.file.fileName}::${r.session.sessionIndex}::${encodeURIComponent(r.driver.name)}`)}
         />
       </div>
     </div>

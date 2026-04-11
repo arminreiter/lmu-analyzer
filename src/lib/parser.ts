@@ -157,7 +157,7 @@ function parseStreamEvents(streamEl: Element | null) {
   return { incidents, penalties, trackLimits };
 }
 
-function parseSession(sessionEl: Element, type: SessionType, index: number): SessionData {
+function parseSession(sessionEl: Element, sourceTag: string, type: SessionType, index: number): SessionData {
   const streamEl = sessionEl.getElementsByTagName('Stream')[0] ?? null;
   const { incidents, penalties, trackLimits } = parseStreamEvents(streamEl);
 
@@ -169,6 +169,7 @@ function parseSession(sessionEl: Element, type: SessionType, index: number): Ses
 
   return {
     type,
+    sourceTag,
     sessionIndex: index,
     dateTime: getText(sessionEl, 'TimeString'),
     lapsLimit: parseInt(getText(sessionEl, 'Laps')) || 0,
@@ -193,7 +194,7 @@ export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
   for (const tag of SESSION_TAGS) {
     const els = root.getElementsByTagName(tag);
     for (let i = 0; i < els.length; i++) {
-      sessions.push(parseSession(els[i], SESSION_TAG_MAP[tag], sessionIdx++));
+      sessions.push(parseSession(els[i], tag, SESSION_TAG_MAP[tag], sessionIdx++));
     }
   }
 

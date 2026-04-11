@@ -74,7 +74,7 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
       render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
     { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
       render: r => onNavigate
-        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
+        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} driverName={r.driverName} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
         : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
     { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
       render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },

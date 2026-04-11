@@ -27,6 +27,50 @@ interface RacePaceViewProps {
   onNavigate?: (view: string, context?: string) => void;
 }
 
+interface ClassAggregate { carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }
+interface RaceClassAggregate extends ClassAggregate { totalLaps: number }
+
+const ratingFromPercent = (pct: number): PaceRating => {
+  if (pct <= 100) return 'Alien';
+  if (pct <= 101) return 'Competitive';
+  if (pct <= 102) return 'Good';
+  if (pct <= 104) return 'Midpack';
+  if (pct <= 106) return 'Tail-ender';
+  return 'Offline';
+};
+
+/** Group items by class, keep best per track+class, return per-class averages */
+function aggregateByClass<T>(
+  items: T[],
+  getKey: (item: T) => { carClass: CarClass; mappedTrack: string },
+  getPercent: (item: T) => number,
+): ClassAggregate[] {
+  const bestByTrackClass = new Map<string, T>();
+  for (const item of items) {
+    const { carClass, mappedTrack } = getKey(item);
+    const key = `${carClass}::${mappedTrack}`;
+    const existing = bestByTrackClass.get(key);
+    if (!existing || getPercent(item) < getPercent(existing)) {
+      bestByTrackClass.set(key, item);
+    }
+  }
+
+  const classMap = new Map<CarClass, T[]>();
+  for (const entry of bestByTrackClass.values()) {
+    const cls = getKey(entry).carClass;
+    const arr = classMap.get(cls) ?? [];
+    arr.push(entry);
+    classMap.set(cls, arr);
+  }
+
+  const results: ClassAggregate[] = [];
+  for (const [carClass, entries] of classMap) {
+    const avg = entries.reduce((sum, e) => sum + getPercent(e), 0) / entries.length;
+    results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg) });
+  }
+  return results.sort((a, b) => a.avgPercent - b.avgPercent);
+}
+
 export const RacePaceView = memo(function RacePaceView({ files, driverNames, onNavigate }: RacePaceViewProps) {
   const [benchmarks, setBenchmarks] = useState<PaceBenchmark[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -169,49 +213,6 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     return [...set].sort();
   }, [comparisons, racePaceComparisons]);
 
-  const ratingFromPercent = (pct: number): PaceRating => {
-    if (pct <= 100) return 'Alien';
-    if (pct <= 101) return 'Competitive';
-    if (pct <= 102) return 'Good';
-    if (pct <= 104) return 'Midpack';
-    if (pct <= 106) return 'Tail-ender';
-    return 'Offline';
-  };
-
-  /** Group items by class, keep best per track+class, return per-class averages */
-  interface ClassAggregate { carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }
-  interface RaceClassAggregate extends ClassAggregate { totalLaps: number }
-
-  function aggregateByClass<T>(
-    items: T[],
-    getKey: (item: T) => { carClass: CarClass; mappedTrack: string },
-    getPercent: (item: T) => number,
-  ): ClassAggregate[] {
-    const bestByTrackClass = new Map<string, T>();
-    for (const item of items) {
-      const { carClass, mappedTrack } = getKey(item);
-      const key = `${carClass}::${mappedTrack}`;
-      const existing = bestByTrackClass.get(key);
-      if (!existing || getPercent(item) < getPercent(existing)) {
-        bestByTrackClass.set(key, item);
-      }
-    }
-
-    const classMap = new Map<CarClass, T[]>();
-    for (const entry of bestByTrackClass.values()) {
-      const cls = getKey(entry).carClass;
-      const arr = classMap.get(cls) ?? [];
-      arr.push(entry);
-      classMap.set(cls, arr);
-    }
-
-    const results: ClassAggregate[] = [];
-    for (const [carClass, entries] of classMap) {
-      const avg = entries.reduce((sum, e) => sum + getPercent(e), 0) / entries.length;
-      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg) });
-    }
-    return results.sort((a, b) => a.avgPercent - b.avgPercent);
-  }
 
   // Aggregate pace % by car class — best lap per track only
   const classAggregates = useMemo(() => {
@@ -353,7 +354,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     { key: 'session', label: 'Session', width: '9%',
       sortValue: r => r.best.sessionType,
       render: r => onNavigate
-        ? <SessionLink fileName={r.best.fileName} sessionIndex={r.best.sessionIndex} onNavigate={onNavigate}>{r.best.sessionType} L{r.best.lapNumber}</SessionLink>
+        ? <SessionLink fileName={r.best.fileName} sessionIndex={r.best.sessionIndex} driverName={r.best.driverName} onNavigate={onNavigate}>{r.best.sessionType} L{r.best.lapNumber}</SessionLink>
         : <span className="text-racing-muted text-xs">{r.best.sessionType} L{r.best.lapNumber}</span> },
     { key: 'date', label: 'Date', width: '13%',
       sortValue: r => r.best.date,

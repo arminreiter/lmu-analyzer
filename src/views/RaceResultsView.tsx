@@ -159,7 +159,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
           columns={raceColumns}
           data={results}
           rowKey={(r, i) => `${r.file.fileName}-${i}`}
-          onRowClick={onNavigate ? (row) => onNavigate('session', `${row.file.fileName}::${row.session.sessionIndex}`) : undefined}
+          onRowClick={onNavigate ? (row) => onNavigate('session', `${row.file.fileName}::${row.session.sessionIndex}::${encodeURIComponent(row.driver.name)}`) : undefined}
         />
       </div>
 

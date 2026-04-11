@@ -45,6 +45,7 @@ export interface DriverResult {
 
 export interface SessionData {
   type: SessionType;
+  sourceTag: string;
   sessionIndex: number;
   dateTime: string;
   lapsLimit: number;
@@ -127,4 +128,3 @@ export interface DriverSummary {
   totalLaps: number;
   isPlayer: boolean;
 }
-

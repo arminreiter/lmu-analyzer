@@ -206,16 +206,19 @@ function App() {
     [files, selectedClasses]
   );
 
-  // Resolve session detail from viewContext "fileName::sessionIndex"
+  // Resolve session detail from viewContext "fileName::sessionIndex[::driverName]"
   const sessionDetail = useMemo(() => {
     if (activeView !== 'session' || !viewContext) return null;
-    const [fileName, idxStr] = viewContext.split('::');
+    const [fileName, idxStr, ...driverParts] = viewContext.split('::');
     const sessionIndex = Number(idxStr);
+    const driverName = driverParts.length > 0 ? decodeURIComponent(driverParts.join('::')) : null;
     const file = filteredFiles.find(f => f.fileName === fileName);
     if (!file) return null;
     const session = file.sessions.find(s => s.sessionIndex === sessionIndex);
     if (!session) return null;
-    const driver = session.drivers.find(d => selectedDrivers.includes(d.name));
+    const driver = driverName
+      ? session.drivers.find(d => d.name === driverName)
+      : session.drivers.find(d => selectedDrivers.includes(d.name));
     if (!driver) return null;
     return { file, session, driver };
   }, [activeView, viewContext, filteredFiles, selectedDrivers]);
