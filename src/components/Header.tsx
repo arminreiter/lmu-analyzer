@@ -7,6 +7,7 @@ import { useInstallPrompt } from '../lib/useInstallPrompt';
 interface HeaderProps {
   selectedDrivers: string[];
   drivers: DriverSummary[];
+  playerDrivers: string[];
   onDriverChange: (names: string[]) => void;
   allClasses: CarClass[];
   selectedClasses: CarClass[];
@@ -34,7 +35,7 @@ const VIEWS = [
   { id: 'about', label: 'About' },
 ];
 
-export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
   const { canInstall, install } = useInstallPrompt();
   const driverOptions = drivers.map(d => ({
     value: d.name,
@@ -82,6 +83,11 @@ export function Header({ selectedDrivers, drivers, onDriverChange, allClasses, s
               onChange={onDriverChange}
               placeholder="Select drivers..."
               icon={<User className="w-3.5 h-3.5 text-racing-muted" />}
+              sortSelectedFirst
+              quickActions={[{
+                label: 'My profiles',
+                onSelect: () => onDriverChange(playerDrivers),
+              }]}
             />
 
             <button

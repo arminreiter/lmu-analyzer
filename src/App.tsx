@@ -21,6 +21,7 @@ import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 function App() {
   const [files, setFiles] = useState<RaceFile[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
+  const [playerDrivers, setPlayerDrivers] = useState<string[]>([]);
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
   const [allClasses, setAllClasses] = useState<CarClass[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<CarClass[]>([]);
@@ -83,18 +84,20 @@ function App() {
     setAllClasses(classes);
     const allDriversList = getAllDrivers(parsed);
     setDrivers(allDriversList);
+    const detected = detectPlayerDrivers(parsed);
+    setPlayerDrivers(detected);
 
     const savedFilters = restoreFilters ? storage.loadFilters() : null;
     if (savedFilters) {
       // Restore saved filters, but only keep values that still exist in the data
       const validDrivers = savedFilters.selectedDrivers.filter(d => allDriversList.some(dl => dl.name === d));
       const validClasses = savedFilters.selectedClasses.filter(c => classes.includes(c));
-      setSelectedDrivers(validDrivers.length > 0 ? validDrivers : detectPlayerDrivers(parsed));
+      setSelectedDrivers(validDrivers.length > 0 ? validDrivers : detected);
       setSelectedClasses(validClasses.length > 0 ? validClasses : classes);
       setActiveView(savedFilters.activeView || 'overview');
     } else {
       setSelectedClasses(classes);
-      setSelectedDrivers(detectPlayerDrivers(parsed));
+      setSelectedDrivers(detected);
     }
     setLoaded(true);
   }, []);
@@ -244,6 +247,7 @@ function App() {
       <Header
         selectedDrivers={selectedDrivers}
         drivers={drivers}
+        playerDrivers={playerDrivers}
         onDriverChange={setSelectedDrivers}
         allClasses={allClasses}
         selectedClasses={selectedClasses}

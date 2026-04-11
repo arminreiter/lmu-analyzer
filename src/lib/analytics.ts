@@ -1,5 +1,8 @@
 import type { RaceFile, PersonalBest, DriverSummary, DriverResult, LapData, SessionData, CarClass } from './types';
 
+/** Car classes ordered by speed (fastest first) */
+export const CLASS_SPEED_ORDER: CarClass[] = ['Hyper', 'LMP3', 'GTE', 'GT3'];
+
 // ---------------------------------------------------------------------------
 // Session deduplication / merging
 // ---------------------------------------------------------------------------
@@ -205,8 +208,7 @@ export function getAllClasses(files: RaceFile[]): CarClass[] {
       }
     }
   }
-  const order: CarClass[] = ['Hyper', 'GT3', 'GTE', 'LMP3'];
-  return order.filter(c => classes.has(c));
+  return CLASS_SPEED_ORDER.filter(c => classes.has(c));
 }
 
 export function filterFilesByClasses(files: RaceFile[], classes: CarClass[]): RaceFile[] {
@@ -474,12 +476,13 @@ export function getTheoreticalBest(files: RaceFile[], driverNames: string | stri
   for (const file of files) {
     if (file.trackCourse !== trackCourse) continue;
     for (const session of file.sessions) {
-      const driver = session.drivers.find(d => names.includes(d.name) && d.carType === carType);
-      if (!driver) continue;
-      for (const lap of driver.laps) {
-        if (lap.sector1 !== null && (bestS1 === null || lap.sector1 < bestS1)) bestS1 = lap.sector1;
-        if (lap.sector2 !== null && (bestS2 === null || lap.sector2 < bestS2)) bestS2 = lap.sector2;
-        if (lap.sector3 !== null && (bestS3 === null || lap.sector3 < bestS3)) bestS3 = lap.sector3;
+      const drivers = session.drivers.filter(d => names.includes(d.name) && d.carType === carType);
+      for (const driver of drivers) {
+        for (const lap of driver.laps) {
+          if (lap.sector1 !== null && (bestS1 === null || lap.sector1 < bestS1)) bestS1 = lap.sector1;
+          if (lap.sector2 !== null && (bestS2 === null || lap.sector2 < bestS2)) bestS2 = lap.sector2;
+          if (lap.sector3 !== null && (bestS3 === null || lap.sector3 < bestS3)) bestS3 = lap.sector3;
+        }
       }
     }
   }

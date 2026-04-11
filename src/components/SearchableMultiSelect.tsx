@@ -8,15 +8,22 @@ export interface MultiSelectOption {
   detail?: string;
 }
 
+export interface QuickAction {
+  label: string;
+  onSelect: () => void;
+}
+
 interface SearchableMultiSelectProps {
   values: string[];
   options: MultiSelectOption[];
   onChange: (values: string[]) => void;
   placeholder?: string;
   icon?: React.ReactNode;
+  quickActions?: QuickAction[];
+  sortSelectedFirst?: boolean;
 }
 
-export function SearchableMultiSelect({ values, options, onChange, placeholder = 'Select...', icon }: SearchableMultiSelectProps) {
+export function SearchableMultiSelect({ values, options, onChange, placeholder = 'Select...', icon, quickActions, sortSelectedFirst = false }: SearchableMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -37,9 +44,15 @@ export function SearchableMultiSelect({ values, options, onChange, placeholder =
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  const filtered = options.filter(o =>
-    o.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = options
+    .filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (!sortSelectedFirst) return 0;
+      const aSelected = values.includes(a.value);
+      const bSelected = values.includes(b.value);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+      return 0;
+    });
 
   const toggle = (value: string) => {
     if (values.includes(value)) {
@@ -91,11 +104,19 @@ export function SearchableMultiSelect({ values, options, onChange, placeholder =
             )}
           </div>
 
-          {/* Select all / none */}
+          {/* Select all / quick actions / clear */}
           <div className="flex gap-2 px-3 py-1.5 border-b border-racing-border text-xs">
             <button onClick={selectAll} className="text-racing-muted hover:text-white transition-colors cursor-pointer">
               Select all
             </button>
+            {quickActions?.map(action => (
+              <span key={action.label} className="contents">
+                <span className="text-racing-border">|</span>
+                <button onClick={action.onSelect} className="text-racing-muted hover:text-white transition-colors cursor-pointer">
+                  {action.label}
+                </button>
+              </span>
+            ))}
             <span className="text-racing-border">|</span>
             <button onClick={selectNone} className="text-racing-muted hover:text-white transition-colors cursor-pointer">
               Clear
