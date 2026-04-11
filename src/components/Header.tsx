@@ -1,7 +1,7 @@
 import { FolderOpen, User, Layers, RefreshCw, Gauge, Download, Sun, Moon } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
-import { getClassColor } from '../lib/analytics';
+import { getClassColor } from '../lib/formatting';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
 
 interface HeaderProps {

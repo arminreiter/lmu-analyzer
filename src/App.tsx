@@ -14,6 +14,7 @@ import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateSessions } from './lib/analytics';
+import { DataIndexProvider } from './lib/DataIndexContext';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
@@ -272,7 +273,7 @@ function App() {
             <p className="text-sm mt-1">Select at least one driver from the dropdown above.</p>
           </div>
         ) : (
-          <>
+          <DataIndexProvider files={filteredFiles} driverNames={selectedDrivers}>
             {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
@@ -284,7 +285,7 @@ function App() {
             {activeView === 'benchmarks' && <RacePaceView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
-          </>
+          </DataIndexProvider>
         )}
       </main>
 

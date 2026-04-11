@@ -6,7 +6,8 @@ import { PillSelector } from '../components/PillSelector';
 import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, formatDistance, getCarStats, getPersonalBests, getAllSessionBests, getAllLaps } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatDistance } from '../lib/formatting';
+import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'track' | 'session' | 'all';
@@ -24,13 +25,10 @@ interface CarsViewProps {
   onNavigate?: (view: string, context?: string) => void;
 }
 
-export const CarsView = memo(function CarsView({ files, driverNames, initialCar, onNavigate }: CarsViewProps) {
+export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsViewProps) {
   const [selectedCar, setSelectedCar] = useState<string | null>(initialCar ?? null);
   const [lapMode, setLapMode] = useState<LapMode>('track');
-  const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
-  const bestPerTrack = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
-  const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
-  const allLaps = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
+  const { carStats: cars, personalBests: bestPerTrack, allSessionBests: bestPerSession, allLaps } = useDataIndex();
 
   const car = selectedCar ?? cars[0]?.carType;
   const carInfo = cars.find(c => c.carType === car);

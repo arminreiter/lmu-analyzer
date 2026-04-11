@@ -5,7 +5,9 @@ import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSpeed, getDriverSessions, isRatedRace, calculateConsistency, getConsistencyColor, getSessionTypeStyle, getTopSpeed } from '../lib/analytics';
+import { isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { formatLapTime, formatSpeed, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
+import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
 interface SessionsViewProps {
@@ -16,12 +18,12 @@ interface SessionsViewProps {
 
 type SessionRow = { file: RaceFile; session: SessionData; driver: DriverResult };
 
-export const SessionsView = memo(function SessionsView({ files, driverNames, onNavigate }: SessionsViewProps) {
+export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsViewProps) {
   const [filterSetting, setFilterSetting] = useState<'all' | 'online' | 'rated'>('all');
   const [filterType, setFilterType] = useState<string>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
 
-  const allSessions = useMemo(() => getDriverSessions(files, driverNames), [files, driverNames]);
+  const { driverSessions: allSessions } = useDataIndex();
   const tracks = useMemo(() => Array.from(new Set(allSessions.map(s => s.file.trackCourse))).sort(), [allSessions]);
 
   const filtered = useMemo(() => allSessions

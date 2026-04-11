@@ -6,7 +6,9 @@ import { DataCardHeader } from '../components/DataCardHeader';
 import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getPersonalBests, formatDelta, CLASS_SPEED_ORDER } from '../lib/analytics';
+import { CLASS_SPEED_ORDER } from '../lib/analytics';
+import { formatLapTime, formatDelta } from '../lib/formatting';
+import { useDataIndex } from '../lib/useDataIndex';
 import {
   fetchBenchmarks,
   mapTrackName,
@@ -47,7 +49,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
   const loading = benchmarks === null && error === null;
 
-  const bests = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
+  const { personalBests: bests } = useDataIndex();
 
   // Build comparison data: match each personal best to a benchmark
   const comparisons = useMemo(() => {

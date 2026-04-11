@@ -7,7 +7,9 @@ import { SessionLink } from '../components/SessionLink';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
+import { getTheoreticalBest } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed } from '../lib/formatting';
+import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -24,9 +26,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const [showTheoretical, setShowTheoretical] = useState(false);
   const [lapMode, setLapMode] = useState<LapMode>('car');
 
-  const bestPerCar = useMemo(() => getPersonalBests(files, driverNames), [files, driverNames]);
-  const bestPerSession = useMemo(() => getAllSessionBests(files, driverNames), [files, driverNames]);
-  const everyLap = useMemo(() => getAllLaps(files, driverNames), [files, driverNames]);
+  const { personalBests: bestPerCar, allSessionBests: bestPerSession, allLaps: everyLap } = useDataIndex();
   const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
   const tracks = Array.from(new Set(allBests.map(b => b.trackCourse))).sort();
   const cars = Array.from(new Set(allBests.map(b => b.carType))).sort();

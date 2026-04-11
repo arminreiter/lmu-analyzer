@@ -6,7 +6,8 @@ import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, getChartTooltipStyle, type RaceResult } from '../lib/analytics';
+import { getRaceResults, isRatedRace, isDriverIncident, type RaceResult } from '../lib/analytics';
+import { formatLapTime, getChartTooltipStyle } from '../lib/formatting';
 import type { RaceFile } from '../lib/types';
 
 interface RaceResultsViewProps {

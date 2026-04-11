@@ -4,7 +4,8 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatDistance, getDriverProfileStats, type TrackBest } from '../lib/analytics';
+import { getDriverProfileStats, type TrackBest } from '../lib/analytics';
+import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
 import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar } from '../lib/storage';
 import type { RaceFile } from '../lib/types';
 

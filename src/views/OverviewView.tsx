@@ -5,7 +5,9 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatDistance, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
+import { getOverviewStats, type TrackStats, type CarStats } from '../lib/analytics';
+import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
+import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile } from '../lib/types';
 
 const trackColumns: Column<TrackStats>[] = [
@@ -87,8 +89,7 @@ interface OverviewViewProps {
 
 export const OverviewView = memo(function OverviewView({ files, driverNames, onNavigate }: OverviewViewProps) {
   const stats = useMemo(() => getOverviewStats(files, driverNames), [files, driverNames]);
-  const tracks = useMemo(() => getTrackStats(files, driverNames), [files, driverNames]);
-  const cars = useMemo(() => getCarStats(files, driverNames), [files, driverNames]);
+  const { trackStats: tracks, carStats: cars } = useDataIndex();
 
   return (
     <div className="space-y-5">

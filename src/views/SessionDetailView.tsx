@@ -5,7 +5,8 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, formatEventTime, isDriverIncident, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle } from '../lib/analytics';
+import { isDriverIncident } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
