@@ -205,6 +205,16 @@ export function formatDistance(km: number): string {
   return `${Math.round(km).toLocaleString()} km`;
 }
 
+export function getConsistencyColor(c: number): string {
+  return c > 98 ? 'text-racing-green' : c > 95 ? 'text-racing-yellow' : 'text-racing-orange';
+}
+
+export function getSessionTypeStyle(type: string): string {
+  return type === 'Race' ? 'bg-racing-red/20 text-racing-red'
+    : type === 'Qualifying' ? 'bg-racing-yellow/20 text-racing-yellow'
+    : 'bg-racing-blue/20 text-racing-blue';
+}
+
 /** Consistency score (0-100%) based on coefficient of variation of valid lap times */
 export function calculateConsistency(laps: LapData[]): number | null {
   const times = laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!);

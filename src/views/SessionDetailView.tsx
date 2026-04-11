@@ -5,7 +5,7 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatEventTime, isDriverIncident, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle } from '../lib/analytics';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
@@ -89,10 +89,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <span className={`px-2.5 py-1 rounded text-xs font-bold
-              ${session.type === 'Race' ? 'bg-racing-red/20 text-racing-red' :
-                session.type === 'Qualifying' ? 'bg-racing-yellow/20 text-racing-yellow' :
-                'bg-racing-blue/20 text-racing-blue'}`}>
+            <span className={`px-2.5 py-1 rounded text-xs font-bold ${getSessionTypeStyle(session.type)}`}>
               {session.type}
             </span>
             <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{file.trackCourse}</h1>
@@ -247,7 +244,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             <MiniStat label="Median" value={formatLapTime(stats.median)} />
             <MiniStat label="Std Dev" value={`${stats.stdDev.toFixed(3)}s`} />
             <MiniStat label="Consistency" value={`${stats.consistency.toFixed(1)}%`}
-              accent={stats.consistency > 98 ? 'text-racing-green' : stats.consistency > 95 ? 'text-racing-yellow' : 'text-racing-orange'} />
+              accent={getConsistencyColor(stats.consistency)} />
             <MiniStat label="Top Speed" value={formatSpeed(stats.topSpeed)} accent="text-racing-orange" />
             <MiniStat label="Avg Speed" value={formatSpeed(stats.avgSpeed)} />
             {stats.avgFuelPerLap !== null && (

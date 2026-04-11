@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
+import { PillSelector } from '../components/PillSelector';
 import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
@@ -95,20 +96,9 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
   return (
     <div className="space-y-6">
       {/* Track Selector */}
-      <div className="flex gap-2 flex-wrap">
-        {tracks.map(t => (
-          <button
-            key={t.trackCourse}
-            onClick={() => setSelectedTrack(t.trackCourse)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors cursor-pointer
-              ${t.trackCourse === track
-                ? 'bg-racing-red text-[#fff]'
-                : 'bg-racing-card border border-racing-border text-racing-muted hover:text-white hover:border-racing-highlight'}`}
-          >
-            {t.trackCourse}
-          </button>
-        ))}
-      </div>
+      <PillSelector items={tracks} itemKey={t => t.trackCourse} selected={track} onSelect={setSelectedTrack}>
+        {t => t.trackCourse}
+      </PillSelector>
 
       {track && (
         <>

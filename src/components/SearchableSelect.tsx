@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
+import { useClickOutside } from '../lib/useClickOutside';
 
 interface SearchableSelectProps {
   value: string;
@@ -14,17 +15,8 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Sele
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch('');
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  const closeDropdown = useCallback(() => { setOpen(false); setSearch(''); }, []);
+  useClickOutside(ref, closeDropdown);
 
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();

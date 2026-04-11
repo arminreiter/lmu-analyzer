@@ -5,7 +5,7 @@ import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSpeed, getDriverSessions, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { formatLapTime, formatSpeed, getDriverSessions, isRatedRace, calculateConsistency, getConsistencyColor, getSessionTypeStyle, getTopSpeed } from '../lib/analytics';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
 interface SessionsViewProps {
@@ -38,10 +38,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
     { key: 'type', label: 'Type', width: '95px',
       sortValue: r => r.session.type,
       render: r => (
-        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold
-          ${r.session.type === 'Race' ? 'bg-racing-red/20 text-racing-red' :
-            r.session.type === 'Qualifying' ? 'bg-racing-yellow/20 text-racing-yellow' :
-            'bg-racing-blue/20 text-racing-blue'}`}>
+        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold ${getSessionTypeStyle(r.session.type)}`}>
           {r.session.type}
         </span>
       ),
@@ -72,7 +69,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
     },
     { key: 'consistency', label: 'Consist.', align: 'right', width: '70px',
       sortValue: r => calculateConsistency(r.driver.laps) ?? 0,
-      render: r => { const c = calculateConsistency(r.driver.laps); if (c === null) return <span className="text-racing-muted">--</span>; return <span className={`text-xs ${c > 98 ? 'text-racing-green' : c > 95 ? 'text-racing-yellow' : 'text-racing-orange'}`}>{c.toFixed(1)}%</span>; },
+      render: r => { const c = calculateConsistency(r.driver.laps); if (c === null) return <span className="text-racing-muted">--</span>; return <span className={`text-xs ${getConsistencyColor(c)}`}>{c.toFixed(1)}%</span>; },
     },
     { key: 'pos', label: 'Pos', align: 'right', width: '45px',
       sortValue: r => r.session.type === 'Race' ? r.driver.classPosition : Infinity,

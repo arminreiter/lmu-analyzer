@@ -176,68 +176,61 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     return 'Offline';
   };
 
+  /** Group items by class, keep best per track+class, return per-class averages */
+  interface ClassAggregate { carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }
+  interface RaceClassAggregate extends ClassAggregate { totalLaps: number }
+
+  function aggregateByClass<T>(
+    items: T[],
+    getKey: (item: T) => { carClass: CarClass; mappedTrack: string },
+    getPercent: (item: T) => number,
+  ): ClassAggregate[] {
+    const bestByTrackClass = new Map<string, T>();
+    for (const item of items) {
+      const { carClass, mappedTrack } = getKey(item);
+      const key = `${carClass}::${mappedTrack}`;
+      const existing = bestByTrackClass.get(key);
+      if (!existing || getPercent(item) < getPercent(existing)) {
+        bestByTrackClass.set(key, item);
+      }
+    }
+
+    const classMap = new Map<CarClass, T[]>();
+    for (const entry of bestByTrackClass.values()) {
+      const cls = getKey(entry).carClass;
+      const arr = classMap.get(cls) ?? [];
+      arr.push(entry);
+      classMap.set(cls, arr);
+    }
+
+    const results: ClassAggregate[] = [];
+    for (const [carClass, entries] of classMap) {
+      const avg = entries.reduce((sum, e) => sum + getPercent(e), 0) / entries.length;
+      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg) });
+    }
+    return results.sort((a, b) => a.avgPercent - b.avgPercent);
+  }
+
   // Aggregate pace % by car class — best lap per track only
   const classAggregates = useMemo(() => {
     const filtered = comparisons.filter(c =>
       !aggExcludedCars.has(c.best.carType) && !aggExcludedTracks.has(c.best.trackCourse)
     );
-
-    // For each class+track, keep only the best (lowest percent) entry
-    const bestByTrackClass = new Map<string, typeof comparisons[number]>();
-    for (const c of filtered) {
-      const key = `${c.best.carClass}::${c.mappedTrack}`;
-      const existing = bestByTrackClass.get(key);
-      if (!existing || c.percent < existing.percent) {
-        bestByTrackClass.set(key, c);
-      }
-    }
-
-    // Group best-per-track entries by class
-    const classMap = new Map<string, typeof comparisons[number][]>();
-    for (const entry of bestByTrackClass.values()) {
-      const arr = classMap.get(entry.best.carClass) ?? [];
-      arr.push(entry);
-      classMap.set(entry.best.carClass, arr);
-    }
-
-    const results: Array<{ carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }> = [];
-    for (const [carClass, entries] of classMap as Map<CarClass, typeof comparisons[number][]>) {
-      const avg = entries.reduce((sum, e) => sum + e.percent, 0) / entries.length;
-      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg) });
-    }
-    return results.sort((a, b) => a.avgPercent - b.avgPercent);
+    return aggregateByClass(filtered, c => ({ carClass: c.best.carClass as CarClass, mappedTrack: c.mappedTrack }), c => c.percent);
   }, [comparisons, aggExcludedCars, aggExcludedTracks]);
 
   // Aggregate race pace % by car class — one entry per track
-  const racePaceAggregates = useMemo(() => {
+  const racePaceAggregates = useMemo((): RaceClassAggregate[] => {
     const filtered = racePaceComparisons.filter(c =>
       !aggExcludedCars.has(c.carType) && !aggExcludedTracks.has(c.trackCourse)
     );
-
-    // Best race pace per track per class
-    const bestByTrackClass = new Map<string, typeof racePaceComparisons[number]>();
+    const base = aggregateByClass(filtered, c => ({ carClass: c.carClass as CarClass, mappedTrack: c.mappedTrack }), c => c.percent);
+    // Add totalLaps per class from the filtered data
+    const lapsByClass = new Map<string, number>();
     for (const c of filtered) {
-      const key = `${c.carClass}::${c.mappedTrack}`;
-      const existing = bestByTrackClass.get(key);
-      if (!existing || c.percent < existing.percent) {
-        bestByTrackClass.set(key, c);
-      }
+      lapsByClass.set(c.carClass, (lapsByClass.get(c.carClass) ?? 0) + c.lapCount);
     }
-
-    const classMap = new Map<string, typeof racePaceComparisons[number][]>();
-    for (const entry of bestByTrackClass.values()) {
-      const arr = classMap.get(entry.carClass) ?? [];
-      arr.push(entry);
-      classMap.set(entry.carClass, arr);
-    }
-
-    const results: Array<{ carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating; totalLaps: number }> = [];
-    for (const [carClass, entries] of classMap as Map<CarClass, typeof racePaceComparisons[number][]>) {
-      const avg = entries.reduce((sum, e) => sum + e.percent, 0) / entries.length;
-      const totalLaps = entries.reduce((sum, e) => sum + e.lapCount, 0);
-      results.push({ carClass, avgPercent: avg, trackCount: entries.length, avgRating: ratingFromPercent(avg), totalLaps });
-    }
-    return results.sort((a, b) => a.avgPercent - b.avgPercent);
+    return base.map(a => ({ ...a, totalLaps: lapsByClass.get(a.carClass) ?? 0 }));
   }, [racePaceComparisons, aggExcludedCars, aggExcludedTracks]);
 
   // Filter options

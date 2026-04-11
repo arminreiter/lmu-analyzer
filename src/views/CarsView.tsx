@@ -2,6 +2,7 @@ import { useState, useMemo, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
+import { PillSelector } from '../components/PillSelector';
 import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
@@ -68,21 +69,9 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
   return (
     <div className="space-y-6">
       {/* Car Selector */}
-      <div className="flex gap-2 flex-wrap">
-        {cars.map(c => (
-          <button
-            key={c.carType}
-            onClick={() => setSelectedCar(c.carType)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 cursor-pointer
-              ${c.carType === car
-                ? 'bg-racing-red text-[#fff]'
-                : 'bg-racing-card border border-racing-border text-racing-muted hover:text-white hover:border-racing-highlight'}`}
-          >
-            {c.carType}
-            <ClassBadge carClass={c.carClass} />
-          </button>
-        ))}
-      </div>
+      <PillSelector items={cars} itemKey={c => c.carType} selected={car} onSelect={setSelectedCar}>
+        {c => <>{c.carType} <ClassBadge carClass={c.carClass} /></>}
+      </PillSelector>
 
       {car && carInfo && (
         <>

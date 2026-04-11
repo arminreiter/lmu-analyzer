@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Download } from 'lucide-react';
+import { useClickOutside } from '../lib/useClickOutside';
 import * as XLSX from 'xlsx';
 import type { Column } from './SortableTable';
 
@@ -81,15 +82,8 @@ const formats: { key: ExportFormat; label: string }[] = [
 export function ExportButton<T>({ columns, data, filename }: ExportButtonProps<T>) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  const closeDropdown = useCallback(() => setOpen(false), []);
+  useClickOutside(ref, closeDropdown);
 
   const handleExport = (format: ExportFormat) => {
     setOpen(false);
