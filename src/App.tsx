@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { FolderPicker } from './components/FolderPicker';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -37,6 +38,17 @@ function App() {
   });
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegisteredSW(_url, registration) {
+      // Check for updates every 5 minutes
+      if (registration) {
+        setInterval(() => registration.update(), 5 * 60 * 1000);
+      }
+    },
+  });
 
   // Auto-restore cached data on mount
   useEffect(() => {
@@ -234,15 +246,30 @@ function App() {
     }
   }, [prevView]);
 
+  const updateToast = needRefresh && (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-racing-card border border-racing-red/50 px-4 py-3 rounded-lg shadow-lg shadow-racing-red/20">
+      <span className="text-sm text-racing-light">A new version is available</span>
+      <button
+        onClick={() => updateServiceWorker(true)}
+        className="px-3 py-1 text-sm font-bold bg-racing-red text-white rounded hover:bg-racing-red/80 transition-colors"
+      >
+        Update
+      </button>
+    </div>
+  );
+
   if (!loaded) {
     return (
-      <FolderPicker
-        onFolderSelected={handleFolderSelected}
-        onFilesUploaded={handleFilesUploaded}
-        onResumeCached={hasCachedData ? handleResumeCached : undefined}
-        loading={loading}
-        error={error}
-      />
+      <>
+        <FolderPicker
+          onFolderSelected={handleFolderSelected}
+          onFilesUploaded={handleFilesUploaded}
+          onResumeCached={hasCachedData ? handleResumeCached : undefined}
+          loading={loading}
+          error={error}
+        />
+        {updateToast}
+      </>
     );
   }
 
@@ -293,6 +320,7 @@ function App() {
       </main>
 
       <Footer />
+      {updateToast}
     </div>
   );
 }

@@ -155,7 +155,7 @@ export function AboutView() {
                 <Code2 className="w-3.5 h-3.5" />
                 View on GitHub
               </a>
-<a
+              <a
                 href="https://buymeacoffee.com/axrider"
                 target="_blank"
                 rel="noopener noreferrer"
