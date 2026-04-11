@@ -69,8 +69,8 @@ const carColumns: Column<CarStats>[] = [
   },
   {
     key: 'tracks', label: 'Tracks', align: 'right', mono: true, width: '5rem',
-    sortValue: c => c.tracks.length,
-    render: c => c.tracks.length,
+    sortValue: c => c.tracks.size,
+    render: c => c.tracks.size,
   },
   {
     key: 'distance', label: 'Distance', align: 'right', mono: true, width: '7rem',

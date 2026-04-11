@@ -108,7 +108,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                   </div>
                   <div>
                     <p className="text-racing-muted text-xs uppercase">Tracks</p>
-                    <p className="text-white text-lg font-bold">{carInfo.tracks.length}</p>
+                    <p className="text-white text-lg font-bold">{carInfo.tracks.size}</p>
                   </div>
                 </div>
               );
