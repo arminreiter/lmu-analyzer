@@ -144,7 +144,7 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
           {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
             <DataCardHeader title={MODE_LABELS[lapMode]}>
-              <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{trackLaps.length} laps</span>
+              <span className="mr-1 text-[10px] font-mono text-racing-muted/50">{trackLaps.length} laps</span>
               <FilterButtonGroup
                 options={[{ value: 'car', label: 'Per Car' }, { value: 'session', label: 'Per Session' }, { value: 'all', label: 'All Laps' }]}
                 value={lapMode}
