@@ -1,9 +1,10 @@
 import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
+import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, getChartTooltipStyle } from '../lib/analytics';
+import { formatLapTime, formatSector, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -64,11 +65,11 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
     { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
-      render: r => <span className="text-racing-muted">{r.sector1?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className="text-racing-muted">{formatSector(r.sector1)}</span> },
     { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
-      render: r => <span className="text-racing-muted">{r.sector2?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className="text-racing-muted">{formatSector(r.sector2)}</span> },
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
-      render: r => <span className="text-racing-muted">{r.sector3?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className="text-racing-muted">{formatSector(r.sector3)}</span> },
     { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
       render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
     { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
@@ -158,18 +159,11 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                 {MODE_LABELS[lapMode]}
               </h3>
               <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{trackLaps.length} laps</span>
-              <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
-                {(['car', 'session', 'all'] as LapMode[]).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setLapMode(mode)}
-                    className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
-                      ${lapMode === mode ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-                  >
-                    {mode === 'car' ? 'Per Car' : mode === 'session' ? 'Per Session' : 'All Laps'}
-                  </button>
-                ))}
-              </div>
+              <FilterButtonGroup
+                options={[{ value: 'car', label: 'Per Car' }, { value: 'session', label: 'Per Session' }, { value: 'all', label: 'All Laps' }]}
+                value={lapMode}
+                onChange={setLapMode}
+              />
               <ExportButton columns={lapColumns} data={sortedTrackLaps} filename={`lmu-track-${(track ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
             </div>
             <SortableTable<PersonalBest>

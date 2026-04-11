@@ -1,10 +1,11 @@
 import { useState, useMemo, memo } from 'react';
 import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
+import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
+import { formatLapTime, formatSector, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -55,18 +56,11 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Car:</label>
           <SearchableSelect value={filterCar} options={[{ value: 'All', label: 'All Cars' }, ...cars.map(c => ({ value: c, label: c }))]} onChange={setFilterCar} />
         </div>
-        <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium">
-          {(['car', 'session', 'all'] as LapMode[]).map(mode => (
-            <button
-              key={mode}
-              onClick={() => setLapMode(mode)}
-              className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border first:border-l-0
-                ${lapMode === mode ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-            >
-              {mode === 'car' ? 'Per Car' : mode === 'session' ? 'Per Session' : 'All Laps'}
-            </button>
-          ))}
-        </div>
+        <FilterButtonGroup
+          options={[{ value: 'car', label: 'Per Car' }, { value: 'session', label: 'Per Session' }, { value: 'all', label: 'All Laps' }]}
+          value={lapMode}
+          onChange={setLapMode}
+        />
         <button onClick={() => setShowTheoretical(!showTheoretical)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
             ${showTheoretical ? 'bg-racing-purple/15 text-racing-purple border border-racing-purple/25' : 'bg-racing-card border border-racing-border text-racing-muted hover:text-racing-text'}`}>
@@ -129,13 +123,13 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             render: r => <span className={`font-bold ${isTheoretical(r) ? 'text-racing-purple glow-purple' : r.lapTime === fastestLap ? 'text-racing-gold' : 'text-white'}`}>{formatLapTime(r.lapTime)}</span> },
           { key: 's1', label: 'S1', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector1,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector1?.toFixed(3) ?? '--'}</span> },
+            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector1)}</span> },
           { key: 's2', label: 'S2', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector2,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector2?.toFixed(3) ?? '--'}</span> },
+            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector2)}</span> },
           { key: 's3', label: 'S3', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector3,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector3?.toFixed(3) ?? '--'}</span> },
+            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
           { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '9%',
             sortValue: r => r.topSpeed,
             render: r => isTheoretical(r) ? <span className="text-racing-muted/40">&mdash;</span> : <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },

@@ -1,9 +1,10 @@
 import { useMemo, useState, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
+import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getDriverSessions, isRatedRace } from '../lib/analytics';
+import { formatLapTime, getDriverSessions, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
 interface SessionsViewProps {
@@ -65,12 +66,12 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
       render: r => <span className="text-racing-muted">{r.driver.totalLaps}</span>,
     },
     { key: 'topspeed', label: 'Top Speed', align: 'right', width: '85px',
-      sortValue: r => { const speeds = r.driver.laps.map(l => l.topSpeed).filter(s => s > 0); return speeds.length ? Math.max(...speeds) : 0; },
-      render: r => { const speeds = r.driver.laps.map(l => l.topSpeed).filter(s => s > 0); const top = speeds.length ? Math.max(...speeds) : 0; return top ? <span className="text-racing-orange text-xs">{top.toFixed(0)} km/h</span> : <span className="text-racing-muted">--</span>; },
+      sortValue: r => getTopSpeed(r.driver.laps) ?? 0,
+      render: r => { const top = getTopSpeed(r.driver.laps); return top ? <span className="text-racing-orange text-xs">{top.toFixed(0)} km/h</span> : <span className="text-racing-muted">--</span>; },
     },
     { key: 'consistency', label: 'Consist.', align: 'right', width: '70px',
-      sortValue: r => { const times = r.driver.laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!); if (times.length < 2) return 0; const avg = times.reduce((a, b) => a + b, 0) / times.length; const std = Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length); return 100 - (std / avg) * 100; },
-      render: r => { const times = r.driver.laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!); if (times.length < 2) return <span className="text-racing-muted">--</span>; const avg = times.reduce((a, b) => a + b, 0) / times.length; const c = 100 - (Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length) / avg) * 100; return <span className={`text-xs ${c > 98 ? 'text-racing-green' : c > 95 ? 'text-racing-yellow' : 'text-racing-orange'}`}>{c.toFixed(1)}%</span>; },
+      sortValue: r => calculateConsistency(r.driver.laps) ?? 0,
+      render: r => { const c = calculateConsistency(r.driver.laps); if (c === null) return <span className="text-racing-muted">--</span>; return <span className={`text-xs ${c > 98 ? 'text-racing-green' : c > 95 ? 'text-racing-yellow' : 'text-racing-orange'}`}>{c.toFixed(1)}%</span>; },
     },
     { key: 'pos', label: 'Pos', align: 'right', width: '45px',
       sortValue: r => r.session.type === 'Race' ? r.driver.classPosition : Infinity,
@@ -91,29 +92,16 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
-          <button
-            onClick={() => setFilterSetting('all')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer ${filterSetting === 'all' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-          >All</button>
-          <button
-            onClick={() => setFilterSetting('online')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'online' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-          >Online</button>
-          <button
-            onClick={() => setFilterSetting('rated')}
-            className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filterSetting === 'rated' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-          >Rated</button>
-        </div>
-        <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
-          {['All', 'Practice', 'Qualifying', 'Race'].map((t, i) => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 transition-colors cursor-pointer ${i > 0 ? 'border-l border-racing-border' : ''} ${filterType === t ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-            >{t}</button>
-          ))}
-        </div>
+        <FilterButtonGroup
+          options={[{ value: 'all', label: 'All' }, { value: 'online', label: 'Online' }, { value: 'rated', label: 'Rated' }]}
+          value={filterSetting}
+          onChange={setFilterSetting}
+        />
+        <FilterButtonGroup
+          options={[{ value: 'All', label: 'All' }, { value: 'Practice', label: 'Practice' }, { value: 'Qualifying', label: 'Qualifying' }, { value: 'Race', label: 'Race' }]}
+          value={filterType}
+          onChange={setFilterType}
+        />
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-xs uppercase tracking-wider">Track:</label>
           <SearchableSelect

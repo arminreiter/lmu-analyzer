@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ClassBadge } from '../components/ClassBadge';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
+import { formatLapTime, formatSector, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
@@ -362,11 +362,11 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
         return <span className={isBest ? 'text-racing-green font-bold' : 'text-white'}>{formatLapTime(r.lapTime)}</span>;
       } },
     { key: 's1', label: 'S1', align: 'right', mono: true, width: '8%', sortValue: r => r.sector1,
-      render: r => <span className={r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector1?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className={r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector1)}</span> },
     { key: 's2', label: 'S2', align: 'right', mono: true, width: '8%', sortValue: r => r.sector2,
-      render: r => <span className={r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector2?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className={r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector2)}</span> },
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '8%', sortValue: r => r.sector3,
-      render: r => <span className={r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{r.sector3?.toFixed(3) ?? '--'}</span> },
+      render: r => <span className={r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
     { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '8%', sortValue: r => r.topSpeed,
       render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)}</span> },
     { key: 'fuel', label: 'Fuel', align: 'right', mono: true, width: '6%', sortValue: r => r.fuel,

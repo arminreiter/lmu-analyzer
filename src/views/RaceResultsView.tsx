@@ -2,6 +2,7 @@ import { useState, useMemo, memo } from 'react';
 import { Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
+import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getRaceResults, isRatedRace, isDriverIncident, getChartTooltipStyle, type RaceResult } from '../lib/analytics';
@@ -86,20 +87,11 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   return (
     <div className="space-y-6">
       {/* Filter */}
-      <div className="flex rounded-lg overflow-hidden border border-racing-border text-xs font-medium w-fit">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer ${filter === 'all' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-        >All Races</button>
-        <button
-          onClick={() => setFilter('online')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'online' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-        >Online</button>
-        <button
-          onClick={() => setFilter('rated')}
-          className={`px-3 py-1.5 transition-colors cursor-pointer border-l border-racing-border ${filter === 'rated' ? 'bg-racing-red text-[#fff]' : 'bg-racing-card text-racing-muted hover:text-white'}`}
-        >Rated</button>
-      </div>
+      <FilterButtonGroup
+        options={[{ value: 'all', label: 'All Races' }, { value: 'online', label: 'Online' }, { value: 'rated', label: 'Rated' }]}
+        value={filter}
+        onChange={setFilter}
+      />
 
       {/* Race Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

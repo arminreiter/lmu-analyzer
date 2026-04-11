@@ -134,6 +134,11 @@ export function deduplicateSessions(files: RaceFile[]): RaceFile[] {
     .filter(f => f.sessions.length > 0);
 }
 
+/** Normalize driver name(s) to always be an array */
+function asArray(driverNames: string | string[]): string[] {
+  return Array.isArray(driverNames) ? driverNames : [driverNames];
+}
+
 export function formatLapTime(seconds: number | null): string {
   if (seconds === null || seconds <= 0) return '--:--.---';
   const mins = Math.floor(seconds / 60);
@@ -171,6 +176,21 @@ export function formatSector(v: number | null): string {
   return v.toFixed(3);
 }
 
+/** Consistency score (0-100%) based on coefficient of variation of valid lap times */
+export function calculateConsistency(laps: LapData[]): number | null {
+  const times = laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!);
+  if (times.length < 2) return null;
+  const avg = times.reduce((a, b) => a + b, 0) / times.length;
+  const std = Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length);
+  return 100 - (std / avg) * 100;
+}
+
+/** Highest top speed from a set of laps, or null if none recorded */
+export function getTopSpeed(laps: LapData[]): number | null {
+  const speeds = laps.map(l => l.topSpeed).filter(s => s > 0);
+  return speeds.length ? Math.max(...speeds) : null;
+}
+
 export function isDriverIncident(incident: { driver1: string; description: string }, driverName: string): boolean {
   return incident.driver1 === driverName || incident.description.includes(driverName);
 }
@@ -182,16 +202,6 @@ export function getClassColor(carClass: CarClass): string {
     case 'GTE': return 'var(--color-gte)';
     case 'LMP3': return 'var(--color-lmp3)';
     default: return 'var(--color-racing-muted)';
-  }
-}
-
-export function getClassBgClass(carClass: CarClass): string {
-  switch (carClass) {
-    case 'Hyper': return 'bg-hyper/20 text-hyper border-hyper/30';
-    case 'GT3': return 'bg-gt3/20 text-gt3 border-gt3/30';
-    case 'GTE': return 'bg-gte/20 text-gte border-gte/30';
-    case 'LMP3': return 'bg-lmp3/20 text-lmp3 border-lmp3/30';
-    default: return 'bg-racing-muted/20 text-racing-muted border-racing-muted/30';
   }
 }
 
@@ -330,7 +340,7 @@ export function getDriverSessions(
   files: RaceFile[],
   driverNames: string | string[]
 ): Array<{ file: RaceFile; session: SessionData; driver: DriverResult }> {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const results: Array<{ file: RaceFile; session: SessionData; driver: DriverResult }> = [];
   for (const file of files) {
     for (const session of file.sessions) {
@@ -346,7 +356,7 @@ export function getDriverSessions(
 }
 
 export function getPersonalBests(files: RaceFile[], driverNames: string | string[]): PersonalBest[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const bests = new Map<string, PersonalBest>();
 
   for (const file of files) {
@@ -389,7 +399,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
 }
 
 export function getAllSessionBests(files: RaceFile[], driverNames: string | string[]): PersonalBest[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const results: PersonalBest[] = [];
 
   for (const file of files) {
@@ -430,7 +440,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
 }
 
 export function getAllLaps(files: RaceFile[], driverNames: string | string[]): PersonalBest[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const results: PersonalBest[] = [];
 
   for (const file of files) {
@@ -468,7 +478,7 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
 export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackCourse: string, carType: string): {
   s1: number | null; s2: number | null; s3: number | null; total: number | null;
 } {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   let bestS1: number | null = null;
   let bestS2: number | null = null;
   let bestS3: number | null = null;
@@ -508,7 +518,7 @@ export interface TrackStats {
 }
 
 export function getTrackStats(files: RaceFile[], driverNames: string | string[]): TrackStats[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const map = new Map<string, TrackStats>();
 
   for (const file of files) {
@@ -567,7 +577,7 @@ export interface CarStats {
 }
 
 export function getCarStats(files: RaceFile[], driverNames: string | string[]): CarStats[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const map = new Map<string, CarStats>();
 
   for (const file of files) {
@@ -618,7 +628,7 @@ export interface OverviewStats {
 }
 
 export function getOverviewStats(files: RaceFile[], driverNames: string | string[]): OverviewStats {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   let totalSessions = 0;
   let totalLaps = 0;
   let totalRaces = 0;
@@ -720,7 +730,7 @@ export interface RaceResult {
 }
 
 export function getRaceResults(files: RaceFile[], driverNames: string | string[]): RaceResult[] {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
   const results: RaceResult[] = [];
 
   for (const file of files) {
@@ -787,7 +797,7 @@ export interface DriverProfileStats {
 }
 
 export function getDriverProfileStats(files: RaceFile[], driverNames: string | string[]): DriverProfileStats {
-  const names = Array.isArray(driverNames) ? driverNames : [driverNames];
+  const names = asArray(driverNames);
 
   const total: RaceStats = { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
   const online: RaceStats = { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
