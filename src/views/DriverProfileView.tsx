@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { Trophy, Flag, Route, Gauge, MapPin, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, getDriverProfileStats, type TrackBest } from '../lib/analytics';
+import { formatLapTime, formatSector, formatDistance, getDriverProfileStats, type TrackBest } from '../lib/analytics';
 import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar } from '../lib/storage';
 import type { RaceFile } from '../lib/types';
 
@@ -393,17 +394,16 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
       {/* Volume Stats */}
       <div className="grid grid-cols-3 gap-3 animate-in animate-in-3">
         <StatTile label="Total Laps" value={profile.totalLaps.toLocaleString()} icon={<Route className="w-4 h-4" />} />
-        <StatTile label="Distance" value={`${Math.round(profile.totalDistanceKm).toLocaleString()} km`} icon={<Gauge className="w-4 h-4" />} />
+        <StatTile label="Distance" value={formatDistance(profile.totalDistanceKm)} icon={<Gauge className="w-4 h-4" />} />
         <StatTile label="Tracks" value={profile.tracksVisited} icon={<MapPin className="w-4 h-4" />} />
       </div>
 
       {/* Best Laps per Track */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-4">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAP PER CIRCUIT</h3>
+        <DataCardHeader title="BEST LAP PER CIRCUIT">
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{visibleTrackBests.length} tracks</span>
           <ExportButton columns={trackColumns} data={visibleTrackBests} filename="lmu-driver-best-per-circuit" />
-        </div>
+        </DataCardHeader>
         <SortableTable<TrackBest>
           columns={trackColumns}
           data={visibleTrackBests}

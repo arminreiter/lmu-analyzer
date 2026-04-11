@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, memo } from 'react';
 import { Loader2, ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
+import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { formatLapTime, getPersonalBests, formatDelta, CLASS_SPEED_ORDER } from '../lib/analytics';
@@ -356,7 +358,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     { key: 'session', label: 'Session', width: '9%',
       sortValue: r => r.best.sessionType,
       render: r => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.best.fileName}::${r.best.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.best.sessionType} L{r.best.lapNumber}</button>
+        ? <SessionLink fileName={r.best.fileName} sessionIndex={r.best.sessionIndex} onNavigate={onNavigate}>{r.best.sessionType} L{r.best.lapNumber}</SessionLink>
         : <span className="text-racing-muted text-xs">{r.best.sessionType} L{r.best.lapNumber}</span> },
     { key: 'date', label: 'Date', width: '13%',
       sortValue: r => r.best.date,
@@ -368,8 +370,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
       {/* Your Pace summary */}
       {(classAggregates.length > 0 || racePaceAggregates.length > 0) && (
         <div className="data-card carbon-fiber overflow-hidden">
-          <div className="px-5 py-2.5 border-b border-racing-border checkered flex items-center justify-between">
-            <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">YOUR OVERALL PACE</h3>
+          <DataCardHeader title="YOUR OVERALL PACE">
             <button
               onClick={() => setAggFiltersOpen(o => !o)}
               className={`p-1.5 rounded transition-colors cursor-pointer ${aggFiltersOpen ? 'bg-racing-red/20 text-racing-red' : 'text-racing-muted hover:text-white hover:bg-white/5'}`}
@@ -377,7 +378,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </DataCardHeader>
           {aggFiltersOpen && (
             <div className="px-5 py-3 border-b border-racing-border/30 bg-racing-dark/30">
               <div className="space-y-2.5 text-[11px]">
@@ -572,16 +573,15 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between checkered">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">{track.toUpperCase()}</h3>
-              <div className="flex items-center gap-3 text-[10px]">
+            <DataCardHeader title={track.toUpperCase()}>
+              <div className="ml-auto flex items-center gap-3 text-[10px]">
                 {classes.map(c => <ClassBadge key={c} carClass={c} />)}
                 <span className={`inline-flex px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${getRatingColor(bestItem.rating)} ${getRatingBgColor(bestItem.rating)}`}>
                   Best: {bestItem.rating}
                 </span>
                 <ExportButton columns={columns} data={sorted} filename={`lmu-pace-${track.toLowerCase().replace(/\s+/g, '-')}`} />
               </div>
-            </div>
+            </DataCardHeader>
             <SortableTable
               columns={columns}
               data={sorted}

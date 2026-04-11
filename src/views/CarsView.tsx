@@ -1,9 +1,11 @@
 import { useState, useMemo, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
+import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, getCarStats, getPersonalBests, getAllSessionBests, getAllLaps } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatDistance, getCarStats, getPersonalBests, getAllSessionBests, getAllLaps } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'track' | 'session' | 'all';
@@ -49,10 +51,10 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
       render: r => <span className="text-racing-muted">{formatSector(r.sector3)}</span> },
     { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-      render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)} km/h</span> },
+      render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
     { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
       render: r => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
         : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
     { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
       render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
@@ -113,7 +115,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                   </div>
                   <div>
                     <p className="text-racing-muted text-xs uppercase">Distance</p>
-                    <p className="text-white text-lg font-bold font-mono">{Math.round(carInfo.totalDistanceKm).toLocaleString()} km</p>
+                    <p className="text-white text-lg font-bold font-mono">{formatDistance(carInfo.totalDistanceKm)}</p>
                   </div>
                   <div>
                     <p className="text-racing-muted text-xs uppercase">Tracks</p>
@@ -126,10 +128,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
 
           {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between checkered">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
-                {MODE_LABELS[lapMode]}
-              </h3>
+            <DataCardHeader title={MODE_LABELS[lapMode]}>
               <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{carLaps.length} laps</span>
               <FilterButtonGroup
                 options={[{ value: 'track', label: 'Per Track' }, { value: 'session', label: 'Per Session' }, { value: 'all', label: 'All Laps' }]}
@@ -137,7 +136,7 @@ export const CarsView = memo(function CarsView({ files, driverNames, initialCar,
                 onChange={setLapMode}
               />
               <ExportButton columns={lapColumns} data={sortedCarLaps} filename={`lmu-car-${(car ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
-            </div>
+            </DataCardHeader>
             <SortableTable<PersonalBest>
               columns={lapColumns}
               data={sortedCarLaps}

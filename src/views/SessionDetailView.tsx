@@ -2,9 +2,10 @@ import { useState, useMemo, memo } from 'react';
 import { ArrowLeft, Info, Timer, BarChart3, AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatEventTime, isDriverIncident, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
@@ -247,8 +248,8 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             <MiniStat label="Std Dev" value={`${stats.stdDev.toFixed(3)}s`} />
             <MiniStat label="Consistency" value={`${stats.consistency.toFixed(1)}%`}
               accent={stats.consistency > 98 ? 'text-racing-green' : stats.consistency > 95 ? 'text-racing-yellow' : 'text-racing-orange'} />
-            <MiniStat label="Top Speed" value={`${stats.topSpeed.toFixed(0)} km/h`} accent="text-racing-orange" />
-            <MiniStat label="Avg Speed" value={`${stats.avgSpeed.toFixed(0)} km/h`} />
+            <MiniStat label="Top Speed" value={formatSpeed(stats.topSpeed)} accent="text-racing-orange" />
+            <MiniStat label="Avg Speed" value={formatSpeed(stats.avgSpeed)} />
             {stats.avgFuelPerLap !== null && (
               <MiniStat label="Fuel/Lap" value={`${stats.avgFuelPerLap.toFixed(2)}%`} accent="text-racing-yellow" />
             )}
@@ -258,16 +259,13 @@ function OverviewTab({ file, session, driver, stats, standings }: {
 
       {/* Standings */}
       <div className="data-card carbon-fiber overflow-hidden">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
-            {session.type === 'Race' ? 'RACE STANDINGS' : 'SESSION STANDINGS'}
-          </h3>
+        <DataCardHeader title={session.type === 'Race' ? 'RACE STANDINGS' : 'SESSION STANDINGS'}>
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">
             {session.drivers.length} drivers
             {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
           </span>
           <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse.toLowerCase().replace(/\s+/g, '-')}-${session.type.toLowerCase()}`} />
-        </div>
+        </DataCardHeader>
         <SortableTable<DriverResult>
           columns={standingsColumns}
           data={standings}
@@ -368,7 +366,7 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '8%', sortValue: r => r.sector3,
       render: r => <span className={r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
     { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '8%', sortValue: r => r.topSpeed,
-      render: r => <span className="text-racing-orange">{r.topSpeed.toFixed(0)}</span> },
+      render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
     { key: 'fuel', label: 'Fuel', align: 'right', mono: true, width: '6%', sortValue: r => r.fuel,
       render: r => <span className="text-racing-yellow">{(r.fuel * 100).toFixed(0)}%</span> },
     { key: 'fuelUsed', label: 'Used', align: 'right', mono: true, width: '6%', sortValue: r => r.fuelUsed,
@@ -384,11 +382,10 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-        <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">LAP DETAILS</h3>
+      <DataCardHeader title="LAP DETAILS">
         <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{driver.laps.length} laps</span>
         <ExportButton columns={columns} data={driver.laps} filename="lmu-lap-details" />
-      </div>
+      </DataCardHeader>
       <SortableTable<LapData>
         columns={columns}
         data={driver.laps}

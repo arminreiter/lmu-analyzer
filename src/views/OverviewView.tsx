@@ -2,9 +2,10 @@ import { useMemo, memo } from 'react';
 import { Flag, MapPin, Car, Gauge, AlertTriangle, Ban, Route, ShieldAlert, Trophy } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
+import { formatLapTime, formatSector, formatDistance, getOverviewStats, getTrackStats, getCarStats, type TrackStats, type CarStats } from '../lib/analytics';
 import type { RaceFile } from '../lib/types';
 
 const trackColumns: Column<TrackStats>[] = [
@@ -74,7 +75,7 @@ const carColumns: Column<CarStats>[] = [
   {
     key: 'distance', label: 'Distance', align: 'right', mono: true, width: '7rem',
     sortValue: c => c.totalDistanceKm,
-    render: c => <span className="text-racing-muted whitespace-nowrap">{Math.round(c.totalDistanceKm).toLocaleString()} km</span>,
+    render: c => <span className="text-racing-muted whitespace-nowrap">{formatDistance(c.totalDistanceKm)}</span>,
   },
 ];
 
@@ -110,7 +111,7 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
           <StatCard label="Cars" value={stats.carsUsed} icon={<Car className="w-3.5 h-3.5" />} />
         </div>
         <div className="animate-in animate-in-6">
-          <StatCard label="Distance" value={`${Math.round(stats.totalDistanceKm).toLocaleString()} km`} icon={<Gauge className="w-3.5 h-3.5" />} />
+          <StatCard label="Distance" value={formatDistance(stats.totalDistanceKm)} icon={<Gauge className="w-3.5 h-3.5" />} />
         </div>
       </div>
 
@@ -145,14 +146,13 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
 
       {/* Tracks — best lap per track */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-3">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">BEST LAP PER CIRCUIT</h3>
+        <DataCardHeader title="BEST LAP PER CIRCUIT">
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{tracks.length} tracks</span>
           {onNavigate && (
             <button onClick={() => onNavigate('tracks')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
           <ExportButton columns={trackColumns} data={tracks} filename="lmu-track-statistics" />
-        </div>
+        </DataCardHeader>
         <SortableTable<TrackStats>
           columns={trackColumns}
           data={tracks}
@@ -163,14 +163,13 @@ export const OverviewView = memo(function OverviewView({ files, driverNames, onN
 
       {/* Cars */}
       <div className="data-card carbon-fiber overflow-hidden animate-in animate-in-4">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">CARS USED</h3>
+        <DataCardHeader title="CARS USED">
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{cars.length} cars</span>
           {onNavigate && (
             <button onClick={() => onNavigate('cars')} className="ml-3 text-[10px] text-racing-muted hover:text-racing-red transition-colors cursor-pointer">View all →</button>
           )}
           <ExportButton columns={carColumns} data={cars} filename="lmu-cars-used" />
-        </div>
+        </DataCardHeader>
         <SortableTable<CarStats>
           columns={carColumns}
           data={cars}

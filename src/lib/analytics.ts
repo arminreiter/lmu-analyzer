@@ -139,6 +139,27 @@ function asArray(driverNames: string | string[]): string[] {
   return Array.isArray(driverNames) ? driverNames : [driverNames];
 }
 
+/** Build a PersonalBest record from file/session/driver/lap context */
+function toLapRecord(file: RaceFile, session: SessionData, driver: DriverResult, lap: LapData): PersonalBest {
+  return {
+    lapTime: lap.lapTime!,
+    sector1: lap.sector1,
+    sector2: lap.sector2,
+    sector3: lap.sector3,
+    topSpeed: lap.topSpeed,
+    trackVenue: file.trackVenue,
+    trackCourse: file.trackCourse,
+    carType: driver.carType,
+    carClass: driver.carClass,
+    sessionType: session.type,
+    sessionIndex: session.sessionIndex,
+    date: file.timeString,
+    fileName: file.fileName,
+    lapNumber: lap.num,
+    driverName: driver.name,
+  };
+}
+
 export function formatLapTime(seconds: number | null): string {
   if (seconds === null || seconds <= 0) return '--:--.---';
   const mins = Math.floor(seconds / 60);
@@ -174,6 +195,14 @@ export function getChartTooltipStyle() {
 export function formatSector(v: number | null): string {
   if (v === null) return '--';
   return v.toFixed(3);
+}
+
+export function formatSpeed(kmh: number): string {
+  return `${kmh.toFixed(0)} km/h`;
+}
+
+export function formatDistance(km: number): string {
+  return `${Math.round(km).toLocaleString()} km`;
 }
 
 /** Consistency score (0-100%) based on coefficient of variation of valid lap times */
@@ -261,14 +290,6 @@ export function getAllDrivers(files: RaceFile[]): DriverSummary[] {
     return b.sessionCount - a.sessionCount;
   });
   return drivers;
-}
-
-export function detectPlayerDriver(files: RaceFile[]): string | null {
-  const drivers = getAllDrivers(files);
-  const players = drivers.filter(d => d.isPlayer);
-  if (players.length === 0) return drivers[0]?.name ?? null;
-  players.sort((a, b) => b.sessionCount - a.sessionCount);
-  return players[0].name;
 }
 
 export function detectPlayerDrivers(files: RaceFile[]): string[] {
@@ -370,23 +391,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
           const existing = bests.get(key);
 
           if (!existing || lap.lapTime < existing.lapTime) {
-            bests.set(key, {
-              lapTime: lap.lapTime,
-              sector1: lap.sector1,
-              sector2: lap.sector2,
-              sector3: lap.sector3,
-              topSpeed: lap.topSpeed,
-              trackVenue: file.trackVenue,
-              trackCourse: file.trackCourse,
-              carType: driver.carType,
-              carClass: driver.carClass,
-              sessionType: session.type,
-              sessionIndex: session.sessionIndex,
-              date: file.timeString,
-              fileName: file.fileName,
-              lapNumber: lap.num,
-              driverName: driver.name,
-            });
+            bests.set(key, toLapRecord(file, session, driver, lap));
           }
         }
       }
@@ -412,24 +417,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
           if (!best || lap.lapTime < best.lap.lapTime!) best = { lap };
         }
         if (best) {
-          const l = best.lap;
-          results.push({
-            lapTime: l.lapTime!,
-            sector1: l.sector1,
-            sector2: l.sector2,
-            sector3: l.sector3,
-            topSpeed: l.topSpeed,
-            trackVenue: file.trackVenue,
-            trackCourse: file.trackCourse,
-            carType: driver.carType,
-            carClass: driver.carClass,
-            sessionType: session.type,
-            sessionIndex: session.sessionIndex,
-            date: file.timeString,
-            fileName: file.fileName,
-            lapNumber: l.num,
-            driverName: driver.name,
-          });
+          results.push(toLapRecord(file, session, driver, best.lap));
         }
       }
     }
@@ -449,23 +437,7 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
       for (const driver of drivers) {
         for (const lap of driver.laps) {
           if (!lap.lapTime || lap.lapTime <= 0) continue;
-          results.push({
-            lapTime: lap.lapTime,
-            sector1: lap.sector1,
-            sector2: lap.sector2,
-            sector3: lap.sector3,
-            topSpeed: lap.topSpeed,
-            trackVenue: file.trackVenue,
-            trackCourse: file.trackCourse,
-            carType: driver.carType,
-            carClass: driver.carClass,
-            sessionType: session.type,
-            sessionIndex: session.sessionIndex,
-            date: file.timeString,
-            fileName: file.fileName,
-            lapNumber: lap.num,
-            driverName: driver.name,
-          });
+          results.push(toLapRecord(file, session, driver, lap));
         }
       }
     }
@@ -677,23 +649,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
           lapTimeSum += lap.lapTime;
           lapTimeCount++;
           if (!bestLap || lap.lapTime < bestLap.lapTime) {
-            bestLap = {
-              lapTime: lap.lapTime,
-              sector1: lap.sector1,
-              sector2: lap.sector2,
-              sector3: lap.sector3,
-              topSpeed: lap.topSpeed,
-              trackVenue: file.trackVenue,
-              trackCourse: file.trackCourse,
-              carType: driver.carType,
-              carClass: driver.carClass,
-              sessionType: session.type,
-              sessionIndex: session.sessionIndex,
-              date: file.timeString,
-              fileName: file.fileName,
-              lapNumber: lap.num,
-              driverName: driver.name,
-            };
+            bestLap = toLapRecord(file, session, driver, lap);
           }
         }
       }

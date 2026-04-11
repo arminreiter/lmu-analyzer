@@ -1,11 +1,13 @@
 import { useState, useMemo, memo } from 'react';
 import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
+import { SessionLink } from '../components/SessionLink';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, getPersonalBests, getAllSessionBests, getAllLaps, getTheoreticalBest } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -132,11 +134,11 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
           { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '9%',
             sortValue: r => r.topSpeed,
-            render: r => isTheoretical(r) ? <span className="text-racing-muted/40">&mdash;</span> : <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
+            render: r => isTheoretical(r) ? <span className="text-racing-muted/40">&mdash;</span> : <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
           { key: 'session', label: 'Session', width: '10%',
             sortValue: r => r.sessionType,
             render: r => isTheoretical(r) ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : onNavigate
-              ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} &mdash; L{r.lapNumber}</button>
+              ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} onNavigate={onNavigate}>{r.sessionType} &mdash; L{r.lapNumber}</SessionLink>
               : <span className="text-racing-muted text-xs">{r.sessionType} &mdash; L{r.lapNumber}</span> },
           { key: 'date', label: 'Date', width: '12%',
             sortValue: r => r.date,
@@ -145,11 +147,10 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">{track.toUpperCase()}</h3>
+            <DataCardHeader title={track.toUpperCase()}>
               <span className="ml-auto" />
               <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track.toLowerCase().replace(/\s+/g, '-')}`} />
-            </div>
+            </DataCardHeader>
             <SortableTable
               columns={columns}
               data={defaultSorted}

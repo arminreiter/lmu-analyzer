@@ -1,10 +1,12 @@
 import { useState, useMemo, memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
+import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, getChartTooltipStyle } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, getTrackStats, getPersonalBests, getAllSessionBests, getAllLaps, getDriverSessions, getChartTooltipStyle } from '../lib/analytics';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -71,10 +73,10 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
       render: r => <span className="text-racing-muted">{formatSector(r.sector3)}</span> },
     { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-      render: r => <span className="text-white/70">{r.topSpeed.toFixed(0)} km/h</span> },
+      render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
     { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
       render: r => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('session', `${r.fileName}::${r.sessionIndex}`); }} className="text-racing-muted text-xs hover:text-racing-red transition-colors cursor-pointer underline decoration-racing-muted/30 hover:decoration-racing-red">{r.sessionType} L{r.lapNumber}</button>
+        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
         : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
     { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
       render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
@@ -154,10 +156,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
 
           {/* Laps table */}
           <div className="data-card carbon-fiber overflow-hidden">
-            <div className="px-5 py-3 border-b border-racing-border flex items-center justify-between checkered">
-              <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">
-                {MODE_LABELS[lapMode]}
-              </h3>
+            <DataCardHeader title={MODE_LABELS[lapMode]}>
               <span className="ml-auto mr-3 text-[10px] font-mono text-racing-muted/50">{trackLaps.length} laps</span>
               <FilterButtonGroup
                 options={[{ value: 'car', label: 'Per Car' }, { value: 'session', label: 'Per Session' }, { value: 'all', label: 'All Laps' }]}
@@ -165,7 +164,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                 onChange={setLapMode}
               />
               <ExportButton columns={lapColumns} data={sortedTrackLaps} filename={`lmu-track-${(track ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
-            </div>
+            </DataCardHeader>
             <SortableTable<PersonalBest>
               columns={lapColumns}
               data={sortedTrackLaps}
@@ -205,7 +204,7 @@ export const TracksView = memo(function TracksView({ files, driverNames, initial
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
                   <Tooltip
                     contentStyle={getChartTooltipStyle()}
-                    formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Top Speed']}
+                    formatter={(v: unknown) => [formatSpeed(Number(v)), 'Top Speed']}
                   />
                   <Line type="monotone" dataKey="topSpeed" stroke="#ff6d00" strokeWidth={2} dot={{ fill: '#ff6d00', r: 3 }} name="Top Speed" />
                 </LineChart>

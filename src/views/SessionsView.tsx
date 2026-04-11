@@ -1,10 +1,11 @@
 import { useMemo, useState, memo } from 'react';
 import { ClassBadge } from '../components/ClassBadge';
+import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, getDriverSessions, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { formatLapTime, formatSpeed, getDriverSessions, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
 interface SessionsViewProps {
@@ -67,7 +68,7 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
     },
     { key: 'topspeed', label: 'Top Speed', align: 'right', width: '85px',
       sortValue: r => getTopSpeed(r.driver.laps) ?? 0,
-      render: r => { const top = getTopSpeed(r.driver.laps); return top ? <span className="text-racing-orange text-xs">{top.toFixed(0)} km/h</span> : <span className="text-racing-muted">--</span>; },
+      render: r => { const top = getTopSpeed(r.driver.laps); return top ? <span className="text-white/70 text-xs">{formatSpeed(top)}</span> : <span className="text-racing-muted">--</span>; },
     },
     { key: 'consistency', label: 'Consist.', align: 'right', width: '70px',
       sortValue: r => calculateConsistency(r.driver.laps) ?? 0,
@@ -117,11 +118,10 @@ export const SessionsView = memo(function SessionsView({ files, driverNames, onN
       </div>
 
       <div className="data-card carbon-fiber overflow-hidden">
-        <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-          <h3 className="section-stripe font-racing text-xs font-bold text-white tracking-[0.1em]">SESSION HISTORY</h3>
+        <DataCardHeader title="SESSION HISTORY">
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{filtered.length} sessions</span>
           <ExportButton columns={columns} data={filtered} filename="lmu-sessions" />
-        </div>
+        </DataCardHeader>
         <SortableTable<SessionRow>
           columns={columns}
           data={filtered}
