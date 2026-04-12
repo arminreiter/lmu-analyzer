@@ -8,6 +8,7 @@ import { PersonalBestsView } from './views/PersonalBestsView';
 import { SessionsView } from './views/SessionsView';
 import { SessionDetailView } from './views/SessionDetailView';
 import { TracksView } from './views/TracksView';
+import { TrackModeView } from './views/TrackModeView';
 import { CarsView } from './views/CarsView';
 import { RaceResultsView } from './views/RaceResultsView';
 import { DriverProfileView } from './views/DriverProfileView';
@@ -312,7 +313,8 @@ function App() {
             )}
             {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} />}
             {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} onNavigate={navigateTo} />}
-            {activeView === 'benchmarks' && <RacePaceView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
+            {activeView === 'benchmarks' && <RacePaceView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} onViewChange={setActiveView} />}
+            {activeView === 'trackmode' && <TrackModeView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} onViewChange={setActiveView} />}
             {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
           </DataIndexProvider>

@@ -140,12 +140,15 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
         <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {VIEWS.map(v => {
             if (v.id === 'benchmarks' && !racePaceEnabled) return null;
+            const isActive = v.id === 'benchmarks'
+              ? activeView === 'benchmarks' || activeView === 'trackmode'
+              : activeView === v.id;
             return (
               <button
                 key={v.id}
                 onClick={() => onViewChange(v.id)}
                 className={`nav-tab relative px-5 py-2.5 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer
-                  ${activeView === v.id
+                  ${isActive
                     ? 'nav-tab-active text-white font-semibold'
                     : 'text-racing-muted hover:text-racing-text hover:bg-white/[0.02]'
                   }`}

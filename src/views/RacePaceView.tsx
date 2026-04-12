@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, memo } from 'react';
 import { Loader2, ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
@@ -25,6 +26,7 @@ interface RacePaceViewProps {
   files: RaceFile[];
   driverNames: string[];
   onNavigate?: (view: string, context?: string) => void;
+  onViewChange?: (view: string) => void;
 }
 
 interface ClassAggregate { carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }
@@ -71,7 +73,7 @@ function aggregateByClass<T>(
   return results.sort((a, b) => a.avgPercent - b.avgPercent);
 }
 
-export const RacePaceView = memo(function RacePaceView({ files, driverNames, onNavigate }: RacePaceViewProps) {
+export const RacePaceView = memo(function RacePaceView({ files, driverNames, onNavigate, onViewChange }: RacePaceViewProps) {
   const [benchmarks, setBenchmarks] = useState<PaceBenchmark[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<string>('All');
@@ -363,6 +365,24 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
   return (
     <div className="space-y-5">
+      {/* Sub-navigation */}
+      {onViewChange && (
+        <div className="flex items-center gap-0 border-b border-racing-border/30">
+          {[{ id: 'benchmarks', label: 'Overview' }, { id: 'trackmode', label: 'Per Track' }].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => onViewChange(tab.id)}
+              className={`px-5 py-2 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer border-b-2 -mb-px
+                ${tab.id === 'benchmarks'
+                  ? 'border-racing-red text-white'
+                  : 'border-transparent text-racing-muted hover:text-racing-text'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Your Pace summary */}
       {(classAggregates.length > 0 || racePaceAggregates.length > 0) && (
         <div className="data-card carbon-fiber overflow-hidden">
@@ -378,7 +398,9 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
           {aggFiltersOpen && (
             <div className="px-5 py-3 border-b border-racing-border/30 bg-racing-dark/30">
               <div className="space-y-2.5 text-[11px]">
-                {/* Outlier removal */}
+                {/* Settings */}
+                <div className="flex items-start gap-2">
+                  <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">Settings:</span>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -389,6 +411,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                   <span className="text-racing-muted">Remove outliers</span>
                   <span className="text-racing-muted/40 text-[9px]">(race pace)</span>
                 </label>
+                </div>
 
                 {/* Track filter */}
                 <div className="flex items-start gap-2">
@@ -474,7 +497,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                   return [
                     best && (
                       <tr key={`best-${cls}`} className="border-b border-racing-border/10">
-                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Best Lap</td>
+                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Based on Best Laps</td>
                         <td className="px-0 py-2"><ClassBadge carClass={best.carClass} /></td>
                         <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{best.avgPercent.toFixed(1)}%</span></td>
                         <td className="px-4 py-2">
@@ -488,7 +511,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                     ),
                     race && (
                       <tr key={`race-${cls}`} className="border-b border-racing-border/10">
-                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Race Pace</td>
+                        <td className="text-racing-muted text-[10px] uppercase tracking-wider font-medium pl-4 pr-1 py-2">Based on Race Pace</td>
                         <td className="px-0 py-2"><ClassBadge carClass={race.carClass} /></td>
                         <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{race.avgPercent.toFixed(1)}%</span></td>
                         <td className="px-4 py-2">
@@ -599,44 +622,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
         </div>
       )}
 
-      {/* Credit attribution */}
-      <div className="data-card carbon-fiber px-5 py-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <p className="text-racing-muted text-xs">
-              Pace benchmarks by{' '}
-              <span className="text-white font-medium">ohne_speed</span>
-            </p>
-            <p className="text-racing-muted/60 text-[10px] mt-0.5">
-              Community-sourced race pace reference data for Le Mans Ultimate
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <a
-              href="https://www.youtube.com/@ohne_speed"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                bg-white/5 border border-racing-border text-racing-text
-                hover:bg-white/10 hover:text-white hover:border-racing-muted/50"
-            >
-              <ExternalLink className="w-3 h-3" />
-              YouTube
-            </a>
-            <a
-              href="https://discord.com/invite/dFAqhnuSXH"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                bg-white/5 border border-racing-border text-racing-text
-                hover:bg-white/10 hover:text-white hover:border-racing-muted/50"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Discord
-            </a>
-          </div>
-        </div>
-      </div>
+      <OhneSpeedCredit />
     </div>
   );
 });
