@@ -326,7 +326,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
   }, [yourTimesRows]);
 
   const yourTimesColumns: Column<YourTimesRow>[] = useMemo(() => [
-    { key: 'car', label: 'Car', width: '18%', cellClass: 'pl-4 pr-1', sortValue: r => r.pb.carType,
+    { key: 'car', label: 'Car', width: '22%', cellClass: 'pl-4 pr-1', sortValue: r => r.pb.carType,
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`text-xs ${getTierColor(r.tierLabel!)} brightness-75`}>Benchmark {r.tierLabel}</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple text-xs font-medium">{r.pb.carType} <span className="text-[10px] opacity-60">(theoretical)</span></span>;
@@ -334,40 +334,45 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
           ? <button onClick={() => onNavigate('cars', r.pb.carType)} className="text-white text-xs font-medium hover:text-racing-red transition-colors cursor-pointer text-left">{r.pb.carType}</button>
           : <span className="text-white text-xs font-medium">{r.pb.carType}</span>;
       } },
-    { key: 'class', label: 'Class', width: '5%', cellClass: 'px-1', sortValue: r => r.pb.carClass,
+    { key: 'class', label: 'Class', width: '60px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
       render: r => <ClassBadge carClass={r.pb.carClass} /> },
-    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '11%', sortValue: r => r.pb.lapTime,
+    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%', sortValue: r => r.pb.lapTime,
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`${getTierColor(r.tierLabel!)} brightness-75`}>{formatLapTime(r.pb.lapTime)}</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple font-bold">{formatLapTime(r.pb.lapTime)}</span>;
         return <span className="text-white font-bold">{formatLapTime(r.pb.lapTime)}</span>;
       } },
-    { key: 's1', label: 'S1', align: 'right', mono: true, width: '8%', cellClass: 'px-2', sortValue: r => r.pb.sector1,
+    { key: 's1', label: 'S1', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector1,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector1)}</span> },
-    { key: 's2', label: 'S2', align: 'right', mono: true, width: '8%', cellClass: 'px-2', sortValue: r => r.pb.sector2,
+    { key: 's2', label: 'S2', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector2,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector2)}</span> },
-    { key: 's3', label: 'S3', align: 'right', mono: true, width: '8%', cellClass: 'px-2', sortValue: r => r.pb.sector3,
+    { key: 's3', label: 'S3', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector3,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector3)}</span> },
-    { key: 'rating', label: 'Rating', width: '11%', sortValue: r => r.rateResult ? RATING_ORDER[r.rateResult.rating] ?? -1 : 99,
+    { key: 'rating', label: 'Rating', width: '95px', cellClass: 'pl-3 pr-1', sortValue: r => r.rateResult ? RATING_ORDER[r.rateResult.rating] ?? -1 : 99,
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border brightness-75 ${getTierColor(r.tierLabel!)} ${getTierBgColor(r.tierLabel!)}`}>{r.tierLabel}</span>;
         return r.rateResult
           ? <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getRatingColor(r.rateResult.rating)} ${getRatingBgColor(r.rateResult.rating)}`}>{r.rateResult.rating}</span>
           : <span className="text-racing-muted/40 text-xs">--</span>;
       } },
-    { key: 'percent', label: '%', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.rateResult?.percent ?? 999,
+    { key: 'percent', label: '%', align: 'right', mono: true, width: '6%', cellClass: 'pl-0 pr-3', sortValue: r => r.rateResult?.percent ?? 999,
       render: r => <span className={`text-xs ${r.rowType === 'benchmark' ? 'text-racing-muted/40' : 'text-racing-muted'}`}>{r.rateResult ? `${r.rateResult.percent.toFixed(1)}%` : '--'}</span> },
-    { key: 'gap', label: 'Gap', align: 'right', mono: true, width: '8%', cellClass: 'px-2', sortValue: r => r.pb.lapTime,
+    { key: 'gap', label: 'Gap', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.lapTime,
       render: (_r: YourTimesRow, i: number) => {
         const gap = gapMap.get(i);
         if (gap === undefined || i === 0) return <span className="text-racing-muted/20 text-xs">--</span>;
         return <span className="text-racing-muted text-xs">{formatDelta(gap)}</span>;
       } },
-    { key: 'session', label: 'Session', width: '16%', sortValue: r => r.rowType === 'lap' ? r.pb.sessionType : 'zzz',
+    { key: 'session', label: 'Session', width: '8%', cellClass: 'pl-4 pr-1', sortValue: r => r.rowType === 'lap' ? `${r.pb.sessionType} L${r.pb.lapNumber}` : 'zzz',
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`text-[10px] ${getTierColor(r.tierLabel!)} brightness-50`}>benchmark</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple/50 text-[10px]">best sectors</span>;
         return <span className="text-racing-muted text-xs">{r.pb.sessionType} L{r.pb.lapNumber}</span>;
+      } },
+    { key: 'date', label: 'Date', width: '13%', sortValue: r => r.rowType === 'lap' ? r.pb.date : 'zzz',
+      render: r => {
+        if (r.rowType !== 'lap') return <span className="text-racing-muted/20 text-xs">--</span>;
+        return <span className="text-racing-muted/60 text-xs font-mono">{r.pb.date}</span>;
       } },
   ], [onNavigate, gapMap]);
 

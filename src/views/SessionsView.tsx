@@ -34,7 +34,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
     })
     .filter(s => filterType === 'All' || s.session.type === filterType)
     .filter(s => filterTrack === 'All' || s.file.trackCourse === filterTrack)
-    .sort((a, b) => b.file.timeString.localeCompare(a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
+    .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
 
   const columns: Column<SessionRow>[] = useMemo(() => [
     { key: 'type', label: 'Type', width: '95px',
@@ -84,8 +84,8 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
       render: r => { if (r.session.type !== 'Race' || !r.driver.gridPosition) return null; const g = r.driver.gridPosition - r.driver.position; return <span className={`text-xs font-bold ${g > 0 ? 'text-racing-green' : g < 0 ? 'text-racing-red' : 'text-racing-muted'}`}>{g > 0 ? '+' : ''}{g}</span>; },
     },
     { key: 'date', label: 'Date', align: 'right', width: '155px',
-      sortValue: r => r.file.timeString,
-      render: r => <span className="text-racing-muted text-xs">{r.file.timeString}</span>,
+      sortValue: r => r.session.dateTime || r.file.timeString,
+      render: r => <span className="text-racing-muted text-xs">{r.session.dateTime || r.file.timeString}</span>,
     },
   ], []);
 

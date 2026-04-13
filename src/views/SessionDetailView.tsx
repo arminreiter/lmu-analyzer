@@ -97,7 +97,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
             <ClassBadge carClass={driver.carClass} />
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
-            {driver.carType} &middot; #{driver.carNumber} &middot; {file.timeString}
+            {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
             {file.setting === 'Multiplayer' && <span className="text-racing-blue ml-2">Online</span>}
           </p>
         </div>
@@ -223,13 +223,13 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             <InfoRow label="Setting" value={file.setting} />
             {file.serverName && <InfoRow label="Server" value={file.serverName} />}
             <InfoRow label="Track Length" value={`${(file.trackLength / 1000).toFixed(2)} km`} />
-            {session.lapsLimit > 0 && <InfoRow label="Lap Limit" value={String(session.lapsLimit)} />}
+            {session.lapsLimit > 0 && <InfoRow label="Lap Limit" value={session.lapsLimit >= 2147483647 ? '∞' : String(session.lapsLimit)} />}
             {session.minutesLimit > 0 && <InfoRow label="Time Limit" value={`${session.minutesLimit} min`} />}
             <InfoRow label="Drivers" value={String(session.drivers.length)} />
             <InfoRow label="Game Version" value={file.gameVersion} />
-            {file.damageMult !== 1 && <InfoRow label="Damage" value={`${(file.damageMult * 100).toFixed(0)}%`} />}
-            {file.fuelMult !== 1 && <InfoRow label="Fuel Rate" value={`${(file.fuelMult * 100).toFixed(0)}%`} />}
-            {file.tireMult !== 1 && <InfoRow label="Tire Rate" value={`${(file.tireMult * 100).toFixed(0)}%`} />}
+            <InfoRow label="Damage" value={`${file.damageMult.toFixed(0)}%`} />
+            {file.fuelMult !== 1 && <InfoRow label="Fuel Rate" value={`${file.fuelMult}x`} />}
+            {file.tireMult !== 1 && <InfoRow label="Tire Rate" value={`${file.tireMult}x`} />}
           </div>
         </div>
       </div>
