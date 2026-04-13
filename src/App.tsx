@@ -202,14 +202,66 @@ function App() {
     });
   }, [activeView]);
 
-  const [prevView, setPrevView] = useState<{ view: string; context: string | null } | null>(null);
-  const currentViewRef = useRef({ view: activeView, context: viewContext });
-  currentViewRef.current = { view: activeView, context: viewContext };
+  const isPoppingRef = useRef(false);
+
+  // Build a URL hash from view + context
+  const buildHash = (view: string, context: string | null) =>
+    '#' + view + (context ? '/' + encodeURIComponent(context) : '');
+
+  // Parse a URL hash back into view + context
+  const parseHash = (hash: string): { view: string; context: string | null } | null => {
+    if (!hash || hash === '#') return null;
+    const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+    const slash = raw.indexOf('/');
+    if (slash === -1) return { view: raw, context: null };
+    return { view: raw.slice(0, slash), context: decodeURIComponent(raw.slice(slash + 1)) };
+  };
+
+  // Push history entry when view changes (unless triggered by popstate)
+  useEffect(() => {
+    if (!loaded) return;
+    if (isPoppingRef.current) {
+      isPoppingRef.current = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+    const hash = buildHash(activeView, viewContext);
+    const state = { view: activeView, context: viewContext };
+    if (window.location.hash !== hash) {
+      window.history.pushState(state, '', hash);
+    } else if (!window.history.state) {
+      window.history.replaceState(state, '', hash);
+    }
+  }, [activeView, viewContext, loaded]);
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = (e.state as { view: string; context: string | null } | null) ?? parseHash(window.location.hash);
+      if (!state) return;
+      isPoppingRef.current = true;
+      setActiveView(state.view);
+      setViewContext(state.context);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // On first load, restore view from URL hash if present, otherwise seed history with current view
+  useEffect(() => {
+    if (!loaded) return;
+    const fromHash = parseHash(window.location.hash);
+    if (fromHash && (fromHash.view !== activeView || fromHash.context !== viewContext)) {
+      isPoppingRef.current = true;
+      setActiveView(fromHash.view);
+      setViewContext(fromHash.context);
+    } else {
+      window.history.replaceState({ view: activeView, context: viewContext }, '', buildHash(activeView, viewContext));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   const navigateTo = useCallback((view: string, context?: string) => {
-    if (view === 'session') {
-      setPrevView(currentViewRef.current);
-    }
     setActiveView(view);
     setViewContext(context ?? null);
   }, []);
@@ -237,15 +289,8 @@ function App() {
   }, [activeView, viewContext, filteredFiles, selectedDrivers]);
 
   const handleSessionBack = useCallback(() => {
-    if (prevView) {
-      setActiveView(prevView.view);
-      setViewContext(prevView.context);
-      setPrevView(null);
-    } else {
-      setActiveView('sessions');
-      setViewContext(null);
-    }
-  }, [prevView]);
+    window.history.back();
+  }, []);
 
   const updateToast = needRefresh && (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-racing-card border border-racing-red/50 px-4 py-3 rounded-lg shadow-lg shadow-racing-red/20">
@@ -288,7 +333,7 @@ function App() {
         onRefresh={dirHandleRef.current ? handleRefresh : undefined}
         refreshing={loading}
         activeView={activeView === 'session' ? 'sessions' : activeView}
-        onViewChange={(view: string) => { setActiveView(view); setViewContext(null); setPrevView(null); }}
+        onViewChange={(view: string) => { setActiveView(view); setViewContext(null); }}
         racePaceEnabled={racePaceEnabled}
         onToggleRacePace={handleToggleRacePace}
         theme={theme}
