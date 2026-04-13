@@ -26,6 +26,9 @@ function resolveCarClass(raw: string): CarClass {
   if (lower === 'hyper' || lower === 'hypercar') return 'Hyper';
   if (lower === 'gt3' || lower === 'lmgt3') return 'GT3';
   if (lower === 'gte' || lower === 'lmgte') return 'GTE';
+  if (lower.includes('lmp2') && lower.includes('elms')) return 'LMP2-ELMS';
+  if (lower.includes('lmp2') && lower.includes('wec')) return 'LMP2-WEC';
+  if (lower === 'lmp2') return 'LMP2-WEC';
   if (lower === 'lmp3') return 'LMP3';
   return 'Unknown';
 }

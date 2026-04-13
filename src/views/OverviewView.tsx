@@ -52,10 +52,10 @@ const carColumns: Column<CarStats>[] = [
   {
     key: 'car', label: 'Car',
     sortValue: c => c.carType,
-    render: c => <span className="text-racing-text">{c.carType}</span>,
+    render: c => <span className="text-racing-text text-xs">{c.carType}</span>,
   },
   {
-    key: 'class', label: 'Class', align: 'center', width: '75px',
+    key: 'class', label: 'Class', align: 'center', width: '110px',
     sortValue: c => c.carClass,
     render: c => <ClassBadge carClass={c.carClass} />,
   },

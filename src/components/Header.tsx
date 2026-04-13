@@ -1,6 +1,7 @@
 import { FolderOpen, User, Layers, RefreshCw, Gauge, Download, Sun, Moon } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
+import { CLASS_SPEED_ORDER } from '../lib/analytics';
 import { getClassColor } from '../lib/formatting';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
 
@@ -9,7 +10,6 @@ interface HeaderProps {
   drivers: DriverSummary[];
   playerDrivers: string[];
   onDriverChange: (names: string[]) => void;
-  allClasses: CarClass[];
   selectedClasses: CarClass[];
   onClassChange: (classes: CarClass[]) => void;
   onReload: () => void;
@@ -35,7 +35,7 @@ const VIEWS = [
   { id: 'about', label: 'About' },
 ];
 
-export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange, allClasses, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
   const { canInstall, install } = useInstallPrompt();
   const driverOptions = drivers.map(d => ({
     value: d.name,
@@ -44,7 +44,7 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
     detail: `${d.sessionCount}s / ${d.totalLaps}L`,
   }));
 
-  const classOptions = allClasses.map(c => ({
+  const classOptions = CLASS_SPEED_ORDER.map(c => ({
     value: c,
     label: c,
     badge: <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: getClassColor(c) }} />,

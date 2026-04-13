@@ -1,7 +1,7 @@
 import type { RaceFile, PersonalBest, DriverSummary, DriverResult, LapData, SessionData, CarClass } from './types';
 
 /** Car classes ordered by speed (fastest first) */
-export const CLASS_SPEED_ORDER: CarClass[] = ['Hyper', 'LMP3', 'GTE', 'GT3'];
+export const CLASS_SPEED_ORDER: CarClass[] = ['Hyper', 'LMP2-WEC', 'LMP2-ELMS', 'LMP3', 'GTE', 'GT3'];
 
 // ---------------------------------------------------------------------------
 // Session deduplication / merging

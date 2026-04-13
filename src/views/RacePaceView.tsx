@@ -293,7 +293,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     { key: 'car', label: 'Car', width: '14%', cellClass: 'pl-4 pr-1',
       sortValue: r => r.best.carType,
       render: r => <span className="text-white text-xs">{r.best.carType}</span> },
-    { key: 'class', label: 'Class', width: '4%', cellClass: 'px-0',
+    { key: 'class', label: 'Class', width: '9%', cellClass: 'px-0',
       sortValue: r => r.best.carClass,
       render: r => <ClassBadge carClass={r.best.carClass} /> },
     { key: 'lapTime', label: 'Your Best', align: 'right', mono: true, width: '8%',
@@ -462,7 +462,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
           <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '14%' }} />
-              <col style={{ width: '4%' }} />
+              <col style={{ width: '9%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '10%' }} />
               <col style={{ width: '13%' }} />

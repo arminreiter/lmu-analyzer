@@ -49,7 +49,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
       sortValue: r => r.file.trackCourse,
       render: r => <span className="text-white text-sm font-medium">{r.file.trackCourse}</span>,
     },
-    { key: 'class', label: 'Class', width: '70px',
+    { key: 'class', label: 'Class', width: '100px',
       sortValue: r => r.driver.carClass,
       render: r => <ClassBadge carClass={r.driver.carClass} />,
     },

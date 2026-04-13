@@ -62,6 +62,8 @@ export function getClassColor(carClass: CarClass): string {
     case 'GT3': return 'var(--color-gt3)';
     case 'GTE': return 'var(--color-gte)';
     case 'LMP3': return 'var(--color-lmp3)';
+    case 'LMP2-WEC': return 'var(--color-lmp2wec)';
+    case 'LMP2-ELMS': return 'var(--color-lmp2elms)';
     default: return 'var(--color-racing-muted)';
   }
 }

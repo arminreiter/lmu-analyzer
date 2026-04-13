@@ -1,5 +1,5 @@
 export type SessionType = 'Practice' | 'Qualifying' | 'Race' | 'Warmup';
-export type CarClass = 'Hyper' | 'GT3' | 'GTE' | 'LMP3' | 'Unknown';
+export type CarClass = 'Hyper' | 'LMP2-WEC' | 'LMP2-ELMS' | 'GT3' | 'GTE' | 'LMP3' | 'Unknown';
 
 export interface LapData {
   num: number;

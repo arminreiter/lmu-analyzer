@@ -40,6 +40,8 @@ const CLASS_MAP: Record<string, CarClass> = {
   LMH: 'Hyper',
   GTE: 'GTE',
   LMP3: 'LMP3',
+  LMP2elms: 'LMP2-ELMS',
+  LMP2wec: 'LMP2-WEC',
 };
 
 // ---------------------------------------------------------------------------
@@ -175,7 +177,8 @@ function parseCSV(csv: string): PaceBenchmark[] {
     if (line.includes('L M G T 3')) { currentSheetClass = 'LMGT3'; continue; }
     if (line.includes('L M H') && !line.includes('L M G')) { currentSheetClass = 'LMH'; continue; }
     if (line.includes('L M P 3')) { currentSheetClass = 'LMP3'; continue; }
-    if (line.includes('L M P 2')) { currentSheetClass = null; continue; } // skip LMP2 — not in app
+    if (line.includes('L M P 2   E L M S')) { currentSheetClass = 'LMP2elms'; continue; }
+    if (line.includes('L M P 2   W E C')) { currentSheetClass = 'LMP2wec'; continue; }
     if (line.includes('G T E') && !line.includes('LMGT')) { currentSheetClass = 'GTE'; continue; }
 
     if (!currentSheetClass) continue;

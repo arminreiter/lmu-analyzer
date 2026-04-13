@@ -60,7 +60,7 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
       render: r => onNavigate
         ? <button onClick={(e) => { e.stopPropagation(); onNavigate('cars', r.carType); }} className="text-white cursor-pointer">{r.carType}</button>
         : <span className="text-white">{r.carType}</span> },
-    { key: 'class', label: 'Class', width: '70px', sortValue: r => r.carClass,
+    { key: 'class', label: 'Class', width: '100px', sortValue: r => r.carClass,
       render: r => <ClassBadge carClass={r.carClass} /> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },

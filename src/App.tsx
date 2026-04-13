@@ -15,7 +15,7 @@ import { DriverProfileView } from './views/DriverProfileView';
 import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
 import { loadFolder, loadFiles } from './lib/parser';
-import { getAllDrivers, detectPlayerDrivers, getAllClasses, filterFilesByClasses, deduplicateSessions } from './lib/analytics';
+import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
 import { DataIndexProvider } from './lib/DataIndexContext';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
@@ -26,7 +26,6 @@ function App() {
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [playerDrivers, setPlayerDrivers] = useState<string[]>([]);
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
-  const [allClasses, setAllClasses] = useState<CarClass[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<CarClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,8 +93,7 @@ function App() {
     }
     const parsed = deduplicateSessions(rawParsed);
     setFiles(parsed);
-    const classes = getAllClasses(parsed);
-    setAllClasses(classes);
+    const classes = CLASS_SPEED_ORDER;
     const allDriversList = getAllDrivers(parsed);
     setDrivers(allDriversList);
     const detected = detectPlayerDrivers(parsed);
@@ -184,7 +182,6 @@ function App() {
     setFiles([]);
     setDrivers([]);
     setSelectedDrivers([]);
-    setAllClasses([]);
     setSelectedClasses([]);
     setLoaded(false);
     setError(null);
@@ -326,7 +323,6 @@ function App() {
         drivers={drivers}
         playerDrivers={playerDrivers}
         onDriverChange={setSelectedDrivers}
-        allClasses={allClasses}
         selectedClasses={selectedClasses}
         onClassChange={setSelectedClasses}
         onReload={handleReload}

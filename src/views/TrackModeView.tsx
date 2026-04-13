@@ -334,7 +334,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
           ? <button onClick={() => onNavigate('cars', r.pb.carType)} className="text-white text-xs font-medium hover:text-racing-red transition-colors cursor-pointer text-left">{r.pb.carType}</button>
           : <span className="text-white text-xs font-medium">{r.pb.carType}</span>;
       } },
-    { key: 'class', label: 'Class', width: '60px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
+    { key: 'class', label: 'Class', width: '100px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
       render: r => <ClassBadge carClass={r.pb.carClass} /> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%', sortValue: r => r.pb.lapTime,
       render: r => {
