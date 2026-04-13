@@ -77,7 +77,16 @@ interface YourTimesRow {
 export const TrackModeView = memo(function TrackModeView({ files, driverNames, initialTrack, onNavigate, onViewChange }: TrackModeViewProps) {
   const { trackStats, personalBests, allLaps, driverSessions } = useDataIndex();
 
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(initialTrack ?? null);
+  const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(
+    initialTrack ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('lmu_trackmode_selected') : null),
+  );
+  const setSelectedTrackId = (id: string | null) => {
+    setSelectedTrackIdState(id);
+    try {
+      if (id) localStorage.setItem('lmu_trackmode_selected', id);
+      else localStorage.removeItem('lmu_trackmode_selected');
+    } catch { /* ignore */ }
+  };
   const [benchmarks, setBenchmarks] = useState<PaceBenchmark[] | null>(null);
   const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
   const [lapLimit, setLapLimit] = useState<LapLimit>('10');
