@@ -94,10 +94,10 @@ const COURSE_MAP: Record<string, string> = {
   'Autodromo Jose Carlos Pace': 'Interlagos',
   // Paul Ricard layouts
   'Circuit Paul Ricard': 'Paul Ricard',
-  'Paul Ricard 1A': 'Paul Ricard (1A)',
-  'Paul Ricard 1A v2': 'Paul Ricard (1A v2)',
-  'Paul Ricard 1A v2 Short': 'Paul Ricard (1A v2 short)',
-  'Paul Ricard 3A': 'Paul Ricard (3A)',
+  'Paul Ricard - 1A': 'Paul Ricard (1A)',
+  'Paul Ricard - 1A-V2': 'Paul Ricard (1A v2)',
+  'Paul Ricard - 1A-V2-Short': 'Paul Ricard (1A v2 short)',
+  'Paul Ricard - 3A': 'Paul Ricard (3A)',
 };
 
 /** Fallback map by trackVenue (when trackCourse matches venue name) */
