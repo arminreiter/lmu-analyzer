@@ -343,7 +343,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
           ? <button onClick={() => onNavigate('cars', r.pb.carType)} className="text-white text-xs font-medium hover:text-racing-red transition-colors cursor-pointer text-left">{r.pb.carType}</button>
           : <span className="text-white text-xs font-medium">{r.pb.carType}</span>;
       } },
-    { key: 'class', label: 'Class', width: '100px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
+    { key: 'class', label: 'Class', width: '88px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
       render: r => <ClassBadge carClass={r.pb.carClass} /> },
     { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%', sortValue: r => r.pb.lapTime,
       render: r => {
@@ -357,7 +357,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector2)}</span> },
     { key: 's3', label: 'S3', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector3,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector3)}</span> },
-    { key: 'rating', label: 'Rating', width: '95px', cellClass: 'pl-3 pr-1', sortValue: r => r.rateResult ? RATING_ORDER[r.rateResult.rating] ?? -1 : 99,
+    { key: 'rating', label: 'Rating', width: '108px', cellClass: 'pl-3 pr-1', sortValue: r => r.rateResult ? RATING_ORDER[r.rateResult.rating] ?? -1 : 99,
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border brightness-75 ${getTierColor(r.tierLabel!)} ${getTierBgColor(r.tierLabel!)}`}>{r.tierLabel}</span>;
         return r.rateResult
