@@ -272,17 +272,23 @@ export function ratingFromPercent(percent: number): PaceRating {
   return 'Offline';
 }
 
-/** Returns the next tier to aim for: its name, target time, and gap from the user's lap. */
+/**
+ * Returns the next tier to aim for: its name, the threshold lap time to enter that tier,
+ * and the gap from the user's current lap. Under the bucket interpretation, the threshold
+ * to enter the next-better tier is the floor of the user's current tier — e.g. a Good
+ * driver only needs to beat the 102% time to become Competitive, not the 101% time.
+ */
 export function getNextTarget(lapTime: number, rating: PaceRating, benchmark: PaceBenchmark): { label: PaceRating; time: number; gap: number } | null {
   const { racePace } = benchmark;
-  // Map each rating to the tier boundary the user needs to beat to reach it
   switch (rating) {
-    case 'Alien': return null; // already at the top
-    case 'Competitive': return { label: 'Alien', time: racePace.alien, gap: lapTime - racePace.alien };
-    case 'Good': return { label: 'Competitive', time: racePace.competitive, gap: lapTime - racePace.competitive };
-    case 'Midpack': return { label: 'Good', time: racePace.good, gap: lapTime - racePace.good };
-    case 'Tail-ender': return { label: 'Midpack', time: racePace.midpack, gap: lapTime - racePace.midpack };
-    case 'Offline': return { label: 'Tail-ender', time: racePace.tailEnder, gap: lapTime - racePace.tailEnder };
+    case 'Alien':
+      // Already Alien, but still aim for the 100% reference time unless already at/below it
+      return lapTime <= racePace.alien ? null : { label: 'Alien', time: racePace.alien, gap: lapTime - racePace.alien };
+    case 'Competitive': return { label: 'Alien', time: racePace.competitive, gap: lapTime - racePace.competitive };
+    case 'Good': return { label: 'Competitive', time: racePace.good, gap: lapTime - racePace.good };
+    case 'Midpack': return { label: 'Good', time: racePace.midpack, gap: lapTime - racePace.midpack };
+    case 'Tail-ender': return { label: 'Midpack', time: racePace.tailEnder, gap: lapTime - racePace.tailEnder };
+    case 'Offline': return { label: 'Tail-ender', time: racePace.offline, gap: lapTime - racePace.offline };
   }
 }
 
