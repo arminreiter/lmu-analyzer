@@ -252,16 +252,24 @@ function parseCSVLine(line: string): string[] {
 export function rateLapTime(lapTime: number, benchmark: PaceBenchmark): { rating: PaceRating; delta: number; percent: number } {
   const { racePace } = benchmark;
   const percent = (lapTime / racePace.alien) * 100;
+  return { rating: ratingFromPercent(percent), delta: lapTime - racePace.alien, percent };
+}
 
-  let rating: PaceRating;
-  if (lapTime <= racePace.alien) rating = 'Alien';
-  else if (lapTime <= racePace.competitive) rating = 'Competitive';
-  else if (lapTime <= racePace.good) rating = 'Good';
-  else if (lapTime <= racePace.midpack) rating = 'Midpack';
-  else if (lapTime <= racePace.tailEnder) rating = 'Tail-ender';
-  else rating = 'Offline';
-
-  return { rating, delta: lapTime - racePace.alien, percent };
+/**
+ * Bucket interpretation: each tier covers the integer-percent band starting at its labeled
+ * time — e.g. a lap rounding to 101.x% is Competitive, 106.x% is Tail-ender. The unnamed
+ * 103% and 105% columns fall through to the preceding tier (Good, Midpack). Rating uses the
+ * display-rounded percent (1 decimal) so a lap shown as "106.0%" is classified as Tail-ender
+ * even if the raw value is 105.97%.
+ */
+export function ratingFromPercent(percent: number): PaceRating {
+  const rounded = Math.round(percent * 10) / 10;
+  if (rounded < 101) return 'Alien';
+  if (rounded < 102) return 'Competitive';
+  if (rounded < 104) return 'Good';
+  if (rounded < 106) return 'Midpack';
+  if (rounded < 107) return 'Tail-ender';
+  return 'Offline';
 }
 
 /** Returns the next tier to aim for: its name, target time, and gap from the user's lap. */

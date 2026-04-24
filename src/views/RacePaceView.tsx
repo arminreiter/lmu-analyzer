@@ -14,6 +14,7 @@ import {
   fetchBenchmarks,
   mapTrackName,
   rateLapTime,
+  ratingFromPercent,
   getNextTarget,
   getRatingColor,
   getRatingBgColor,
@@ -31,15 +32,6 @@ interface RacePaceViewProps {
 
 interface ClassAggregate { carClass: CarClass; avgPercent: number; trackCount: number; avgRating: PaceRating }
 interface RaceClassAggregate extends ClassAggregate { totalLaps: number }
-
-const ratingFromPercent = (pct: number): PaceRating => {
-  if (pct <= 100) return 'Alien';
-  if (pct <= 101) return 'Competitive';
-  if (pct <= 102) return 'Good';
-  if (pct <= 104) return 'Midpack';
-  if (pct <= 106) return 'Tail-ender';
-  return 'Offline';
-};
 
 /** Group items by class, keep best per track+class, return per-class averages */
 function aggregateByClass<T>(
