@@ -193,6 +193,15 @@ body {
   );
 }
 
+.recharts-tooltip-item-list,
+.recharts-tooltip-item {
+  color: var(--color-racing-text) !important;
+}
+
+.recharts-tooltip-label {
+  color: var(--color-racing-muted) !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
