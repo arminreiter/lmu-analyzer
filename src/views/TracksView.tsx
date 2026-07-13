@@ -170,7 +170,6 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
                   <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
                   <Tooltip
                     contentStyle={getChartTooltipStyle()}
-                    labelStyle={{ color: document.documentElement.classList.contains('light') ? '#1f2937' : '#e5e7eb' }}
                     formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { car: string } }).payload.car]}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />

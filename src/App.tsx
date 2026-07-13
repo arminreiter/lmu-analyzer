@@ -21,6 +21,19 @@ import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
 import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 
+// Build a URL hash from view + context
+const buildHash = (view: string, context: string | null) =>
+  '#' + view + (context ? '/' + encodeURIComponent(context) : '');
+
+// Parse a URL hash back into view + context
+const parseHash = (hash: string): { view: string; context: string | null } | null => {
+  if (!hash || hash === '#') return null;
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+  const slash = raw.indexOf('/');
+  if (slash === -1) return { view: raw, context: null };
+  return { view: raw.slice(0, slash), context: decodeURIComponent(raw.slice(slash + 1)) };
+};
+
 function App() {
   const [files, setFiles] = useState<RaceFile[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
@@ -36,7 +49,7 @@ function App() {
   const [racePaceEnabled, setRacePaceEnabled] = useState(() => {
     try { const v = localStorage.getItem('lmu-analyzer-benchmarks'); return v === null || v === '1'; } catch { return true; }
   });
-  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const {
     needRefresh: [needRefresh],
@@ -50,6 +63,42 @@ function App() {
     },
   });
 
+  const applyParsedData = useCallback((rawParsed: RaceFile[], restoreFilters = false) => {
+    if (rawParsed.length === 0) {
+      setError('No valid XML race files found.');
+      setLoading(false);
+      return;
+    }
+    const parsed = deduplicateSessions(rawParsed);
+    setFiles(parsed);
+    const classes = CLASS_SPEED_ORDER;
+    const allDriversList = getAllDrivers(parsed);
+    setDrivers(allDriversList);
+    const detected = detectPlayerDrivers(parsed);
+    setPlayerDrivers(detected);
+
+    const savedFilters = restoreFilters ? storage.loadFilters() : null;
+    if (savedFilters) {
+      // Restore saved filters, but only keep values that still exist in the data
+      const validDrivers = savedFilters.selectedDrivers.filter(d => allDriversList.some(dl => dl.name === d));
+      const validClasses = savedFilters.selectedClasses.filter(c => classes.includes(c));
+      setSelectedDrivers(validDrivers.length > 0 ? validDrivers : detected);
+      setSelectedClasses(validClasses.length > 0 ? validClasses : classes);
+    } else {
+      setSelectedClasses(classes);
+      setSelectedDrivers(detected);
+    }
+    // URL hash wins over saved view so deep links / reloads land on the right view
+    const fromHash = parseHash(window.location.hash);
+    if (fromHash) {
+      setActiveView(fromHash.view);
+      setViewContext(fromHash.context);
+    } else if (savedFilters) {
+      setActiveView(savedFilters.activeView || 'overview');
+    }
+    setLoaded(true);
+  }, []);
+
   // Auto-restore cached data on mount
   useEffect(() => {
     (async () => {
@@ -60,7 +109,7 @@ function App() {
         // Try to restore directory handle for refresh capability
         const handle = await storage.loadDirectoryHandle();
         if (!handle) return;
-        dirHandleRef.current = handle;
+        setDirHandle(handle);
         // If data came from a directory, try to re-read fresh data
         if (storage.loadDataSource() === 'directory') {
           try {
@@ -85,39 +134,10 @@ function App() {
     }
   }, [selectedDrivers, selectedClasses, activeView, loaded]);
 
-  const applyParsedData = useCallback((rawParsed: RaceFile[], restoreFilters = false) => {
-    if (rawParsed.length === 0) {
-      setError('No valid XML race files found.');
-      setLoading(false);
-      return;
-    }
-    const parsed = deduplicateSessions(rawParsed);
-    setFiles(parsed);
-    const classes = CLASS_SPEED_ORDER;
-    const allDriversList = getAllDrivers(parsed);
-    setDrivers(allDriversList);
-    const detected = detectPlayerDrivers(parsed);
-    setPlayerDrivers(detected);
-
-    const savedFilters = restoreFilters ? storage.loadFilters() : null;
-    if (savedFilters) {
-      // Restore saved filters, but only keep values that still exist in the data
-      const validDrivers = savedFilters.selectedDrivers.filter(d => allDriversList.some(dl => dl.name === d));
-      const validClasses = savedFilters.selectedClasses.filter(c => classes.includes(c));
-      setSelectedDrivers(validDrivers.length > 0 ? validDrivers : detected);
-      setSelectedClasses(validClasses.length > 0 ? validClasses : classes);
-      setActiveView(savedFilters.activeView || 'overview');
-    } else {
-      setSelectedClasses(classes);
-      setSelectedDrivers(detected);
-    }
-    setLoaded(true);
-  }, []);
-
   const handleFolderSelected = useCallback(async (handle: FileSystemDirectoryHandle) => {
     setLoading(true);
     setError(null);
-    dirHandleRef.current = handle;
+    setDirHandle(handle);
     try {
       const parsed = await loadFolder(handle);
       applyParsedData(parsed, true);
@@ -134,7 +154,7 @@ function App() {
   const handleFilesUploaded = useCallback(async (uploadedFiles: File[]) => {
     setLoading(true);
     setError(null);
-    dirHandleRef.current = null;
+    setDirHandle(null);
     try {
       const parsed = await loadFiles(uploadedFiles);
       applyParsedData(parsed, true);
@@ -149,7 +169,7 @@ function App() {
   }, [applyParsedData]);
 
   const handleRefresh = useCallback(async () => {
-    const handle = dirHandleRef.current;
+    const handle = dirHandle;
     if (!handle) return;
     setLoading(true);
     setError(null);
@@ -168,14 +188,14 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData]);
+  }, [applyParsedData, dirHandle]);
 
   const handleResumeCached = useCallback(async () => {
     const cached = await storage.loadFiles();
     if (!cached || cached.length === 0) return;
     applyParsedData(cached, true);
     const handle = await storage.loadDirectoryHandle();
-    if (handle) dirHandleRef.current = handle;
+    if (handle) setDirHandle(handle);
   }, [applyParsedData]);
 
   const handleReload = useCallback(() => {
@@ -186,7 +206,7 @@ function App() {
     setLoaded(false);
     setError(null);
     storage.clearAll();
-    dirHandleRef.current = null;
+    setDirHandle(null);
     setHasCachedData(false);
   }, []);
 
@@ -200,19 +220,6 @@ function App() {
   }, [activeView]);
 
   const isPoppingRef = useRef(false);
-
-  // Build a URL hash from view + context
-  const buildHash = (view: string, context: string | null) =>
-    '#' + view + (context ? '/' + encodeURIComponent(context) : '');
-
-  // Parse a URL hash back into view + context
-  const parseHash = (hash: string): { view: string; context: string | null } | null => {
-    if (!hash || hash === '#') return null;
-    const raw = hash.startsWith('#') ? hash.slice(1) : hash;
-    const slash = raw.indexOf('/');
-    if (slash === -1) return { view: raw, context: null };
-    return { view: raw.slice(0, slash), context: decodeURIComponent(raw.slice(slash + 1)) };
-  };
 
   // Push history entry when view changes (unless triggered by popstate)
   useEffect(() => {
@@ -243,20 +250,6 @@ function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-
-  // On first load, restore view from URL hash if present, otherwise seed history with current view
-  useEffect(() => {
-    if (!loaded) return;
-    const fromHash = parseHash(window.location.hash);
-    if (fromHash && (fromHash.view !== activeView || fromHash.context !== viewContext)) {
-      isPoppingRef.current = true;
-      setActiveView(fromHash.view);
-      setViewContext(fromHash.context);
-    } else {
-      window.history.replaceState({ view: activeView, context: viewContext }, '', buildHash(activeView, viewContext));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded]);
 
   const navigateTo = useCallback((view: string, context?: string) => {
     setActiveView(view);
@@ -326,7 +319,7 @@ function App() {
         selectedClasses={selectedClasses}
         onClassChange={setSelectedClasses}
         onReload={handleReload}
-        onRefresh={dirHandleRef.current ? handleRefresh : undefined}
+        onRefresh={dirHandle ? handleRefresh : undefined}
         refreshing={loading}
         activeView={activeView === 'session' ? 'sessions' : activeView}
         onViewChange={(view: string) => { setActiveView(view); setViewContext(null); }}

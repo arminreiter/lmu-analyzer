@@ -36,13 +36,12 @@ export function formatDistance(km: number): string {
 }
 
 export function getChartTooltipStyle() {
-  const isLight = document.documentElement.classList.contains('light');
   return {
-    background: isLight ? '#ffffff' : '#1a1a24',
-    border: isLight ? '1px solid #d1d5db' : '1px solid #2a2a3a',
+    background: 'var(--color-racing-card)',
+    border: '1px solid var(--color-racing-border)',
     borderRadius: 8,
     fontSize: 12,
-    color: isLight ? '#1f2937' : '#e5e7eb',
+    color: 'var(--color-racing-text)',
   };
 }
 
