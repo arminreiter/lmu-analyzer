@@ -216,6 +216,24 @@ export function getTopSpeed(laps: LapData[]): number | null {
   return speeds.length ? Math.max(...speeds) : null;
 }
 
+/**
+ * Average tire wear per lap in %-points (mean of the four corners).
+ * Skips laps without tire data and tire changes (remaining wear going up).
+ */
+export function getTireWearPerLap(laps: LapData[]): number | null {
+  const deltas: number[] = [];
+  let prev: number | null = null;
+  for (const lap of laps) {
+    const { fl, fr, rl, rr } = lap.tireWear;
+    if (fl <= 0) { prev = null; continue; }
+    const avg = (fl + fr + rl + rr) / 4;
+    if (prev !== null && prev > avg) deltas.push((prev - avg) * 100);
+    prev = lap.isPit ? null : avg;
+  }
+  if (deltas.length === 0) return null;
+  return deltas.reduce((a, b) => a + b, 0) / deltas.length;
+}
+
 export function isDriverIncident(incident: { driver1: string; description: string }, driverName: string): boolean {
   return incident.driver1 === driverName || incident.description.includes(driverName);
 }

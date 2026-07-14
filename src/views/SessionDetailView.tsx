@@ -1,24 +1,28 @@
 import { useState, useMemo, memo } from 'react';
-import { ArrowLeft, Info, Timer, BarChart3, AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Users, Timer, BarChart3, LifeBuoy, AlertTriangle, Ban, ShieldAlert, UserCheck } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
+import { SessionLink } from '../components/SessionLink';
+import { getTireWearPerLap, getTopSpeed, isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
 import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
-type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
+type Tab = 'overview' | 'laps' | 'charts' | 'tyres' | 'incidents' | 'penalties' | 'tracklimits';
 
 interface SessionDetailViewProps {
+  onNavigate?: (view: string, context?: string) => void;
+  /** The app-level driver selection — defines who "me" is (the XML isPlayer flag is unreliable online). */
+  playerNames?: string[];
   file: RaceFile;
   session: SessionData;
   driver: DriverResult;
   onBack: () => void;
 }
 
-export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack }: SessionDetailViewProps) {
+export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack, onNavigate, playerNames }: SessionDetailViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const validLaps = useMemo(() => driver.laps.filter(isValidLap), [driver.laps]);
@@ -58,19 +62,31 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
     return { best, worst, avg, median, stdDev, consistency, avgSpeed, topSpeed, avgFuelPerLap };
   }, [validLaps, driver.laps]);
 
-  // Session standings (all drivers in this session)
+  // The local player's entry in this session (for the "Select me" shortcut)
+  const playerDriver = useMemo(() =>
+    session.drivers.find(d => playerNames?.includes(d.name))
+      ?? session.drivers.find(d => d.isPlayer)
+      ?? null,
+    [session.drivers, playerNames]);
+
+  // Session standings (all drivers in this session), stats precomputed once per row
   const standings = useMemo(() => {
     const sorted = [...session.drivers].sort((a, b) => {
       if (session.type === 'Race') return a.position - b.position;
       return (a.bestLapTime ?? Infinity) - (b.bestLapTime ?? Infinity);
     });
-    return sorted;
+    return sorted.map((d): StandingRow => ({
+      ...d,
+      driverTopSpeed: getTopSpeed(d.laps),
+      wearPerLap: getTireWearPerLap(d.laps),
+    }));
   }, [session]);
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: <Info className="w-3.5 h-3.5" /> },
+    { id: 'overview', label: 'Standings', icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'laps', label: 'Lap Details', icon: <Timer className="w-3.5 h-3.5" /> },
     { id: 'charts', label: 'Charts', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+    { id: 'tyres', label: 'Tyre Wear', icon: <LifeBuoy className="w-3.5 h-3.5" /> },
     { id: 'incidents', label: 'Incidents', icon: <AlertTriangle className="w-3.5 h-3.5" />, count: driverIncidents.length },
     { id: 'penalties', label: 'Penalties', icon: <Ban className="w-3.5 h-3.5" />, count: driverPenalties.length },
     { id: 'tracklimits', label: 'Track Limits', icon: <ShieldAlert className="w-3.5 h-3.5" />, count: driverTrackLimits.length },
@@ -95,11 +111,20 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
             <ClassBadge carClass={driver.carClass} />
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
-            {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
+            {driver.name} &middot; {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
             {isOnline(file) && <span className="text-racing-blue ml-2">Online</span>}
           </p>
         </div>
+        {onNavigate && playerDriver && playerDriver.name !== driver.name && (
+          <SessionLink fileName={file.fileName} sessionIndex={session.sessionIndex} driverName={playerDriver.name} onNavigate={onNavigate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-racing-green/10 border border-racing-green/25 text-racing-green hover:bg-racing-green/20 transition-colors cursor-pointer whitespace-nowrap">
+            <UserCheck className="w-3.5 h-3.5" /> Select me
+          </SessionLink>
+        )}
       </div>
+
+      {/* Driver / session / performance context — always visible, independent of the active tab */}
+      <DriverSessionCards file={file} session={session} driver={driver} stats={stats} />
 
       {/* Tabs */}
       <nav className="flex gap-0 border-b border-racing-border overflow-x-auto scrollbar-none">
@@ -128,10 +153,11 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <OverviewTab file={file} session={session} driver={driver} stats={stats} standings={standings} />
+        <StandingsTab file={file} session={session} driver={driver} standings={standings} onNavigate={onNavigate} />
       )}
       {activeTab === 'laps' && <LapsTab driver={driver} validLaps={validLaps} />}
       {activeTab === 'charts' && <ChartsTab driver={driver} validLaps={validLaps} />}
+      {activeTab === 'tyres' && <TyreWearTab driver={driver} />}
       {activeTab === 'incidents' && <IncidentsTab incidents={driverIncidents} />}
       {activeTab === 'penalties' && <PenaltiesTab penalties={driverPenalties} />}
       {activeTab === 'tracklimits' && <TrackLimitsTab trackLimits={driverTrackLimits} />}
@@ -147,43 +173,18 @@ interface StatsData {
   avgFuelPerLap: number | null;
 }
 
-function OverviewTab({ file, session, driver, stats, standings }: {
-  file: RaceFile; session: SessionData; driver: DriverResult;
-  stats: StatsData | null; standings: DriverResult[];
+type StandingRow = DriverResult & { driverTopSpeed: number | null; wearPerLap: number | null };
+
+function DriverSessionCards({ file, session, driver, stats }: {
+  file: RaceFile; session: SessionData; driver: DriverResult; stats: StatsData | null;
 }) {
-  // Find current driver index in standings
-  const driverIdx = standings.findIndex(d => d.name === driver.name);
-
-  const standingsColumns: Column<DriverResult>[] = useMemo(() => [
-    { key: 'pos', label: 'Pos', width: '50px', sortValue: r => session.type === 'Race' ? r.position : (r.bestLapTime ?? Infinity),
-      render: (_r: DriverResult, i: number) => <span className={`font-bold ${i === 0 ? 'text-racing-gold' : i <= 2 ? 'text-racing-orange' : 'text-racing-muted'}`}>{i + 1}</span> },
-    { key: 'name', label: 'Driver', width: '15%', sortValue: r => r.name,
-      render: r => <span className={`truncate block ${r.name === driver.name ? 'text-racing-green font-bold' : 'text-white'}`}>{r.name}</span> },
-    { key: 'car', label: 'Car', width: '15%', sortValue: r => r.carType,
-      render: r => <div className="flex items-center gap-1.5 truncate"><span className="text-racing-muted text-xs truncate">{r.carType}</span><ClassBadge carClass={r.carClass} /></div> },
-    { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px', sortValue: r => r.bestLapTime ?? Infinity,
-      render: r => <span className="text-racing-green">{formatLapTime(r.bestLapTime)}</span> },
-    { key: 'laps', label: 'Laps', align: 'right', width: '55px', sortValue: r => r.totalLaps,
-      render: r => <span className="text-racing-muted">{r.totalLaps}</span> },
-    ...(session.type === 'Race' ? [
-      { key: 'time', label: 'Total Time', align: 'right' as const, mono: true, width: '120px', sortValue: (r: DriverResult) => r.finishTime ?? Infinity,
-        render: (r: DriverResult) => <span className="text-racing-muted">{r.finishTime ? formatEventTime(r.finishTime) : '--'}</span> },
-      { key: 'pits', label: 'Pits', align: 'right' as const, width: '50px', sortValue: (r: DriverResult) => r.pitstops,
-        render: (r: DriverResult) => <span className="text-racing-muted">{r.pitstops}</span> },
-      { key: 'strategy', label: 'Strategy', width: '180px', sortValue: (r: DriverResult) => r.pitstops,
-        render: (r: DriverResult) => <TireStrategy laps={r.laps} /> },
-      { key: 'status', label: 'Status', width: '120px', sortValue: (r: DriverResult) => r.finishStatus,
-        render: (r: DriverResult) => <span className={`text-xs ${!isDnf(r.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
-    ] : []),
-  ], [session.type, driver.name]);
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Session Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Driver Info */}
         <div className="data-card carbon-fiber p-5">
-          <h3 className="text-xs uppercase tracking-wider text-racing-muted mb-3 font-medium">Driver Info</h3>
+          <h3 className="text-xs uppercase tracking-wider text-racing-muted mb-3 font-medium">Driver Info — {driver.name}</h3>
           <div className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-sm">
             <InfoRow label="Team" value={driver.teamName} />
             <InfoRow label="Car #" value={driver.carNumber} />
@@ -252,23 +253,66 @@ function OverviewTab({ file, session, driver, stats, standings }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Standings */}
-      <div className="data-card carbon-fiber overflow-hidden">
-        <DataCardHeader title={session.type === 'Race' ? 'RACE STANDINGS' : 'SESSION STANDINGS'}>
-          <span className="ml-auto text-[10px] font-mono text-racing-muted/50">
-            {session.drivers.length} drivers
-            {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
-          </span>
-          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse}-${session.type}`} />
-        </DataCardHeader>
-        <SortableTable<DriverResult>
-          columns={standingsColumns}
-          data={standings}
-          rowKey={r => r.name}
-          rowClass={r => r.name === driver.name ? 'bg-racing-green/[0.06]' : ''}
-        />
-      </div>
+function StandingsTab({ file, session, driver, standings, onNavigate }: {
+  file: RaceFile; session: SessionData; driver: DriverResult;
+  standings: StandingRow[];
+  onNavigate?: (view: string, context?: string) => void;
+}) {
+  // Find current driver index in standings
+  const driverIdx = standings.findIndex(d => d.name === driver.name);
+
+  const standingsColumns: Column<StandingRow>[] = useMemo(() => [
+    { key: 'pos', label: 'Pos', width: '50px', sortValue: r => session.type === 'Race' ? r.position : (r.bestLapTime ?? Infinity),
+      render: (_r: DriverResult, i: number) => <span className={`font-bold ${i === 0 ? 'text-racing-gold' : i <= 2 ? 'text-racing-orange' : 'text-racing-muted'}`}>{i + 1}</span> },
+    { key: 'name', label: 'Driver', width: '15%', sortValue: r => r.name,
+      render: r => {
+        const cls = `truncate block text-left ${r.name === driver.name ? 'text-racing-green font-bold' : 'text-white'}`;
+        return onNavigate
+          ? <SessionLink fileName={file.fileName} sessionIndex={session.sessionIndex} driverName={r.name} onNavigate={onNavigate}
+              className={`${cls} hover:text-racing-red transition-colors cursor-pointer`}>{r.name}</SessionLink>
+          : <span className={cls}>{r.name}</span>;
+      } },
+    { key: 'car', label: 'Car', width: '15%', sortValue: r => r.carType,
+      render: r => <div className="flex items-center gap-1.5 truncate"><span className="text-racing-muted text-xs truncate">{r.carType}</span><ClassBadge carClass={r.carClass} /></div> },
+    { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px', sortValue: r => r.bestLapTime ?? Infinity,
+      render: r => <span className="text-racing-green">{formatLapTime(r.bestLapTime)}</span> },
+    { key: 'laps', label: 'Laps', align: 'right', width: '55px', sortValue: r => r.totalLaps,
+      render: r => <span className="text-racing-muted">{r.totalLaps}</span> },
+    { key: 'topspeed', label: 'Top Speed', align: 'right', mono: true, width: '95px', sortValue: r => r.driverTopSpeed ?? 0,
+      render: r => <span className="text-racing-muted">{r.driverTopSpeed ? formatSpeed(r.driverTopSpeed) : '--'}</span> },
+    { key: 'wear', label: 'Wear/Lap', align: 'right', mono: true, width: '85px', sortValue: r => r.wearPerLap ?? 0,
+      render: r => <span className="text-racing-muted">{r.wearPerLap !== null ? `${r.wearPerLap.toFixed(1)}%` : '--'}</span> },
+    ...(session.type === 'Race' ? [
+      { key: 'time', label: 'Total Time', align: 'right' as const, mono: true, width: '120px', sortValue: (r: DriverResult) => r.finishTime ?? Infinity,
+        render: (r: DriverResult) => <span className="text-racing-muted">{r.finishTime ? formatEventTime(r.finishTime) : '--'}</span> },
+      { key: 'pits', label: 'Pits', align: 'right' as const, width: '50px', sortValue: (r: DriverResult) => r.pitstops,
+        render: (r: DriverResult) => <span className="text-racing-muted">{r.pitstops}</span> },
+      { key: 'strategy', label: 'Strategy', width: '120px', sortValue: (r: DriverResult) => r.pitstops,
+        render: (r: DriverResult) => <TireStrategy laps={r.laps} /> },
+      { key: 'status', label: 'Status', width: '120px', sortValue: (r: DriverResult) => r.finishStatus,
+        render: (r: DriverResult) => <span className={`text-xs ${!isDnf(r.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
+    ] : []),
+  ], [session, driver.name, file.fileName, onNavigate]);
+
+  return (
+    <div className="data-card carbon-fiber overflow-hidden">
+      <DataCardHeader title={session.type === 'Race' ? 'RACE STANDINGS' : 'SESSION STANDINGS'}>
+        <span className="ml-auto text-[10px] font-mono text-racing-muted/50">
+          {session.drivers.length} drivers
+          {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
+        </span>
+        <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse}-${session.type}`} />
+      </DataCardHeader>
+      <SortableTable<StandingRow>
+        columns={standingsColumns}
+        data={standings}
+        rowKey={r => r.name}
+        rowClass={r => r.name === driver.name ? 'bg-racing-green/[0.06]' : ''}
+      />
     </div>
   );
 }
@@ -394,6 +438,138 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
 
 // ── Charts Tab ───────────────────────────────────────────────────────────────
 
+// ── Tyre Wear Tab ─────────────────────────────────────────────────────────────
+
+type WearRow = LapData & { avgWear: number; wearDelta: number | null };
+
+function wearColor(pct: number): string {
+  if (pct >= 75) return 'text-racing-green';
+  if (pct >= 50) return 'text-racing-yellow';
+  if (pct >= 25) return 'text-racing-orange';
+  return 'text-racing-red';
+}
+
+function TyreWearTab({ driver }: { driver: DriverResult }) {
+  const tireLaps = useMemo(() => driver.laps.filter(l => l.tireWear.fl > 0), [driver.laps]);
+
+  const rows = useMemo((): WearRow[] => {
+    const out: WearRow[] = [];
+    let prev: LapData | null = null;
+    for (const l of tireLaps) {
+      const avg = (l.tireWear.fl + l.tireWear.fr + l.tireWear.rl + l.tireWear.rr) / 4;
+      const prevAvg = prev ? (prev.tireWear.fl + prev.tireWear.fr + prev.tireWear.rl + prev.tireWear.rr) / 4 : null;
+      const wearDelta = prevAvg !== null && prevAvg > avg ? (prevAvg - avg) * 100 : null;
+      prev = l.isPit ? null : l;
+      out.push({ ...l, avgWear: avg * 100, wearDelta });
+    }
+    return out;
+  }, [tireLaps]);
+
+  // Average wear per lap per corner (same stint rule as getTireWearPerLap)
+  const rates = useMemo(() => {
+    let n = 0;
+    const s = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    let prev: LapData | null = null;
+    for (const l of tireLaps) {
+      if (prev) {
+        const prevAvg = (prev.tireWear.fl + prev.tireWear.fr + prev.tireWear.rl + prev.tireWear.rr) / 4;
+        const avg = (l.tireWear.fl + l.tireWear.fr + l.tireWear.rl + l.tireWear.rr) / 4;
+        if (prevAvg > avg) {
+          s.fl += (prev.tireWear.fl - l.tireWear.fl) * 100;
+          s.fr += (prev.tireWear.fr - l.tireWear.fr) * 100;
+          s.rl += (prev.tireWear.rl - l.tireWear.rl) * 100;
+          s.rr += (prev.tireWear.rr - l.tireWear.rr) * 100;
+          n++;
+        }
+      }
+      prev = l.isPit ? null : l;
+    }
+    if (n === 0) return null;
+    return { fl: s.fl / n, fr: s.fr / n, rl: s.rl / n, rr: s.rr / n, overall: (s.fl + s.fr + s.rl + s.rr) / (4 * n) };
+  }, [tireLaps]);
+
+  const chartData = useMemo(() => tireLaps.map(l => ({
+    lap: l.num,
+    FL: +(l.tireWear.fl * 100).toFixed(1),
+    FR: +(l.tireWear.fr * 100).toFixed(1),
+    RL: +(l.tireWear.rl * 100).toFixed(1),
+    RR: +(l.tireWear.rr * 100).toFixed(1),
+  })), [tireLaps]);
+
+  const wearColumns: Column<WearRow>[] = useMemo(() => [
+    { key: 'lap', label: 'Lap', width: '60px', sortValue: r => r.num,
+      render: r => <span className="text-racing-muted font-mono">{r.num}{r.isPit && <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-racing-blue/20 text-racing-blue">PIT</span>}</span> },
+    { key: 'compound', label: 'Compound', width: '110px', sortValue: r => r.frontCompound,
+      render: r => <span className="text-racing-muted text-xs">{r.frontCompound === r.rearCompound ? r.frontCompound : `${r.frontCompound} / ${r.rearCompound}`}</span> },
+    { key: 'fl', label: 'FL', align: 'right', mono: true, width: '9%', sortValue: r => r.tireWear.fl,
+      render: r => <span className={wearColor(r.tireWear.fl * 100)}>{(r.tireWear.fl * 100).toFixed(1)}%</span> },
+    { key: 'fr', label: 'FR', align: 'right', mono: true, width: '9%', sortValue: r => r.tireWear.fr,
+      render: r => <span className={wearColor(r.tireWear.fr * 100)}>{(r.tireWear.fr * 100).toFixed(1)}%</span> },
+    { key: 'rl', label: 'RL', align: 'right', mono: true, width: '9%', sortValue: r => r.tireWear.rl,
+      render: r => <span className={wearColor(r.tireWear.rl * 100)}>{(r.tireWear.rl * 100).toFixed(1)}%</span> },
+    { key: 'rr', label: 'RR', align: 'right', mono: true, width: '9%', sortValue: r => r.tireWear.rr,
+      render: r => <span className={wearColor(r.tireWear.rr * 100)}>{(r.tireWear.rr * 100).toFixed(1)}%</span> },
+    { key: 'avg', label: 'Avg', align: 'right', mono: true, width: '9%', sortValue: r => r.avgWear,
+      render: r => <span className="text-white">{r.avgWear.toFixed(1)}%</span> },
+    { key: 'delta', label: 'Wear', align: 'right', mono: true, width: '9%', sortValue: r => r.wearDelta ?? 0,
+      render: r => <span className="text-racing-muted">{r.wearDelta !== null ? `-${r.wearDelta.toFixed(2)}%` : '--'}</span> },
+  ], []);
+
+  if (tireLaps.length === 0) {
+    return <div className="text-center py-12 text-racing-muted text-sm">No tire data recorded for this session.</div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {rates && (
+        <div className="data-card carbon-fiber p-5">
+          <h3 className="text-xs uppercase tracking-wider text-racing-muted mb-3 font-medium">Wear per Lap</h3>
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+            <MiniStat label="Overall" value={`${rates.overall.toFixed(2)}%`} accent="text-racing-orange" />
+            <MiniStat label="Front Left" value={`${rates.fl.toFixed(2)}%`} />
+            <MiniStat label="Front Right" value={`${rates.fr.toFixed(2)}%`} />
+            <MiniStat label="Rear Left" value={`${rates.rl.toFixed(2)}%`} />
+            <MiniStat label="Rear Right" value={`${rates.rr.toFixed(2)}%`} />
+          </div>
+        </div>
+      )}
+
+      {/* Remaining tire per corner over the session */}
+      {chartData.length > 1 && (
+        <div className="data-card carbon-fiber p-4">
+          <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TIRE WEAR (%)</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="FL" stroke="#e10600" strokeWidth={1.5} dot={false} name="Front Left" />
+              <Line type="monotone" dataKey="FR" stroke="#ff6d00" strokeWidth={1.5} dot={false} name="Front Right" />
+              <Line type="monotone" dataKey="RL" stroke="#2196f3" strokeWidth={1.5} dot={false} name="Rear Left" />
+              <Line type="monotone" dataKey="RR" stroke="#00c853" strokeWidth={1.5} dot={false} name="Rear Right" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+
+      <div className="data-card carbon-fiber overflow-hidden">
+        <DataCardHeader title="TYRE WEAR PER LAP">
+          <span className="ml-auto" />
+          <ExportButton columns={wearColumns} data={rows} filename={`lmu-tyre-wear-${driver.name}`} />
+        </DataCardHeader>
+        <SortableTable<WearRow>
+          columns={wearColumns}
+          data={rows}
+          rowKey={r => String(r.num)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapData[] }) {
   const lapChartData = useMemo(() => validLaps.map(l => ({
     lap: l.num,
@@ -402,14 +578,6 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
     s2: l.sector2,
     s3: l.sector3,
   })), [validLaps]);
-
-  const tireData = useMemo(() => driver.laps.filter(l => l.tireWear.fl > 0).map(l => ({
-    lap: l.num,
-    FL: +(l.tireWear.fl * 100).toFixed(1),
-    FR: +(l.tireWear.fr * 100).toFixed(1),
-    RL: +(l.tireWear.rl * 100).toFixed(1),
-    RR: +(l.tireWear.rr * 100).toFixed(1),
-  })), [driver.laps]);
 
   const fuelData = useMemo(() => driver.laps.filter(l => l.fuel > 0).map(l => ({
     lap: l.num,
@@ -476,26 +644,6 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
         </div>
       )}
 
-      {/* Tire Wear */}
-      {tireData.length > 1 && (
-        <div className="data-card carbon-fiber p-4">
-          <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TIRE WEAR (%)</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={tireData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
-              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
-              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
-              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="FL" stroke="#e10600" strokeWidth={1.5} dot={false} name="Front Left" />
-              <Line type="monotone" dataKey="FR" stroke="#ff6d00" strokeWidth={1.5} dot={false} name="Front Right" />
-              <Line type="monotone" dataKey="RL" stroke="#2196f3" strokeWidth={1.5} dot={false} name="Rear Left" />
-              <Line type="monotone" dataKey="RR" stroke="#00c853" strokeWidth={1.5} dot={false} name="Rear Right" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
       {/* Fuel */}
       {fuelData.length > 1 && (
         <div className="data-card carbon-fiber p-4">
@@ -514,7 +662,7 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
         </div>
       )}
 
-      {lapChartData.length <= 1 && tireData.length <= 1 && fuelData.length <= 1 && (
+      {lapChartData.length <= 1 && fuelData.length <= 1 && (
         <div className="text-center py-12 text-racing-muted">
           <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-30" />
           <p>Not enough lap data for charts.</p>
