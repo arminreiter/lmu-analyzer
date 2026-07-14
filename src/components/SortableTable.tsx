@@ -21,12 +21,11 @@ interface SortableTableProps<T> {
   rowKey: (row: T, index: number) => string;
   rowClass?: (row: T, index: number) => string;
   onRowClick?: (row: T, index: number) => void;
-  stickyRows?: ReactNode;
 }
 
 type SortDir = 'asc' | 'desc';
 
-export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, stickyRows }: SortableTableProps<T>) {
+export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick }: SortableTableProps<T>) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -103,7 +102,6 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, 
           </tr>
         </thead>
         <tbody>
-          {stickyRows}
           {sorted.map((row, i) => (
             <tr
               key={rowKey(row, i)}

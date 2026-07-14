@@ -14,8 +14,10 @@ import { RaceResultsView } from './views/RaceResultsView';
 import { DriverProfileView } from './views/DriverProfileView';
 import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
-import { loadFolder, loadFiles } from './lib/parser';
+import { loadFolder, parseUploadedFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
+import { errorMessage } from './lib/formatting';
+import { parseSessionContext } from './lib/sessionContext';
 import { DataIndexProvider } from './lib/DataIndexContext';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
@@ -24,6 +26,10 @@ import type { RaceFile, DriverSummary, CarClass } from './lib/types';
 // Build a URL hash from view + context
 const buildHash = (view: string, context: string | null) =>
   '#' + view + (context ? '/' + encodeURIComponent(context) : '');
+
+// Short summary line for files that failed to parse
+const failedFilesNotice = (failed: string[]) =>
+  `${failed.length} file${failed.length === 1 ? '' : 's'} could not be parsed and ${failed.length === 1 ? 'was' : 'were'} skipped: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? ', …' : ''}`;
 
 // Parse a URL hash back into view + context
 const parseHash = (hash: string): { view: string; context: string | null } | null => {
@@ -42,12 +48,14 @@ function App() {
   const [selectedClasses, setSelectedClasses] = useState<CarClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Non-blocking warning (skipped files, stale cache, caching failure) — dismissible toast
+  const [notice, setNotice] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('overview');
   const [viewContext, setViewContext] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [hasCachedData, setHasCachedData] = useState(false);
   const [racePaceEnabled, setRacePaceEnabled] = useState(() => {
-    try { const v = localStorage.getItem('lmu-analyzer-benchmarks'); return v === null || v === '1'; } catch { return true; }
+    try { const v = localStorage.getItem(storage.KEYS.benchmarks); return v === null || v === '1'; } catch { return true; }
   });
   const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
@@ -63,11 +71,13 @@ function App() {
     },
   });
 
-  const applyParsedData = useCallback((rawParsed: RaceFile[], restoreFilters = false) => {
+  // Applies a parsed dataset to app state; returns the deduplicated array (or null if empty)
+  // so callers can persist the deduplicated data instead of the raw parse.
+  const applyParsedData = useCallback((rawParsed: RaceFile[], restoreFilters = false): RaceFile[] | null => {
     if (rawParsed.length === 0) {
       setError('No valid XML race files found.');
       setLoading(false);
-      return;
+      return null;
     }
     const parsed = deduplicateSessions(rawParsed);
     setFiles(parsed);
@@ -97,30 +107,42 @@ function App() {
       setActiveView(savedFilters.activeView || 'overview');
     }
     setLoaded(true);
+    return parsed;
+  }, []);
+
+  // Persist a dataset for resume; caching failure is non-fatal but worth surfacing
+  const persistFiles = useCallback((parsed: RaceFile[]) => {
+    storage.saveFiles(parsed).then(ok => {
+      if (!ok) {
+        console.warn('Failed to cache parsed files');
+        setNotice('Could not cache your data — "Resume last session" will not be available.');
+      }
+    });
   }, []);
 
   // Auto-restore cached data on mount
   useEffect(() => {
     (async () => {
-      const cached = await storage.loadFiles();
+      const [cached, handle] = await Promise.all([storage.loadCachedFiles(), storage.loadDirectoryHandle()]);
       if (cached && cached.length > 0) {
         setHasCachedData(true);
         applyParsedData(cached, true);
-        // Try to restore directory handle for refresh capability
-        const handle = await storage.loadDirectoryHandle();
+        // Directory handle enables the refresh button
         if (!handle) return;
         setDirHandle(handle);
         // If data came from a directory, try to re-read fresh data
         if (storage.loadDataSource() === 'directory') {
           try {
-            const perm = await (handle as FileSystemDirectoryHandle & { queryPermission(desc: { mode: string }): Promise<string> }).queryPermission({ mode: 'read' });
+            // Permission not granted needs a user gesture (refresh button) — stay silent
+            const perm = await handle.queryPermission({ mode: 'read' });
             if (perm === 'granted') {
-              const parsed = await loadFolder(handle);
-              applyParsedData(parsed, true);
-              await storage.saveFiles(parsed);
+              const { files: fresh, failedFiles } = await loadFolder(handle);
+              const deduped = applyParsedData(fresh, true);
+              if (deduped) persistFiles(deduped);
+              if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
             }
           } catch {
-            // Permission not granted or folder unavailable — cached data is still shown
+            setNotice('Showing cached data — folder could not be re-read.');
           }
         }
       }
@@ -139,34 +161,40 @@ function App() {
     setError(null);
     setDirHandle(handle);
     try {
-      const parsed = await loadFolder(handle);
-      applyParsedData(parsed, true);
-      storage.saveFiles(parsed);
-      storage.saveDataSource('directory');
-      storage.saveDirectoryHandle(handle);
+      const { files: parsed, failedFiles } = await loadFolder(handle);
+      const deduped = applyParsedData(parsed, true);
+      if (deduped) {
+        persistFiles(deduped);
+        storage.saveDataSource('directory');
+        storage.saveDirectoryHandle(handle);
+      }
+      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
     } catch (e) {
-      setError(`Failed to load data: ${(e as Error).message}`);
+      setError(`Failed to load data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData]);
+  }, [applyParsedData, persistFiles]);
 
   const handleFilesUploaded = useCallback(async (uploadedFiles: File[]) => {
     setLoading(true);
     setError(null);
     setDirHandle(null);
     try {
-      const parsed = await loadFiles(uploadedFiles);
-      applyParsedData(parsed, true);
-      storage.saveFiles(parsed);
-      storage.saveDataSource('upload');
-      storage.clearDirectoryHandle();
+      const { files: parsed, failedFiles } = await parseUploadedFiles(uploadedFiles);
+      const deduped = applyParsedData(parsed, true);
+      if (deduped) {
+        persistFiles(deduped);
+        storage.saveDataSource('upload');
+        storage.clearDirectoryHandle();
+      }
+      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
     } catch (e) {
-      setError(`Failed to load data: ${(e as Error).message}`);
+      setError(`Failed to load data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData]);
+  }, [applyParsedData, persistFiles]);
 
   const handleRefresh = useCallback(async () => {
     const handle = dirHandle;
@@ -174,24 +202,25 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const perm = await (handle as FileSystemDirectoryHandle & { requestPermission(desc: { mode: string }): Promise<string> }).requestPermission({ mode: 'read' });
+      const perm = await handle.requestPermission({ mode: 'read' });
       if (perm !== 'granted') {
         setError('Permission to read folder was denied.');
         setLoading(false);
         return;
       }
-      const parsed = await loadFolder(handle);
-      applyParsedData(parsed, true);
-      storage.saveFiles(parsed);
+      const { files: parsed, failedFiles } = await loadFolder(handle);
+      const deduped = applyParsedData(parsed, true);
+      if (deduped) persistFiles(deduped);
+      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
     } catch (e) {
-      setError(`Failed to refresh data: ${(e as Error).message}`);
+      setError(`Failed to refresh data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData, dirHandle]);
+  }, [applyParsedData, persistFiles, dirHandle]);
 
   const handleResumeCached = useCallback(async () => {
-    const cached = await storage.loadFiles();
+    const cached = await storage.loadCachedFiles();
     if (!cached || cached.length === 0) return;
     applyParsedData(cached, true);
     const handle = await storage.loadDirectoryHandle();
@@ -205,6 +234,7 @@ function App() {
     setSelectedClasses([]);
     setLoaded(false);
     setError(null);
+    setNotice(null);
     storage.clearAll();
     setDirHandle(null);
     setHasCachedData(false);
@@ -213,7 +243,7 @@ function App() {
   const handleToggleRacePace = useCallback(() => {
     setRacePaceEnabled(prev => {
       const next = !prev;
-      try { localStorage.setItem('lmu-analyzer-benchmarks', next ? '1' : '0'); } catch { /* ignore */ }
+      try { localStorage.setItem(storage.KEYS.benchmarks, next ? '1' : '0'); } catch { /* ignore */ }
       if (!next && activeView === 'benchmarks') setActiveView('overview');
       return next;
     });
@@ -264,9 +294,7 @@ function App() {
   // Resolve session detail from viewContext "fileName::sessionIndex[::driverName]"
   const sessionDetail = useMemo(() => {
     if (activeView !== 'session' || !viewContext) return null;
-    const [fileName, idxStr, ...driverParts] = viewContext.split('::');
-    const sessionIndex = Number(idxStr);
-    const driverName = driverParts.length > 0 ? decodeURIComponent(driverParts.join('::')) : null;
+    const { fileName, sessionIndex, driverName } = parseSessionContext(viewContext);
     const file = filteredFiles.find(f => f.fileName === fileName);
     if (!file) return null;
     const session = file.sessions.find(s => s.sessionIndex === sessionIndex);
@@ -294,6 +322,19 @@ function App() {
     </div>
   );
 
+  // Non-blocking warning toast (skipped files, stale cache, caching failure)
+  const noticeToast = notice && (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-racing-card border border-racing-yellow/50 px-4 py-3 rounded-lg shadow-lg">
+      <span className="text-sm text-racing-light">{notice}</span>
+      <button
+        onClick={() => setNotice(null)}
+        className="px-3 py-1 text-sm font-bold bg-racing-yellow/20 text-racing-yellow rounded hover:bg-racing-yellow/30 transition-colors"
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+
   if (!loaded) {
     return (
       <>
@@ -305,6 +346,7 @@ function App() {
           error={error}
         />
         {updateToast}
+        {noticeToast}
       </>
     );
   }
@@ -357,6 +399,7 @@ function App() {
 
       <Footer />
       {updateToast}
+      {noticeToast}
     </div>
   );
 }

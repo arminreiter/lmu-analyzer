@@ -4,10 +4,11 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { PillSelector } from '../components/PillSelector';
-import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, getChartTooltipStyle } from '../lib/formatting';
+import { buildLapColumns } from '../components/lapColumns';
+import { isValidLap } from '../lib/analytics';
+import { formatLapTime, formatSpeed, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
@@ -52,33 +53,23 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
     return data;
   }, [trackSessions]);
 
-  // Top speed progression
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
-    { key: 'pos', label: '#', width: '35px', sortValue: r => r.lapTime,
-      render: (_, i) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
-    { key: 'car', label: 'Car', width: '18%', sortValue: r => r.carType,
-      render: r => onNavigate
+    { key: 'pos', label: '#', width: '35px', sortValue: (r: PersonalBest) => r.lapTime,
+      render: (_: PersonalBest, i: number) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
+    { key: 'car', label: 'Car', width: '18%', sortValue: (r: PersonalBest) => r.carType,
+      render: (r: PersonalBest) => onNavigate
         ? <button onClick={(e) => { e.stopPropagation(); onNavigate('cars', r.carType); }} className="text-white cursor-pointer">{r.carType}</button>
         : <span className="text-white">{r.carType}</span> },
-    { key: 'class', label: 'Class', width: '100px', sortValue: r => r.carClass,
-      render: r => <ClassBadge carClass={r.carClass} /> },
-    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
-      render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
-    { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector1)}</span> },
-    { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector2)}</span> },
-    { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector3)}</span> },
-    { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-      render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
-    { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-      render: r => onNavigate
-        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} driverName={r.driverName} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
-        : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
-    { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
-      render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
+    { key: 'class', label: 'Class', width: '100px', sortValue: (r: PersonalBest) => r.carClass,
+      render: (r: PersonalBest) => <ClassBadge carClass={r.carClass} /> },
+    ...buildLapColumns(onNavigate),
   ], [onNavigate]);
+
+  const lapCounts = useMemo(() => {
+    const totalLaps = trackSessions.reduce((sum, s) => sum + s.driver.totalLaps, 0);
+    const validLaps = trackSessions.reduce((sum, s) => sum + s.driver.laps.filter(isValidLap).length, 0);
+    return { totalLaps, validLaps, invalidLaps: totalLaps - validLaps };
+  }, [trackSessions]);
 
   const sortedTrackLaps = useMemo(() => [...trackLaps].sort((a, b) => a.lapTime - b.lapTime), [trackLaps]);
 
@@ -103,9 +94,7 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
           <div className="data-card carbon-fiber p-6">
             <h2 className="font-racing text-xl font-bold text-white tracking-wider mb-4">{track}</h2>
             {(() => {
-              const totalLaps = trackSessions.reduce((sum, s) => sum + s.driver.totalLaps, 0);
-              const validLaps = trackSessions.reduce((sum, s) => sum + s.driver.laps.filter(l => l.lapTime && l.lapTime > 0).length, 0);
-              const invalidLaps = totalLaps - validLaps;
+              const { totalLaps, validLaps, invalidLaps } = lapCounts;
               return (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                   <div>
@@ -150,7 +139,7 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
                 value={lapMode}
                 onChange={setLapMode}
               />
-              <ExportButton columns={lapColumns} data={sortedTrackLaps} filename={`lmu-track-${(track ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
+              <ExportButton columns={lapColumns} data={sortedTrackLaps} filename={`lmu-track-${track ?? 'unknown'}`} />
             </DataCardHeader>
             <SortableTable<PersonalBest>
               columns={lapColumns}
@@ -165,9 +154,9 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
               <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">LAP TIME PROGRESSION</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={progressionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-                  <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                  <XAxis dataKey="session" tick={{ fill: CHART_AXIS_TICK, fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
                   <Tooltip
                     contentStyle={getChartTooltipStyle()}
                     formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { car: string } }).payload.car]}
@@ -185,9 +174,9 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
               <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TOP SPEED TREND</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={speedData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-                  <XAxis dataKey="session" tick={{ fill: '#6b7280', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                  <XAxis dataKey="session" tick={{ fill: CHART_AXIS_TICK, fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} />
                   <Tooltip
                     contentStyle={getChartTooltipStyle()}
                     formatter={(v: unknown) => [formatSpeed(Number(v)), 'Top Speed']}

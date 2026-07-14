@@ -1,6 +1,7 @@
 import type { RaceFile, CarClass } from './types';
 
-const KEYS = {
+/** All localStorage keys used by the app. Register new keys here. */
+export const KEYS = {
   files: 'lmu-analyzer-files',
   selectedDrivers: 'lmu-analyzer-selected-drivers',
   selectedClasses: 'lmu-analyzer-selected-classes',
@@ -8,7 +9,14 @@ const KEYS = {
   dataSource: 'lmu-analyzer-data-source', // 'directory' | 'upload'
   profileName: 'lmu-analyzer-profile-name',
   profileAvatar: 'lmu-analyzer-profile-avatar',
+  profileSettings: 'lmu-analyzer-profile-settings',
+  benchmarks: 'lmu-analyzer-benchmarks',
+  theme: 'lmu-analyzer-theme',
+  trackModeSelected: 'lmu_trackmode_selected', // legacy name — renaming would lose users' stored value
 } as const;
+
+// Bump when the cached RaceFile shape changes — mismatched (or unversioned) caches are discarded.
+const CACHE_VERSION = 1;
 
 const DB_NAME = 'lmu-analyzer';
 const DB_STORE = 'handles';
@@ -16,23 +24,31 @@ const DB_FILES_STORE = 'files';
 const DIR_HANDLE_KEY = 'directory-handle';
 const FILES_KEY = 'race-files';
 
-// --- localStorage helpers ---
+// --- localStorage helpers (Safari lockdown / quota can throw on any access) ---
+
+function lsGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function lsSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* quota exceeded or unavailable */ }
+}
+
+function lsRemove(key: string): void {
+  try { localStorage.removeItem(key); } catch { /* unavailable */ }
+}
 
 export function saveFilters(selectedDrivers: string[], selectedClasses: CarClass[], activeView: string) {
-  try {
-    localStorage.setItem(KEYS.selectedDrivers, JSON.stringify(selectedDrivers));
-    localStorage.setItem(KEYS.selectedClasses, JSON.stringify(selectedClasses));
-    localStorage.setItem(KEYS.activeView, activeView);
-  } catch {
-    // quota exceeded or unavailable — silently ignore
-  }
+  lsSet(KEYS.selectedDrivers, JSON.stringify(selectedDrivers));
+  lsSet(KEYS.selectedClasses, JSON.stringify(selectedClasses));
+  lsSet(KEYS.activeView, activeView);
 }
 
 export function loadFilters(): { selectedDrivers: string[]; selectedClasses: CarClass[]; activeView: string } | null {
   try {
-    const drivers = localStorage.getItem(KEYS.selectedDrivers);
-    const classes = localStorage.getItem(KEYS.selectedClasses);
-    const view = localStorage.getItem(KEYS.activeView);
+    const drivers = lsGet(KEYS.selectedDrivers);
+    const classes = lsGet(KEYS.selectedClasses);
+    const view = lsGet(KEYS.activeView);
     if (!drivers && !classes && !view) return null;
     return {
       selectedDrivers: drivers ? JSON.parse(drivers) : [],
@@ -44,47 +60,56 @@ export function loadFilters(): { selectedDrivers: string[]; selectedClasses: Car
   }
 }
 
-export async function saveFiles(files: RaceFile[]) {
+interface FilesCache {
+  version: number;
+  files: RaceFile[];
+}
+
+/**
+ * Persist parsed files for later resume.
+ * Returns false when neither IndexedDB nor localStorage could store them.
+ */
+export async function saveFiles(files: RaceFile[]): Promise<boolean> {
+  const cache: FilesCache = { version: CACHE_VERSION, files };
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_FILES_STORE, 'readwrite');
-    tx.objectStore(DB_FILES_STORE).put(files, FILES_KEY);
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await idbPut(DB_FILES_STORE, FILES_KEY, cache);
     // Clean up old localStorage entry if it exists
-    localStorage.removeItem(KEYS.files);
+    lsRemove(KEYS.files);
+    return true;
   } catch {
     // IndexedDB unavailable — try localStorage as last resort
     try {
-      localStorage.setItem(KEYS.files, JSON.stringify(files));
+      localStorage.setItem(KEYS.files, JSON.stringify(cache));
+      return true;
     } catch {
-      // quota exceeded
+      return false; // quota exceeded
     }
   }
 }
 
-export async function loadFiles(): Promise<RaceFile[] | null> {
+function unwrapCache(raw: unknown): RaceFile[] | null {
+  // Unversioned caches (plain arrays from older app versions) are discarded
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cache = raw as FilesCache;
+  if (cache.version !== CACHE_VERSION || !Array.isArray(cache.files)) return null;
+  return cache.files;
+}
+
+export async function loadCachedFiles(): Promise<RaceFile[] | null> {
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_FILES_STORE, 'readonly');
-    const req = tx.objectStore(DB_FILES_STORE).get(FILES_KEY);
-    const files = await new Promise<RaceFile[] | null>((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result ?? null);
-      req.onerror = () => reject(req.error);
-    });
-    db.close();
+    const raw = await idbGet(DB_FILES_STORE, FILES_KEY);
+    const files = unwrapCache(raw);
     if (files) return files;
   } catch {
     // IndexedDB unavailable
   }
   // Fallback: try localStorage (migrates old data)
   try {
-    const data = localStorage.getItem(KEYS.files);
+    const data = lsGet(KEYS.files);
     if (!data) return null;
-    const files = JSON.parse(data) as RaceFile[];
+    // Cast is safe: the version check above guarantees we wrote this shape ourselves
+    const files = unwrapCache(JSON.parse(data));
+    if (!files) return null;
     // Migrate to IndexedDB
     saveFiles(files);
     return files;
@@ -94,51 +119,50 @@ export async function loadFiles(): Promise<RaceFile[] | null> {
 }
 
 export function saveDataSource(source: 'directory' | 'upload') {
-  localStorage.setItem(KEYS.dataSource, source);
+  lsSet(KEYS.dataSource, source);
 }
 
 export function loadDataSource(): 'directory' | 'upload' | null {
-  return localStorage.getItem(KEYS.dataSource) as 'directory' | 'upload' | null;
+  return lsGet(KEYS.dataSource) as 'directory' | 'upload' | null;
 }
 
 export function saveProfileName(name: string) {
-  try { localStorage.setItem(KEYS.profileName, name); } catch { /* ignore */ }
+  lsSet(KEYS.profileName, name);
 }
 
 export function loadProfileName(): string | null {
-  return localStorage.getItem(KEYS.profileName);
+  return lsGet(KEYS.profileName);
 }
 
 export function saveProfileAvatar(dataUrl: string) {
-  try { localStorage.setItem(KEYS.profileAvatar, dataUrl); } catch { /* ignore */ }
+  lsSet(KEYS.profileAvatar, dataUrl);
 }
 
 export function loadProfileAvatar(): string | null {
-  return localStorage.getItem(KEYS.profileAvatar);
+  return lsGet(KEYS.profileAvatar);
 }
 
 export function clearProfileAvatar() {
-  localStorage.removeItem(KEYS.profileAvatar);
+  lsRemove(KEYS.profileAvatar);
 }
 
+// Keys that survive a data reload: theme and profile are user identity/preference,
+// everything else (files, filters, benchmarks toggle, track-mode selection) is data-related.
+const KEEP_ON_CLEAR: ReadonlySet<string> = new Set([
+  KEYS.theme, KEYS.profileName, KEYS.profileAvatar, KEYS.profileSettings,
+]);
+
 export async function clearAll() {
-  Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+  Object.values(KEYS).forEach(k => { if (!KEEP_ON_CLEAR.has(k)) lsRemove(k); });
   clearDirectoryHandle();
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_FILES_STORE, 'readwrite');
-    tx.objectStore(DB_FILES_STORE).delete(FILES_KEY);
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await idbDelete(DB_FILES_STORE, FILES_KEY);
   } catch {
     // ignore
   }
 }
 
-// --- IndexedDB for FileSystemDirectoryHandle ---
+// --- IndexedDB helpers ---
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -157,16 +181,41 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+/** Run one operation in its own transaction and await completion */
+async function idbOp<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  op: (os: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const db = await openDB();
+  try {
+    const tx = db.transaction(store, mode);
+    const req = op(tx.objectStore(store));
+    return await new Promise<T>((resolve, reject) => {
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function idbPut(store: string, key: string, value: unknown): Promise<IDBValidKey> {
+  return idbOp(store, 'readwrite', os => os.put(value, key));
+}
+
+async function idbGet(store: string, key: string): Promise<unknown> {
+  return (await idbOp(store, 'readonly', os => os.get(key))) ?? null;
+}
+
+function idbDelete(store: string, key: string): Promise<undefined> {
+  return idbOp(store, 'readwrite', os => os.delete(key));
+}
+
 export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle) {
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put(handle, DIR_HANDLE_KEY);
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await idbPut(DB_STORE, DIR_HANDLE_KEY, handle);
   } catch {
     // IndexedDB unavailable
   }
@@ -174,15 +223,7 @@ export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle) {
 
 export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_STORE, 'readonly');
-    const req = tx.objectStore(DB_STORE).get(DIR_HANDLE_KEY);
-    const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result ?? null);
-      req.onerror = () => reject(req.error);
-    });
-    db.close();
-    return handle;
+    return ((await idbGet(DB_STORE, DIR_HANDLE_KEY)) as FileSystemDirectoryHandle | null) ?? null;
   } catch {
     return null;
   }
@@ -190,14 +231,7 @@ export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle |
 
 export async function clearDirectoryHandle() {
   try {
-    const db = await openDB();
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete(DIR_HANDLE_KEY);
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    await idbDelete(DB_STORE, DIR_HANDLE_KEY);
   } catch {
     // ignore
   }

@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useMemo, memo, useCallback, type ReactNode } from 'react';
 import { Trophy, Flag, Route, Gauge, MapPin, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { getDriverProfileStats, type TrackBest } from '../lib/analytics';
+import { StatCard } from '../components/StatCard';
+import { getDriverProfileStats, type DriverProfileStats, type TrackBest } from '../lib/analytics';
 import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
-import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar } from '../lib/storage';
+import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar, KEYS } from '../lib/storage';
+import { useClickOutside } from '../lib/useClickOutside';
 import type { RaceFile } from '../lib/types';
-
-const PROFILE_SETTINGS_KEY = 'lmu-analyzer-profile-settings';
 
 interface ProfileSettings {
   showTotalRaces: boolean;
@@ -31,14 +31,14 @@ const defaultSettings: ProfileSettings = {
 
 function loadSettings(): ProfileSettings {
   try {
-    const raw = localStorage.getItem(PROFILE_SETTINGS_KEY);
+    const raw = localStorage.getItem(KEYS.profileSettings);
     if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
   } catch { /* ignore */ }
   return defaultSettings;
 }
 
 function saveSettings(s: ProfileSettings) {
-  try { localStorage.setItem(PROFILE_SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+  try { localStorage.setItem(KEYS.profileSettings, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
 interface DriverProfileViewProps {
@@ -165,14 +165,8 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
   }
 
   // Close settings on outside click
-  useEffect(() => {
-    if (!settingsOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [settingsOpen]);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  useClickOutside(settingsRef, closeSettings);
 
   const trackColumns = useMemo(() => {
     const cols: Column<TrackBest>[] = [circuitColumn];
@@ -340,63 +334,24 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
 
       {/* All Race Stats */}
       {settings.showTotalRaces && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 animate-in animate-in-2">
-          <StatTile label="Races" value={profile.total.races} icon={<Flag className="w-4 h-4" />} />
-          <StatTile label="Wins" value={profile.total.wins} icon={<Trophy className="w-4 h-4" />}
-            accent="text-racing-gold"
-            sub={profile.total.classWins !== profile.total.wins ? `${profile.total.classWins} class` : undefined} />
-          <StatTile label="Podiums" value={profile.total.podiums} icon={<Medal className="w-4 h-4" />}
-            accent="text-racing-green"
-            sub={profile.total.classPodiums !== profile.total.podiums ? `${profile.total.classPodiums} class` : undefined} />
-          <StatTile label="Poles" value={profile.total.poles} icon={<Target className="w-4 h-4" />} />
-          <StatTile label="Fastest Laps" value={profile.total.fastestLaps} icon={<Zap className="w-4 h-4" />}
-            accent={profile.total.fastestLaps > 0 ? 'text-racing-purple' : undefined} />
-          <StatTile label="DNFs" value={profile.total.dnfs} icon={<CircleOff className="w-4 h-4" />}
-            accent={profile.total.dnfs > 0 ? 'text-racing-red' : 'text-racing-green'} />
-        </div>
+        <RaceStatGrid stats={profile.total} racesIcon={<Flag className="w-4 h-4" />} />
       )}
 
       {/* Online Race Stats */}
       {settings.showOnlineRaces && hasOnline && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 animate-in animate-in-2">
-          <StatTile label="Online Races" value={profile.online.races} icon={<Globe className="w-4 h-4" />} />
-          <StatTile label="Online Wins" value={profile.online.wins} icon={<Trophy className="w-4 h-4" />}
-            accent="text-racing-gold"
-            sub={profile.online.classWins !== profile.online.wins ? `${profile.online.classWins} class` : undefined} />
-          <StatTile label="Online Podiums" value={profile.online.podiums} icon={<Medal className="w-4 h-4" />}
-            accent="text-racing-green"
-            sub={profile.online.classPodiums !== profile.online.podiums ? `${profile.online.classPodiums} class` : undefined} />
-          <StatTile label="Online Poles" value={profile.online.poles} icon={<Target className="w-4 h-4" />} />
-          <StatTile label="Online FL" value={profile.online.fastestLaps} icon={<Zap className="w-4 h-4" />}
-            accent={profile.online.fastestLaps > 0 ? 'text-racing-purple' : undefined} />
-          <StatTile label="Online DNFs" value={profile.online.dnfs} icon={<CircleOff className="w-4 h-4" />}
-            accent={profile.online.dnfs > 0 ? 'text-racing-red' : 'text-racing-green'} />
-        </div>
+        <RaceStatGrid stats={profile.online} prefix="Online" racesIcon={<Globe className="w-4 h-4" />} />
       )}
 
       {/* Rated Race Stats */}
       {settings.showRatedRaces && hasRated && (
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 animate-in animate-in-2">
-          <StatTile label="Rated Races" value={profile.rated.races} icon={<Shield className="w-4 h-4" />} />
-          <StatTile label="Rated Wins" value={profile.rated.wins} icon={<Trophy className="w-4 h-4" />}
-            accent="text-racing-gold"
-            sub={profile.rated.classWins !== profile.rated.wins ? `${profile.rated.classWins} class` : undefined} />
-          <StatTile label="Rated Podiums" value={profile.rated.podiums} icon={<Medal className="w-4 h-4" />}
-            accent="text-racing-green"
-            sub={profile.rated.classPodiums !== profile.rated.podiums ? `${profile.rated.classPodiums} class` : undefined} />
-          <StatTile label="Rated Poles" value={profile.rated.poles} icon={<Target className="w-4 h-4" />} />
-          <StatTile label="Rated FL" value={profile.rated.fastestLaps} icon={<Zap className="w-4 h-4" />}
-            accent={profile.rated.fastestLaps > 0 ? 'text-racing-purple' : undefined} />
-          <StatTile label="Rated DNFs" value={profile.rated.dnfs} icon={<CircleOff className="w-4 h-4" />}
-            accent={profile.rated.dnfs > 0 ? 'text-racing-red' : 'text-racing-green'} />
-        </div>
+        <RaceStatGrid stats={profile.rated} prefix="Rated" racesIcon={<Shield className="w-4 h-4" />} />
       )}
 
       {/* Volume Stats */}
       <div className="grid grid-cols-3 gap-3 animate-in animate-in-3">
-        <StatTile label="Total Laps" value={profile.totalLaps.toLocaleString()} icon={<Route className="w-4 h-4" />} />
-        <StatTile label="Distance" value={formatDistance(profile.totalDistanceKm)} icon={<Gauge className="w-4 h-4" />} />
-        <StatTile label="Tracks" value={profile.tracksVisited} icon={<MapPin className="w-4 h-4" />} />
+        <StatCard variant="tile" label="Total Laps" value={profile.totalLaps.toLocaleString()} icon={<Route className="w-4 h-4" />} />
+        <StatCard variant="tile" label="Distance" value={formatDistance(profile.totalDistanceKm)} icon={<Gauge className="w-4 h-4" />} />
+        <StatCard variant="tile" label="Tracks" value={profile.tracksVisited} icon={<MapPin className="w-4 h-4" />} />
       </div>
 
       {/* Best Laps per Track */}
@@ -420,23 +375,27 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
   );
 });
 
-function StatTile({ label, value, icon, accent, sub }: {
-  label: string;
-  value: string | number;
-  icon?: React.ReactNode;
-  accent?: string;
-  sub?: string;
+/** One 6-tile race stat grid (Total / Online / Rated differ only in label prefix and data source) */
+function RaceStatGrid({ stats, prefix, racesIcon }: {
+  stats: DriverProfileStats['total'];
+  prefix?: string;
+  racesIcon: ReactNode;
 }) {
+  const p = prefix ? `${prefix} ` : '';
   return (
-    <div className="data-card carbon-fiber p-4 group">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-racing-muted">{label}</span>
-        {icon && <span className="text-racing-muted/40 group-hover:text-racing-red/60 transition-colors">{icon}</span>}
-      </div>
-      <div className={`text-2xl font-bold font-mono tracking-tight ${accent ?? 'text-white'}`}>
-        {value}
-      </div>
-      {sub && <p className="text-racing-muted text-[10px] mt-0.5 font-mono">{sub}</p>}
+    <div className="grid grid-cols-3 md:grid-cols-6 gap-3 animate-in animate-in-2">
+      <StatCard variant="tile" label={`${p}Races`} value={stats.races} icon={racesIcon} />
+      <StatCard variant="tile" label={`${p}Wins`} value={stats.wins} icon={<Trophy className="w-4 h-4" />}
+        accent="text-racing-gold"
+        sub={stats.classWins !== stats.wins ? `${stats.classWins} class` : undefined} />
+      <StatCard variant="tile" label={`${p}Podiums`} value={stats.podiums} icon={<Medal className="w-4 h-4" />}
+        accent="text-racing-green"
+        sub={stats.classPodiums !== stats.podiums ? `${stats.classPodiums} class` : undefined} />
+      <StatCard variant="tile" label={`${p}Poles`} value={stats.poles} icon={<Target className="w-4 h-4" />} />
+      <StatCard variant="tile" label={prefix ? `${prefix} FL` : 'Fastest Laps'} value={stats.fastestLaps} icon={<Zap className="w-4 h-4" />}
+        accent={stats.fastestLaps > 0 ? 'text-racing-purple' : undefined} />
+      <StatCard variant="tile" label={`${p}DNFs`} value={stats.dnfs} icon={<CircleOff className="w-4 h-4" />}
+        accent={stats.dnfs > 0 ? 'text-racing-red' : 'text-racing-green'} />
     </div>
   );
 }

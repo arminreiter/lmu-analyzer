@@ -1,23 +1,25 @@
-import { useState, useMemo, useEffect, memo } from 'react';
-import { Loader2, ExternalLink, SlidersHorizontal } from 'lucide-react';
+import { useState, useMemo, memo } from 'react';
+import { Loader2, SlidersHorizontal } from 'lucide-react';
 import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
+import { PaceSubNav } from '../components/PaceSubNav';
+import { RatingBadge } from '../components/RatingBadge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { CLASS_SPEED_ORDER } from '../lib/analytics';
+import { CLASS_SPEED_ORDER, isValidLap } from '../lib/analytics';
 import { formatLapTime, formatDelta } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
+import { useBenchmarks } from '../lib/useBenchmarks';
 import {
-  fetchBenchmarks,
   mapTrackName,
   rateLapTime,
   ratingFromPercent,
   getNextTarget,
   getRatingColor,
-  getRatingBgColor,
+  RATING_ORDER,
   type PaceBenchmark,
   type PaceRating,
 } from '../lib/racepace';
@@ -66,8 +68,7 @@ function aggregateByClass<T>(
 }
 
 export const RacePaceView = memo(function RacePaceView({ files, driverNames, onNavigate, onViewChange }: RacePaceViewProps) {
-  const [benchmarks, setBenchmarks] = useState<PaceBenchmark[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { benchmarkMap, loading, error } = useBenchmarks();
   const [selectedTrack, setSelectedTrack] = useState<string>('All');
   const [selectedCar, setSelectedCar] = useState<string>('All');
 
@@ -77,21 +78,11 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   const [aggExcludedCars, setAggExcludedCars] = useState<Set<string>>(new Set());
   const [aggExcludedTracks, setAggExcludedTracks] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchBenchmarks()
-      .then(data => { if (!cancelled) setBenchmarks(data); })
-      .catch(e => { if (!cancelled) setError(e.message); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const loading = benchmarks === null && error === null;
-
   const { personalBests: bests } = useDataIndex();
 
   // Build comparison data: match each personal best to a benchmark
   const comparisons = useMemo(() => {
-    if (!benchmarks || benchmarks.length === 0) return [];
+    if (!benchmarkMap) return [];
     const results: Array<{
       best: PersonalBest;
       benchmark: PaceBenchmark;
@@ -104,18 +95,18 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     for (const best of bests) {
       const mappedTrack = mapTrackName(best.trackCourse, best.trackVenue);
       if (!mappedTrack) continue;
-      const benchmark = benchmarks.find(b => b.track === mappedTrack && b.carClass === best.carClass);
+      const benchmark = benchmarkMap.get(`${mappedTrack}|${best.carClass}`);
       if (!benchmark) continue;
       const { rating, delta, percent } = rateLapTime(best.lapTime, benchmark);
       results.push({ best, benchmark, rating, delta, percent, mappedTrack });
     }
 
     return results;
-  }, [bests, benchmarks]);
+  }, [bests, benchmarkMap]);
 
   // Compute race pace: average race lap time per track/class
   const racePaceComparisons = useMemo(() => {
-    if (!benchmarks || benchmarks.length === 0) return [];
+    if (!benchmarkMap) return [];
     const results: Array<{
       carClass: CarClass;
       carType: string;
@@ -138,7 +129,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
           if (!driverNames.some(n => n === driver.name)) continue;
           const mappedTrack = mapTrackName(file.trackCourse, file.trackVenue);
           if (!mappedTrack) continue;
-          const benchmark = benchmarks.find(b => b.track === mappedTrack && b.carClass === driver.carClass);
+          const benchmark = benchmarkMap.get(`${mappedTrack}|${driver.carClass}`);
           if (!benchmark) continue;
 
           const key = `${driver.carClass}::${mappedTrack}`;
@@ -148,7 +139,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
           const group = raceGroups.get(key)!;
 
           for (const lap of driver.laps) {
-            if (!lap.lapTime || lap.lapTime <= 0) continue;
+            if (!isValidLap(lap)) continue;
             if (lap.isPit) continue;
             if (lap.num <= 1) continue;
             group.laps.push(lap.lapTime);
@@ -190,7 +181,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
     }
 
     return results;
-  }, [files, driverNames, benchmarks, aggRemoveOutliers]);
+  }, [files, driverNames, benchmarkMap, aggRemoveOutliers]);
 
   // Available cars and tracks for aggregate filters
   const aggAvailableCars = useMemo(() => {
@@ -292,15 +283,8 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
       sortValue: r => r.best.lapTime,
       render: r => <span className="text-white font-bold">{formatLapTime(r.best.lapTime)}</span> },
     { key: 'rating', label: 'Rating', width: '10%',
-      sortValue: r => {
-        const order: Record<PaceRating, number> = { 'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5 };
-        return order[r.rating];
-      },
-      render: r => (
-        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getRatingColor(r.rating)} ${getRatingBgColor(r.rating)}`}>
-          {r.rating}
-        </span>
-      ),
+      sortValue: r => RATING_ORDER[r.rating],
+      render: r => <RatingBadge rating={r.rating} />,
     },
     { key: 'target', label: 'Next Target', width: '13%',
       sortValue: r => {
@@ -358,23 +342,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   return (
     <div className="space-y-5">
       {/* Sub-navigation */}
-      {onViewChange && (
-        <div className="flex items-center gap-0 border-b border-racing-border/30">
-          {[{ id: 'benchmarks', label: 'Overview' }, { id: 'trackmode', label: 'Per Track' }].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => onViewChange(tab.id)}
-              className={`px-5 py-2 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer border-b-2 -mb-px
-                ${tab.id === 'benchmarks'
-                  ? 'border-racing-red text-white'
-                  : 'border-transparent text-racing-muted hover:text-racing-text'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <PaceSubNav active="benchmarks" onViewChange={onViewChange} />
       {/* Your Pace summary */}
       {(classAggregates.length > 0 || racePaceAggregates.length > 0) && (
         <div className="data-card carbon-fiber overflow-hidden">
@@ -405,64 +373,39 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                 </label>
                 </div>
 
-                {/* Track filter */}
-                <div className="flex items-start gap-2">
-                  <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">Tracks:</span>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {aggAvailableTracks.map(t => (
-                      <label key={t} className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!aggExcludedTracks.has(t)}
-                          onChange={() => setAggExcludedTracks(prev => {
-                            const next = new Set(prev);
-                            if (next.has(t)) next.delete(t); else next.add(t);
-                            return next;
-                          })}
-                          className="accent-racing-red w-3 h-3 cursor-pointer"
-                        />
-                        <span className="text-racing-muted">{t}</span>
-                      </label>
-                    ))}
+                {/* Track / Car exclusion filters */}
+                {([
+                  { label: 'Tracks', options: aggAvailableTracks, excluded: aggExcludedTracks, setExcluded: setAggExcludedTracks },
+                  { label: 'Cars', options: aggAvailableCars, excluded: aggExcludedCars, setExcluded: setAggExcludedCars },
+                ]).map(group => (
+                  <div key={group.label} className="flex items-start gap-2">
+                    <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">{group.label}:</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {group.options.map(opt => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!group.excluded.has(opt)}
+                            onChange={() => group.setExcluded(prev => {
+                              const next = new Set(prev);
+                              if (next.has(opt)) next.delete(opt); else next.add(opt);
+                              return next;
+                            })}
+                            className="accent-racing-red w-3 h-3 cursor-pointer"
+                          />
+                          <span className="text-racing-muted">{opt}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                {/* Car filter */}
-                <div className="flex items-start gap-2">
-                  <span className="text-racing-muted/60 text-[10px] uppercase tracking-wider font-medium pt-0.5 shrink-0 w-12">Cars:</span>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {aggAvailableCars.map(c => (
-                      <label key={c} className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!aggExcludedCars.has(c)}
-                          onChange={() => setAggExcludedCars(prev => {
-                            const next = new Set(prev);
-                            if (next.has(c)) next.delete(c); else next.add(c);
-                            return next;
-                          })}
-                          className="accent-racing-red w-3 h-3 cursor-pointer"
-                        />
-                        <span className="text-racing-muted">{c}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
           <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+            {/* Reuse the main table's column widths so the two tables stay aligned */}
             <colgroup>
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '13%' }} />
+              {columns.map(col => <col key={col.key} style={{ width: col.width }} />)}
             </colgroup>
             <thead>
               <tr className="text-racing-muted text-[10px] uppercase tracking-wider border-b border-racing-border/30">
@@ -493,9 +436,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                         <td className="px-0 py-2"><ClassBadge carClass={best.carClass} /></td>
                         <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{best.avgPercent.toFixed(1)}%</span></td>
                         <td className="px-4 py-2">
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider border ${getRatingColor(best.avgRating)} ${getRatingBgColor(best.avgRating)}`}>
-                            {best.avgRating}
-                          </span>
+                          <RatingBadge rating={best.avgRating} size="sm" />
                         </td>
                         <td className="text-racing-muted/50 text-[10px] px-4 py-2">{best.trackCount} {best.trackCount === 1 ? 'track' : 'tracks'}</td>
                         <td colSpan={5} />
@@ -507,9 +448,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                         <td className="px-0 py-2"><ClassBadge carClass={race.carClass} /></td>
                         <td className="text-right px-4 py-2"><span className="text-white font-mono font-bold">{race.avgPercent.toFixed(1)}%</span></td>
                         <td className="px-4 py-2">
-                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider border ${getRatingColor(race.avgRating)} ${getRatingBgColor(race.avgRating)}`}>
-                            {race.avgRating}
-                          </span>
+                          <RatingBadge rating={race.avgRating} size="sm" />
                         </td>
                         <td className="text-racing-muted/50 text-[10px] px-4 py-2">{race.trackCount} {race.trackCount === 1 ? 'track' : 'tracks'}, {race.totalLaps} laps</td>
                         <td colSpan={5} />
@@ -543,33 +482,11 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
             />
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-wider">
-            <span className="text-racing-muted font-medium">Pace Tiers:</span>
-            {(['Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline'] as PaceRating[]).map(r => (
-              <span key={r} className={`${getRatingColor(r)} font-semibold`}>{r}</span>
-            ))}
-          </div>
-          <span className="text-racing-border">|</span>
-          <div className="flex items-center gap-1.5 text-[10px] text-racing-muted/60">
-            <span>Data by</span>
-            <a
-              href="https://www.youtube.com/@ohne_speed"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-racing-muted hover:text-white transition-colors font-medium"
-            >ohne_speed</a>
-            <span>&middot;</span>
-            <a
-              href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-racing-muted hover:text-white transition-colors flex items-center gap-0.5"
-            >
-              <ExternalLink className="w-2.5 h-2.5" />
-              Spreadsheet
-            </a>
-          </div>
+        <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-wider">
+          <span className="text-racing-muted font-medium">Pace Tiers:</span>
+          {(Object.keys(RATING_ORDER) as PaceRating[]).map(r => (
+            <span key={r} className={`${getRatingColor(r)} font-semibold`}>{r}</span>
+          ))}
         </div>
       </div>
 
@@ -578,8 +495,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
         const sorted = [...items].sort((a, b) => a.best.lapTime - b.best.lapTime);
 
         // Best rating achieved at this track
-        const ratingOrder: Record<PaceRating, number> = { 'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5 };
-        const bestItem = sorted.reduce((best, cur) => ratingOrder[cur.rating] < ratingOrder[best.rating] ? cur : best, sorted[0]);
+        const bestItem = sorted.reduce((best, cur) => RATING_ORDER[cur.rating] < RATING_ORDER[best.rating] ? cur : best, sorted[0]);
         const classes = [...new Set(sorted.map(r => r.best.carClass))];
 
         return (
@@ -587,10 +503,8 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
             <DataCardHeader title={track.toUpperCase()}>
               <div className="ml-auto flex items-center gap-3 text-[10px]">
                 {classes.map(c => <ClassBadge key={c} carClass={c} />)}
-                <span className={`inline-flex px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${getRatingColor(bestItem.rating)} ${getRatingBgColor(bestItem.rating)}`}>
-                  Best: {bestItem.rating}
-                </span>
-                <ExportButton columns={columns} data={sorted} filename={`lmu-pace-${track.toLowerCase().replace(/\s+/g, '-')}`} />
+                <RatingBadge rating={bestItem.rating}>Best: {bestItem.rating}</RatingBadge>
+                <ExportButton columns={columns} data={sorted} filename={`lmu-pace-${track}`} />
               </div>
             </DataCardHeader>
             <SortableTable

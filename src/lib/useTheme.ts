@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect } from 'react';
+import { KEYS } from './storage';
 
-const THEME_KEY = 'lmu-analyzer-theme';
+const THEME_KEY = KEYS.theme;
 type Theme = 'dark' | 'light';
 
 function getInitialTheme(): Theme {

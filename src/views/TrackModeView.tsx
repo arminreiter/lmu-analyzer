@@ -1,21 +1,25 @@
-import { useState, useMemo, useEffect, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Loader2, Gauge, Zap } from 'lucide-react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
+import { PaceSubNav } from '../components/PaceSubNav';
+import { RatingBadge } from '../components/RatingBadge';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { useDataIndex } from '../lib/useDataIndex';
+import { useBenchmarks } from '../lib/useBenchmarks';
 import { formatLapTime, formatDelta, formatSector } from '../lib/formatting';
-import { getTheoreticalBest } from '../lib/analytics';
+import { getTheoreticalBest, isValidLap } from '../lib/analytics';
+import { KEYS } from '../lib/storage';
 import {
-  fetchBenchmarks,
   mapTrackName,
   rateLapTime,
   getNextTarget,
   getRatingColor,
   getRatingBgColor,
+  RATING_ORDER,
   type PaceBenchmark,
   type PaceRating,
 } from '../lib/racepace';
@@ -31,28 +35,16 @@ interface TrackModeViewProps {
 
 type LapLimit = '10' | 'all';
 
-const RATING_ORDER: Record<PaceRating, number> = {
-  'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5,
-};
-
-const TIER_COLORS: Record<string, string> = {
-  Hotlap: 'text-white',
-  Alien: 'text-racing-purple',
-  Competitive: 'text-racing-green',
-  Good: 'text-racing-green/80',
-  Midpack: 'text-racing-yellow',
-  'Tail-ender': 'text-racing-orange',
-  Offline: 'text-racing-red',
-};
-
-function getTierColor(tier: string): string {
-  return TIER_COLORS[tier] ?? 'text-racing-muted';
-}
-
-function getTierBgColor(tier: string): string {
-  if (tier === 'Hotlap') return 'bg-white/5 border-white/10';
-  return getRatingBgColor(tier as PaceRating);
-}
+/** Benchmark reference tiers shown in "Your Times": hotlap + race pace tiers */
+const TIERS: Array<{ key: keyof PaceBenchmark['racePace'] | 'hotlap'; label: PaceRating | 'Hotlap'; rating: PaceRating }> = [
+  { key: 'hotlap', label: 'Hotlap', rating: 'Alien' },
+  { key: 'alien', label: 'Alien', rating: 'Alien' },
+  { key: 'competitive', label: 'Competitive', rating: 'Competitive' },
+  { key: 'good', label: 'Good', rating: 'Good' },
+  { key: 'midpack', label: 'Midpack', rating: 'Midpack' },
+  { key: 'tailEnder', label: 'Tail-ender', rating: 'Tail-ender' },
+  { key: 'offline', label: 'Offline', rating: 'Offline' },
+];
 
 /** Unified track item for the pill selector */
 interface TrackItem {
@@ -63,46 +55,35 @@ interface TrackItem {
   hasUserData: boolean;
 }
 
-type RowType = 'lap' | 'theoretical' | 'benchmark';
-
-interface YourTimesRow {
-  pb: PersonalBest;
+interface PaceInfo {
   rateResult: { rating: PaceRating; delta: number; percent: number } | null;
   nextTarget: { label: PaceRating; time: number; gap: number } | null;
-  rowType: RowType;
-  /** For benchmark rows: the tier label */
-  tierLabel?: string;
 }
 
+type YourTimesRow =
+  | (PaceInfo & { rowType: 'lap' | 'theoretical'; pb: PersonalBest })
+  | (PaceInfo & { rowType: 'benchmark'; lapTime: number; carClass: CarClass; tierLabel: PaceRating | 'Hotlap' });
+
+const rowLapTime = (r: YourTimesRow) => r.rowType === 'benchmark' ? r.lapTime : r.pb.lapTime;
+const rowCarClass = (r: YourTimesRow) => r.rowType === 'benchmark' ? r.carClass : r.pb.carClass;
+
 export const TrackModeView = memo(function TrackModeView({ files, driverNames, initialTrack, onNavigate, onViewChange }: TrackModeViewProps) {
-  const { trackStats, personalBests, allLaps, driverSessions } = useDataIndex();
+  const { trackStats, personalBests, allLaps, driverSessions, sectorMins } = useDataIndex();
 
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(
-    initialTrack ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('lmu_trackmode_selected') : null),
+    initialTrack ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(KEYS.trackModeSelected) : null),
   );
   const setSelectedTrackId = (id: string | null) => {
     setSelectedTrackIdState(id);
     try {
-      if (id) localStorage.setItem('lmu_trackmode_selected', id);
-      else localStorage.removeItem('lmu_trackmode_selected');
+      if (id) localStorage.setItem(KEYS.trackModeSelected, id);
+      else localStorage.removeItem(KEYS.trackModeSelected);
     } catch { /* ignore */ }
   };
-  const [benchmarks, setBenchmarks] = useState<PaceBenchmark[] | null>(null);
-  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
+  const { benchmarks, benchmarkMap, loading: benchmarkLoading } = useBenchmarks();
   const [lapLimit, setLapLimit] = useState<LapLimit>('10');
   const [showBenchmarks, setShowBenchmarks] = useState(true);
   const [showTheoretical, setShowTheoretical] = useState(true);
-
-  // Load benchmarks
-  useEffect(() => {
-    let cancelled = false;
-    fetchBenchmarks()
-      .then(data => { if (!cancelled) setBenchmarks(data); })
-      .catch(e => { if (!cancelled) setBenchmarkError(e.message); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const benchmarkLoading = benchmarks === null && benchmarkError === null;
 
   // Active classes from filtered data (respects header class filter)
   const activeClasses = useMemo(() => {
@@ -190,7 +171,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
     let count = 0;
     for (const ds of trackSessions) {
       for (const lap of ds.driver.laps) {
-        if (lap.lapTime && lap.lapTime > 0) count++;
+        if (isValidLap(lap)) count++;
       }
     }
     return count;
@@ -206,14 +187,14 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
 
   // Best rating across all cars at this track
   const bestRating = useMemo((): { rating: PaceRating; carType: string } | null => {
-    if (!benchmarks || trackLapsSorted.length === 0) return null;
+    if (!benchmarkMap || trackLapsSorted.length === 0) return null;
     // Use personalBests for best-per-car rating
     const trackPBs = personalBests.filter(pb => pb.trackCourse === currentTrack?.trackCourse);
     let best: { rating: PaceRating; carType: string; order: number } | null = null;
     for (const pb of trackPBs) {
       const mapped = mapTrackName(pb.trackCourse, pb.trackVenue);
       if (!mapped) continue;
-      const bm = benchmarks.find(b => b.track === mapped && b.carClass === pb.carClass);
+      const bm = benchmarkMap.get(`${mapped}|${pb.carClass}`);
       if (!bm) continue;
       const { rating } = rateLapTime(pb.lapTime, bm);
       const order = RATING_ORDER[rating];
@@ -222,7 +203,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       }
     }
     return best;
-  }, [benchmarks, trackLapsSorted, personalBests, currentTrack]);
+  }, [benchmarkMap, trackLapsSorted, personalBests, currentTrack]);
 
   // Build "Your Times" rows: top N laps + benchmark tiers + theoretical bests
   const yourTimesRows = useMemo((): YourTimesRow[] => {
@@ -234,7 +215,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
     const lapsToShow = lapLimit === '10' ? trackLapsSorted.slice(0, 10) : trackLapsSorted;
     for (const pb of lapsToShow) {
       const mapped = mapTrackName(pb.trackCourse, pb.trackVenue);
-      const bm = mapped && benchmarks ? benchmarks.find(b => b.track === mapped && b.carClass === pb.carClass) ?? null : null;
+      const bm = mapped && benchmarkMap ? benchmarkMap.get(`${mapped}|${pb.carClass}`) ?? null : null;
       const rateResult = bm ? rateLapTime(pb.lapTime, bm) : null;
       const nextTarget = bm && rateResult ? getNextTarget(pb.lapTime, rateResult.rating, bm) : null;
       rows.push({ pb, rateResult, nextTarget, rowType: 'lap' });
@@ -242,52 +223,37 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
 
     // 2. Benchmark tier rows — hotlap + pace tiers, one per class
     if (showBenchmarks) {
-      const TIERS: Array<{ key: keyof PaceBenchmark['racePace'] | 'hotlap'; label: string }> = [
-        { key: 'hotlap', label: 'Hotlap' },
-        { key: 'alien', label: 'Alien' },
-        { key: 'competitive', label: 'Competitive' },
-        { key: 'good', label: 'Good' },
-        { key: 'midpack', label: 'Midpack' },
-        { key: 'tailEnder', label: 'Tail-ender' },
-        { key: 'offline', label: 'Offline' },
-      ];
       for (const bm of trackBenchmarks) {
         for (const tier of TIERS) {
           const lapTime = tier.key === 'hotlap' ? bm.hotlapTime : bm.racePace[tier.key];
-          const ratingLabel = tier.key === 'hotlap' ? 'Alien' : tier.label;
-          const stubPb = {
-            lapTime,
-            sector1: null, sector2: null, sector3: null,
-            topSpeed: 0,
-            trackVenue: '', trackCourse: currentTrack.trackCourse ?? '',
-            carType: tier.label, carClass: bm.carClass,
-            sessionType: '' as PersonalBest['sessionType'],
-            sessionIndex: 0, date: '', fileName: '', lapNumber: 0, driverName: '',
-          } satisfies PersonalBest;
           rows.push({
-            pb: stubPb,
-            rateResult: { rating: ratingLabel as PaceRating, delta: 0, percent: (lapTime / bm.racePace.alien) * 100 },
-            nextTarget: null,
             rowType: 'benchmark',
+            lapTime,
+            carClass: bm.carClass,
             tierLabel: tier.label,
+            rateResult: { rating: tier.rating, delta: 0, percent: (lapTime / bm.racePace.alien) * 100 },
+            nextTarget: null,
           });
         }
       }
     }
 
     // 3. Theoretical bests per unique car
-    if (!showTheoretical) return rows.sort((a, b) => a.pb.lapTime - b.pb.lapTime);
+    if (!showTheoretical) return rows.sort((a, b) => rowLapTime(a) - rowLapTime(b));
     const seenCars = new Set<string>();
     for (const pb of personalBests) {
       if (pb.trackCourse !== currentTrack.trackCourse) continue;
       if (seenCars.has(pb.carType)) continue;
       seenCars.add(pb.carType);
 
-      const theoretical = getTheoreticalBest(files, driverNames, pb.trackCourse, pb.carType);
+      const theoretical = getTheoreticalBest(
+        files, driverNames, pb.trackCourse, pb.carType,
+        sectorMins.get(`${pb.trackCourse}|${pb.carType}`),
+      );
       if (theoretical.total === null || theoretical.total >= pb.lapTime) continue;
 
       const mapped = mapTrackName(pb.trackCourse, pb.trackVenue);
-      const bm = mapped && benchmarks ? benchmarks.find(b => b.track === mapped && b.carClass === pb.carClass) ?? null : null;
+      const bm = mapped && benchmarkMap ? benchmarkMap.get(`${mapped}|${pb.carClass}`) ?? null : null;
       const rateResult = bm ? rateLapTime(theoretical.total, bm) : null;
       const nextTarget = bm && rateResult ? getNextTarget(theoretical.total, rateResult.rating, bm) : null;
 
@@ -300,10 +266,10 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
     }
 
     // Sort all by lap time
-    rows.sort((a, b) => a.pb.lapTime - b.pb.lapTime);
+    rows.sort((a, b) => rowLapTime(a) - rowLapTime(b));
 
     return rows;
-  }, [trackLapsSorted, lapLimit, benchmarks, trackBenchmarks, personalBests, currentTrack, files, driverNames, showBenchmarks, showTheoretical]);
+  }, [trackLapsSorted, lapLimit, benchmarkMap, trackBenchmarks, personalBests, currentTrack, files, driverNames, sectorMins, showBenchmarks, showTheoretical]);
 
   // Column definitions for SortableTable
   const benchmarkColumns: Column<PaceBenchmark>[] = useMemo(() => [
@@ -329,44 +295,44 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
   const gapMap = useMemo(() => {
     const map = new Map<number, number>();
     for (let i = 1; i < yourTimesRows.length; i++) {
-      map.set(i, yourTimesRows[i].pb.lapTime - yourTimesRows[i - 1].pb.lapTime);
+      map.set(i, rowLapTime(yourTimesRows[i]) - rowLapTime(yourTimesRows[i - 1]));
     }
     return map;
   }, [yourTimesRows]);
 
   const yourTimesColumns: Column<YourTimesRow>[] = useMemo(() => [
-    { key: 'car', label: 'Car', width: '22%', cellClass: 'pl-4 pr-1', sortValue: r => r.pb.carType,
+    { key: 'car', label: 'Car', width: '22%', cellClass: 'pl-4 pr-1', sortValue: r => r.rowType === 'benchmark' ? r.tierLabel : r.pb.carType,
       render: r => {
-        if (r.rowType === 'benchmark') return <span className={`text-xs ${getTierColor(r.tierLabel!)} brightness-75`}>Benchmark {r.tierLabel}</span>;
+        if (r.rowType === 'benchmark') return <span className={`text-xs ${getRatingColor(r.tierLabel)} brightness-75`}>Benchmark {r.tierLabel}</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple text-xs font-medium">{r.pb.carType} <span className="text-[10px] opacity-60">(theoretical)</span></span>;
         return onNavigate
           ? <button onClick={() => onNavigate('cars', r.pb.carType)} className="text-white text-xs font-medium hover:text-racing-red transition-colors cursor-pointer text-left">{r.pb.carType}</button>
           : <span className="text-white text-xs font-medium">{r.pb.carType}</span>;
       } },
-    { key: 'class', label: 'Class', width: '88px', cellClass: 'px-1', sortValue: r => r.pb.carClass,
-      render: r => <ClassBadge carClass={r.pb.carClass} /> },
-    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%', sortValue: r => r.pb.lapTime,
+    { key: 'class', label: 'Class', width: '88px', cellClass: 'px-1', sortValue: r => rowCarClass(r),
+      render: r => <ClassBadge carClass={rowCarClass(r)} /> },
+    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%', sortValue: r => rowLapTime(r),
       render: r => {
-        if (r.rowType === 'benchmark') return <span className={`${getTierColor(r.tierLabel!)} brightness-75`}>{formatLapTime(r.pb.lapTime)}</span>;
+        if (r.rowType === 'benchmark') return <span className={`${getRatingColor(r.tierLabel)} brightness-75`}>{formatLapTime(r.lapTime)}</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple font-bold">{formatLapTime(r.pb.lapTime)}</span>;
         return <span className="text-white font-bold">{formatLapTime(r.pb.lapTime)}</span>;
       } },
-    { key: 's1', label: 'S1', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector1,
+    { key: 's1', label: 'S1', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.rowType === 'benchmark' ? null : r.pb.sector1,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector1)}</span> },
-    { key: 's2', label: 'S2', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector2,
+    { key: 's2', label: 'S2', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.rowType === 'benchmark' ? null : r.pb.sector2,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector2)}</span> },
-    { key: 's3', label: 'S3', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.sector3,
+    { key: 's3', label: 'S3', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.rowType === 'benchmark' ? null : r.pb.sector3,
       render: r => r.rowType === 'benchmark' ? <span className="text-racing-muted/30">--</span> : <span className="text-racing-muted text-xs">{formatSector(r.pb.sector3)}</span> },
     { key: 'rating', label: 'Rating', width: '108px', cellClass: 'pl-3 pr-1', sortValue: r => r.rateResult ? RATING_ORDER[r.rateResult.rating] ?? -1 : 99,
       render: r => {
-        if (r.rowType === 'benchmark') return <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border brightness-75 ${getTierColor(r.tierLabel!)} ${getTierBgColor(r.tierLabel!)}`}>{r.tierLabel}</span>;
+        if (r.rowType === 'benchmark') return <RatingBadge rating={r.tierLabel} className="brightness-75" />;
         return r.rateResult
-          ? <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getRatingColor(r.rateResult.rating)} ${getRatingBgColor(r.rateResult.rating)}`}>{r.rateResult.rating}</span>
+          ? <RatingBadge rating={r.rateResult.rating} />
           : <span className="text-racing-muted/40 text-xs">--</span>;
       } },
     { key: 'percent', label: '%', align: 'right', mono: true, width: '6%', cellClass: 'pl-0 pr-3', sortValue: r => r.rateResult?.percent ?? 999,
       render: r => <span className={`text-xs ${r.rowType === 'benchmark' ? 'text-racing-muted/40' : 'text-racing-muted'}`}>{r.rateResult ? `${r.rateResult.percent.toFixed(1)}%` : '--'}</span> },
-    { key: 'gap', label: 'Gap', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => r.pb.lapTime,
+    { key: 'gap', label: 'Gap', align: 'right', mono: true, width: '7%', cellClass: 'px-2', sortValue: r => rowLapTime(r),
       render: (_r: YourTimesRow, i: number) => {
         const gap = gapMap.get(i);
         if (gap === undefined || i === 0) return <span className="text-racing-muted/20 text-xs">--</span>;
@@ -374,7 +340,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       } },
     { key: 'session', label: 'Session', width: '8%', cellClass: 'pl-4 pr-1', sortValue: r => r.rowType === 'lap' ? `${r.pb.sessionType} L${r.pb.lapNumber}` : 'zzz',
       render: r => {
-        if (r.rowType === 'benchmark') return <span className={`text-[10px] ${getTierColor(r.tierLabel!)} brightness-50`}>benchmark</span>;
+        if (r.rowType === 'benchmark') return <span className={`text-[10px] ${getRatingColor(r.tierLabel)} brightness-50`}>benchmark</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple/50 text-[10px]">best sectors</span>;
         return <span className="text-racing-muted text-xs">{r.pb.sessionType} L{r.pb.lapNumber}</span>;
       } },
@@ -397,18 +363,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
   return (
     <div className="space-y-5">
       {/* Sub-navigation with track selector */}
-      <div className="flex items-center gap-0 border-b border-racing-border/30">
-        {onViewChange && (
-          <button
-            onClick={() => onViewChange('benchmarks')}
-            className="px-5 py-2 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap transition-all cursor-pointer border-b-2 -mb-px border-transparent text-racing-muted hover:text-racing-text"
-          >
-            Overview
-          </button>
-        )}
-        <span className="px-5 py-2 text-xs font-medium tracking-[0.08em] uppercase whitespace-nowrap border-b-2 -mb-px border-racing-red text-white">
-          Per Track
-        </span>
+      <PaceSubNav active="trackmode" onViewChange={onViewChange}>
         <div className="ml-4 flex items-center gap-2 py-1">
           <SearchableSelect
             value={trackId ?? ''}
@@ -416,7 +371,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
             onChange={setSelectedTrackId}
           />
         </div>
-      </div>
+      </PaceSubNav>
 
       {currentTrack && (
         <>
@@ -450,9 +405,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
                 <div>
                   <div className="text-racing-muted text-[10px] uppercase tracking-wider mb-1">Best Rating</div>
                   {bestRating ? (
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getRatingColor(bestRating.rating)} ${getRatingBgColor(bestRating.rating)}`}>
-                      {bestRating.rating}
-                    </span>
+                    <RatingBadge rating={bestRating.rating} />
                   ) : (
                     <span className="text-racing-muted text-sm">--</span>
                   )}
@@ -487,8 +440,8 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
             <div className="data-card carbon-fiber overflow-hidden">
               <DataCardHeader title="PACE REFERENCE">
                 <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-wider">
-                  {Object.entries(TIER_COLORS).map(([label, color]) => (
-                    <span key={label} className={`${color} font-semibold`}>{label}</span>
+                  {TIERS.map(tier => (
+                    <span key={tier.label} className={`${getRatingColor(tier.label)} font-semibold`}>{tier.label}</span>
                   ))}
                 </div>
               </DataCardHeader>
@@ -531,12 +484,12 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
                 columns={yourTimesColumns}
                 data={yourTimesRows}
                 rowKey={(r, i) => {
-                  if (r.rowType === 'benchmark') return `bm-${r.pb.carClass}-${r.tierLabel}`;
+                  if (r.rowType === 'benchmark') return `bm-${r.carClass}-${r.tierLabel}`;
                   if (r.rowType === 'theoretical') return `theo-${r.pb.carType}`;
                   return `${r.pb.carType}-${r.pb.fileName}-${r.pb.lapNumber}-${i}`;
                 }}
                 rowClass={r => {
-                  if (r.rowType === 'benchmark') return `${getTierBgColor(r.tierLabel!).split(' ')[0]}/[0.03]`;
+                  if (r.rowType === 'benchmark') return `${getRatingBgColor(r.tierLabel).split(' ')[0]}/[0.03]`;
                   if (r.rowType === 'theoretical') return 'bg-racing-purple/[0.04]';
                   return '';
                 }}

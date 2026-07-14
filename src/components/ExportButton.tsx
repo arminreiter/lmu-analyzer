@@ -79,7 +79,9 @@ const formats: { key: ExportFormat; label: string }[] = [
   { key: 'xlsx', label: 'Excel' },
 ];
 
-export function ExportButton<T>({ columns, data, filename }: ExportButtonProps<T>) {
+export function ExportButton<T>({ columns, data, filename: rawFilename }: ExportButtonProps<T>) {
+  // Slugify here so call sites can pass raw display names (idempotent for pre-slugged input)
+  const filename = rawFilename.toLowerCase().replace(/\s+/g, '-');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const closeDropdown = useCallback(() => setOpen(false), []);

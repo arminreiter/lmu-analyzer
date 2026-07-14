@@ -31,6 +31,11 @@ export interface PaceBenchmark {
 
 export type PaceRating = 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
 
+/** Tier sort order, best first. Also the canonical tier list (`Object.keys`). */
+export const RATING_ORDER: Record<PaceRating, number> = {
+  'Alien': 0, 'Competitive': 1, 'Good': 2, 'Midpack': 3, 'Tail-ender': 4, 'Offline': 5,
+};
+
 // ---------------------------------------------------------------------------
 // Spreadsheet class → app CarClass mapping
 // ---------------------------------------------------------------------------
@@ -129,6 +134,10 @@ export function mapTrackName(trackCourse: string, trackVenue?: string): string |
 const SHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=1766901750&single=true&output=csv';
 
+/** Human-viewable spreadsheet URL (same published sheet as SHEET_CSV_URL) */
+export const SHEET_HTML_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750';
+
 // ---------------------------------------------------------------------------
 // Parse lap time string "M:SS.sss" → seconds
 // ---------------------------------------------------------------------------
@@ -151,20 +160,21 @@ function parseLapTimeStr(s: string): number | null {
 // Fetch & parse
 // ---------------------------------------------------------------------------
 
-let cachedBenchmarks: PaceBenchmark[] | null = null;
+// Caches the in-flight promise so concurrent callers share one request.
+let benchmarksPromise: Promise<PaceBenchmark[]> | null = null;
 
-export async function fetchBenchmarks(): Promise<PaceBenchmark[]> {
-  if (cachedBenchmarks) return cachedBenchmarks;
-
-  const res = await fetch(SHEET_CSV_URL);
-  if (!res.ok) throw new Error(`Failed to fetch pace data: ${res.status}`);
-  const text = await res.text();
-  cachedBenchmarks = parseCSV(text);
-  return cachedBenchmarks;
-}
-
-export function clearBenchmarkCache() {
-  cachedBenchmarks = null;
+export function fetchBenchmarks(): Promise<PaceBenchmark[]> {
+  if (!benchmarksPromise) {
+    benchmarksPromise = (async () => {
+      const res = await fetch(SHEET_CSV_URL);
+      // No context prefix here — the views prepend "Failed to load pace data:"
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return parseCSV(await res.text());
+    })();
+    // Drop failed attempts so a reload of the view can retry
+    benchmarksPromise.catch(() => { benchmarksPromise = null; });
+  }
+  return benchmarksPromise;
 }
 
 function parseCSV(csv: string): PaceBenchmark[] {
@@ -292,8 +302,9 @@ export function getNextTarget(lapTime: number, rating: PaceRating, benchmark: Pa
   }
 }
 
-export function getRatingColor(rating: PaceRating): string {
+export function getRatingColor(rating: PaceRating | 'Hotlap'): string {
   switch (rating) {
+    case 'Hotlap': return 'text-white';
     case 'Alien': return 'text-racing-purple';
     case 'Competitive': return 'text-racing-green';
     case 'Good': return 'text-racing-green/80';
@@ -303,8 +314,9 @@ export function getRatingColor(rating: PaceRating): string {
   }
 }
 
-export function getRatingBgColor(rating: PaceRating): string {
+export function getRatingBgColor(rating: PaceRating | 'Hotlap'): string {
   switch (rating) {
+    case 'Hotlap': return 'bg-white/5 border-white/10';
     case 'Alien': return 'bg-racing-purple/15 border-racing-purple/30';
     case 'Competitive': return 'bg-racing-green/15 border-racing-green/30';
     case 'Good': return 'bg-racing-green/10 border-racing-green/20';
@@ -318,11 +330,9 @@ export function getRatingBgColor(rating: PaceRating): string {
 // Lookup helpers
 // ---------------------------------------------------------------------------
 
-export function findBenchmark(benchmarks: PaceBenchmark[], trackName: string, carClass: CarClass): PaceBenchmark | null {
-  const mappedTrack = trackName; // already mapped by caller
-  return benchmarks.find(b => b.track === mappedTrack && b.carClass === carClass) ?? null;
-}
-
-export function getAvailableTracks(benchmarks: PaceBenchmark[]): string[] {
-  return [...new Set(benchmarks.map(b => b.track))];
+/** Fast lookup keyed `${track}|${carClass}` — benchmark lists are consulted inside per-lap loops */
+export function buildBenchmarkMap(benchmarks: PaceBenchmark[]): Map<string, PaceBenchmark> {
+  const map = new Map<string, PaceBenchmark>();
+  for (const b of benchmarks) map.set(`${b.track}|${b.carClass}`, b);
+  return map;
 }

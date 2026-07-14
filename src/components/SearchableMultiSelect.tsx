@@ -2,14 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, Search, X, Check } from 'lucide-react';
 import { useClickOutside } from '../lib/useClickOutside';
 
-export interface MultiSelectOption {
+interface MultiSelectOption {
   value: string;
   label: string;
   badge?: React.ReactNode;
   detail?: string;
 }
 
-export interface QuickAction {
+interface QuickAction {
   label: string;
   onSelect: () => void;
 }

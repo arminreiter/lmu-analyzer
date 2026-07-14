@@ -5,8 +5,8 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isDriverIncident } from '../lib/analytics';
-import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
+import { isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
+import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
 type Tab = 'overview' | 'laps' | 'charts' | 'incidents' | 'penalties' | 'tracklimits';
@@ -21,7 +21,7 @@ interface SessionDetailViewProps {
 export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack }: SessionDetailViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
-  const validLaps = useMemo(() => driver.laps.filter(l => l.lapTime && l.lapTime > 0), [driver.laps]);
+  const validLaps = useMemo(() => driver.laps.filter(isValidLap), [driver.laps]);
 
   const driverIncidents = useMemo(() =>
     session.incidents.filter(i => isDriverIncident(i, driver.name)),
@@ -42,10 +42,8 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
     const times = validLaps.map(l => l.lapTime!);
     const best = Math.min(...times);
     const worst = Math.max(...times);
-    const avg = times.reduce((s, t) => s + t, 0) / times.length;
     const median = [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)];
-    const stdDev = Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length);
-    const consistency = ((1 - stdDev / avg) * 100);
+    const { avg, stdDev, consistency } = lapTimeStats(times);
 
     const speeds = validLaps.map(l => l.topSpeed);
     const avgSpeed = speeds.reduce((s, v) => s + v, 0) / speeds.length;
@@ -98,7 +96,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
             {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
-            {file.setting === 'Multiplayer' && <span className="text-racing-blue ml-2">Online</span>}
+            {isOnline(file) && <span className="text-racing-blue ml-2">Online</span>}
           </p>
         </div>
       </div>
@@ -223,7 +221,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             <InfoRow label="Setting" value={file.setting} />
             {file.serverName && <InfoRow label="Server" value={file.serverName} />}
             <InfoRow label="Track Length" value={`${(file.trackLength / 1000).toFixed(2)} km`} />
-            {session.lapsLimit > 0 && <InfoRow label="Lap Limit" value={session.lapsLimit >= 2147483647 ? '∞' : String(session.lapsLimit)} />}
+            {session.lapsLimit > 0 && <InfoRow label="Lap Limit" value={session.lapsLimit >= MAX_INT32_SENTINEL ? '∞' : String(session.lapsLimit)} />}
             {session.minutesLimit > 0 && <InfoRow label="Time Limit" value={`${session.minutesLimit} min`} />}
             <InfoRow label="Drivers" value={String(session.drivers.length)} />
             <InfoRow label="Game Version" value={file.gameVersion} />
@@ -262,7 +260,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             {session.drivers.length} drivers
             {driverIdx >= 0 && ` · You: P${driverIdx + 1}`}
           </span>
-          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse.toLowerCase().replace(/\s+/g, '-')}-${session.type.toLowerCase()}`} />
+          <ExportButton columns={standingsColumns} data={standings} filename={`lmu-standings-${file.trackCourse}-${session.type}`} />
         </DataCardHeader>
         <SortableTable<DriverResult>
           columns={standingsColumns}
@@ -432,9 +430,9 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">LAP TIMES</h3>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={lapChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} label={{ value: 'Lap', fill: '#6b7280', fontSize: 11, position: 'bottom' }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} label={{ value: 'Lap', fill: CHART_AXIS_TICK, fontSize: 11, position: 'bottom' }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
               <Tooltip contentStyle={getChartTooltipStyle()}
                 formatter={(v: unknown) => formatLapTime(v as number)} />
               <Line type="monotone" dataKey="time" stroke="#e10600" strokeWidth={2} dot={{ fill: '#e10600', r: 3 }} name="Lap Time" />
@@ -449,9 +447,9 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">SECTOR TIMES</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={lapChartData.filter(d => d.s1 && d.s2 && d.s3)}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${Number(v).toFixed(3)}s`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="s1" fill="#9c27b0" name="S1" stackId="a" />
@@ -468,9 +466,9 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TOP SPEED</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={speedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={['auto', 'auto']} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => [`${Number(v).toFixed(1)} km/h`, 'Speed']} />
               <Line type="monotone" dataKey="speed" stroke="#ff6d00" strokeWidth={2} dot={{ fill: '#ff6d00', r: 3 }} name="Top Speed" />
             </LineChart>
@@ -484,9 +482,9 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">TIRE WEAR (%)</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={tireData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="FL" stroke="#e10600" strokeWidth={1.5} dot={false} name="Front Left" />
@@ -504,9 +502,9 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">FUEL</h3>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={fuelData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[(min: number) => Math.max(0, Math.floor(min / 5) * 5 - 5), (max: number) => Math.min(100, Math.ceil(max / 5) * 5 + 5)]} />
               <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => `${v}%`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="fuel" stroke="#ffd600" strokeWidth={2} dot={false} name="Fuel Level %" />
@@ -556,13 +554,9 @@ function IncidentsTab({ incidents }: { incidents: SessionDetailViewProps['sessio
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-        <h3 className="section-stripe font-racing text-xs font-bold text-racing-orange tracking-[0.1em]">
-          INCIDENTS ({incidents.length})
-        </h3>
-        <span className="ml-auto" />
+      <DataCardHeader title={<span className="text-racing-orange">INCIDENTS ({incidents.length})</span>}>
         <ExportButton columns={columns} data={incidents} filename="lmu-incidents" />
-      </div>
+      </DataCardHeader>
       <SortableTable columns={columns} data={incidents} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-orange/[0.02]'} />
     </div>
@@ -594,13 +588,9 @@ function PenaltiesTab({ penalties }: { penalties: SessionDetailViewProps['sessio
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-        <h3 className="section-stripe font-racing text-xs font-bold text-racing-red tracking-[0.1em]">
-          PENALTIES ({penalties.length})
-        </h3>
-        <span className="ml-auto" />
+      <DataCardHeader title={<span className="text-racing-red">PENALTIES ({penalties.length})</span>}>
         <ExportButton columns={columns} data={penalties} filename="lmu-penalties" />
-      </div>
+      </DataCardHeader>
       <SortableTable columns={columns} data={penalties} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-red/[0.02]'} />
     </div>
@@ -634,13 +624,9 @@ function TrackLimitsTab({ trackLimits }: { trackLimits: SessionDetailViewProps['
 
   return (
     <div className="data-card carbon-fiber overflow-hidden">
-      <div className="px-5 py-3 border-b border-racing-border flex items-center checkered">
-        <h3 className="section-stripe font-racing text-xs font-bold text-racing-yellow tracking-[0.1em]">
-          TRACK LIMITS ({trackLimits.length})
-        </h3>
-        <span className="ml-auto" />
+      <DataCardHeader title={<span className="text-racing-yellow">TRACK LIMITS ({trackLimits.length})</span>}>
         <ExportButton columns={columns} data={trackLimits} filename="lmu-track-limits" />
-      </div>
+      </DataCardHeader>
       <SortableTable columns={columns} data={trackLimits} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-yellow/[0.02]'} />
     </div>

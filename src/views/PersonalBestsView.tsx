@@ -14,6 +14,9 @@ import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
 
+// Real laps and theoretical bests share one row shape; rowType discriminates them
+type BestRow = PersonalBest & { rowType: 'lap' | 'theoretical' };
+
 interface PersonalBestsViewProps {
   files: RaceFile[];
   driverNames: string[];
@@ -26,16 +29,16 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
   const [showTheoretical, setShowTheoretical] = useState(false);
   const [lapMode, setLapMode] = useState<LapMode>('car');
 
-  const { personalBests: bestPerCar, allSessionBests: bestPerSession, allLaps: everyLap } = useDataIndex();
+  const { personalBests: bestPerCar, allSessionBests: bestPerSession, allLaps: everyLap, sectorMins } = useDataIndex();
   const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
-  const tracks = Array.from(new Set(allBests.map(b => b.trackCourse))).sort();
-  const cars = Array.from(new Set(allBests.map(b => b.carType))).sort();
+  const tracks = useMemo(() => Array.from(new Set(allBests.map(b => b.trackCourse))).sort(), [allBests]);
+  const cars = useMemo(() => Array.from(new Set(allBests.map(b => b.carType))).sort(), [allBests]);
 
-  const filtered = allBests.filter(b => {
+  const filtered = useMemo(() => allBests.filter(b => {
     if (filterTrack !== 'All' && b.trackCourse !== filterTrack) return false;
     if (filterCar !== 'All' && b.carType !== filterCar) return false;
     return true;
-  });
+  }), [allBests, filterTrack, filterCar]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, PersonalBest[]>();
@@ -71,17 +74,18 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
       </div>
 
       {Array.from(grouped.entries()).map(([track, bests]) => {
-        // Build theoretical best entries as PersonalBest objects so they sort with real laps
-        const theoreticalBests: PersonalBest[] = [];
+        // Build theoretical best entries as rows so they sort with real laps
+        const rows: BestRow[] = bests.map(b => ({ ...b, rowType: 'lap' as const }));
         if (showTheoretical) {
           const carTypes = Array.from(new Set(bests.map(b => b.carType)));
           for (const carType of carTypes) {
-            const tb = getTheoreticalBest(files, driverNames, track, carType);
+            const tb = getTheoreticalBest(files, driverNames, track, carType, sectorMins.get(`${track}|${carType}`));
             if (!tb.total) continue;
             const ref = bests.find(b => b.carType === carType);
             // Skip if theoretical is not faster than the actual best lap
             if (ref && tb.total >= ref.lapTime) continue;
-            theoreticalBests.push({
+            rows.push({
+              rowType: 'theoretical',
               lapTime: tb.total,
               sector1: tb.s1 ?? null,
               sector2: tb.s2 ?? null,
@@ -89,7 +93,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
               topSpeed: 0,
               trackVenue: ref?.trackVenue ?? '',
               trackCourse: track,
-              carType: `${carType} (theoretical)`,
+              carType,
               carClass: ref?.carClass ?? 'Unknown',
               sessionType: 'Practice',
               sessionIndex: -1,
@@ -101,8 +105,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           }
         }
 
-        const allEntries = [...bests, ...theoreticalBests];
-        const defaultSorted = allEntries.sort((a, b) => a.lapTime - b.lapTime);
+        const defaultSorted = rows.sort((a, b) => a.lapTime - b.lapTime);
         let bestS1 = Infinity, bestS2 = Infinity, bestS3 = Infinity;
         for (const b of defaultSorted) {
           if (b.sector1 && b.sector1 < bestS1) bestS1 = b.sector1;
@@ -110,52 +113,54 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           if (b.sector3 && b.sector3 < bestS3) bestS3 = b.sector3;
         }
         const fastestLap = defaultSorted[0]?.lapTime ?? Infinity;
-        const isTheoretical = (r: PersonalBest) => r.carType.endsWith('(theoretical)');
 
-        const columns: Column<PersonalBest>[] = [
+        const columns: Column<BestRow>[] = [
           { key: 'pos', label: '#', width: '40px',
             sortValue: r => r.lapTime,
-            render: (r, i) => isTheoretical(r) ? <Zap className="w-3 h-3 text-racing-purple" /> : i === 0 ? <Trophy className="w-4 h-4 text-racing-gold" /> : i === 1 ? <Trophy className="w-4 h-4 text-racing-silver" /> : i === 2 ? <Trophy className="w-4 h-4 text-racing-bronze" /> : <span className="text-racing-muted/40 font-mono text-xs">{i + 1}</span> },
+            render: (r, i) => r.rowType === 'theoretical' ? <Zap className="w-3 h-3 text-racing-purple" /> : i === 0 ? <Trophy className="w-4 h-4 text-racing-gold" /> : i === 1 ? <Trophy className="w-4 h-4 text-racing-silver" /> : i === 2 ? <Trophy className="w-4 h-4 text-racing-bronze" /> : <span className="text-racing-muted/40 font-mono text-xs">{i + 1}</span> },
           { key: 'car', label: 'Car', width: '22%', sortValue: r => r.carType,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/80 text-xs' : 'text-white text-xs'}>{r.carType}</span> },
+            render: r => r.rowType === 'theoretical'
+              ? <span className="text-racing-purple/80 text-xs">{r.carType} (theoretical)</span>
+              : <span className="text-white text-xs">{r.carType}</span> },
           { key: 'class', label: 'Class', width: '100px', sortValue: r => r.carClass,
             render: r => <ClassBadge carClass={r.carClass} /> },
           { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%',
             sortValue: r => r.lapTime,
-            render: r => <span className={`font-bold ${isTheoretical(r) ? 'text-racing-purple glow-purple' : r.lapTime === fastestLap ? 'text-racing-gold' : 'text-white'}`}>{formatLapTime(r.lapTime)}</span> },
+            render: r => <span className={`font-bold ${r.rowType === 'theoretical' ? 'text-racing-purple glow-purple' : r.lapTime === fastestLap ? 'text-racing-gold' : 'text-white'}`}>{formatLapTime(r.lapTime)}</span> },
           { key: 's1', label: 'S1', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector1,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector1)}</span> },
+            render: r => <span className={r.rowType === 'theoretical' ? 'text-racing-purple/70' : r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector1)}</span> },
           { key: 's2', label: 'S2', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector2,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector2)}</span> },
+            render: r => <span className={r.rowType === 'theoretical' ? 'text-racing-purple/70' : r.sector2 !== null && r.sector2 <= bestS2 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector2)}</span> },
           { key: 's3', label: 'S3', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector3,
-            render: r => <span className={isTheoretical(r) ? 'text-racing-purple/70' : r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
+            render: r => <span className={r.rowType === 'theoretical' ? 'text-racing-purple/70' : r.sector3 !== null && r.sector3 <= bestS3 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector3)}</span> },
           { key: 'speed', label: 'Top Speed', align: 'right', mono: true, width: '9%',
             sortValue: r => r.topSpeed,
-            render: r => isTheoretical(r) ? <span className="text-racing-muted/40">&mdash;</span> : <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
+            render: r => r.rowType === 'theoretical' ? <span className="text-racing-muted/40">&mdash;</span> : <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
           { key: 'session', label: 'Session', width: '10%',
             sortValue: r => r.sessionType,
-            render: r => isTheoretical(r) ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : onNavigate
+            exportValue: r => r.rowType === 'theoretical' ? 'Theoretical' : r.sessionType,
+            render: r => r.rowType === 'theoretical' ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : onNavigate
               ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} driverName={r.driverName} onNavigate={onNavigate}>{r.sessionType} &mdash; L{r.lapNumber}</SessionLink>
               : <span className="text-racing-muted text-xs">{r.sessionType} &mdash; L{r.lapNumber}</span> },
           { key: 'date', label: 'Date', width: '12%',
             sortValue: r => r.date,
-            render: r => isTheoretical(r) ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : <span className="text-racing-muted/60 text-xs">{r.date}</span> },
+            render: r => r.rowType === 'theoretical' ? <span className="text-racing-muted/40 text-xs">&mdash;</span> : <span className="text-racing-muted/60 text-xs">{r.date}</span> },
         ];
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
             <DataCardHeader title={track.toUpperCase()}>
               <span className="ml-auto" />
-              <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track.toLowerCase().replace(/\s+/g, '-')}`} />
+              <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track}`} />
             </DataCardHeader>
             <SortableTable
               columns={columns}
               data={defaultSorted}
-              rowKey={(r, i) => `${r.carType}-${r.fileName}-${r.lapNumber}-${i}`}
-              rowClass={r => isTheoretical(r) ? 'bg-racing-purple/[0.04]' : r.lapTime === fastestLap ? 'bg-racing-gold/[0.03]' : ''}
+              rowKey={(r, i) => `${r.rowType}-${r.carType}-${r.fileName}-${r.lapNumber}-${i}`}
+              rowClass={r => r.rowType === 'theoretical' ? 'bg-racing-purple/[0.04]' : r.lapTime === fastestLap ? 'bg-racing-gold/[0.03]' : ''}
             />
           </div>
         );

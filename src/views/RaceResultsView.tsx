@@ -6,9 +6,16 @@ import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { getRaceResults, isRatedRace, isDriverIncident, type RaceResult } from '../lib/analytics';
-import { formatLapTime, getChartTooltipStyle } from '../lib/formatting';
+import { StatCard } from '../components/StatCard';
+import { getRaceResults, isDnf, isOnline, isRatedRace, isDriverIncident, type RaceResult } from '../lib/analytics';
+import { formatLapTime, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
+import { buildSessionContext } from '../lib/sessionContext';
 import type { RaceFile } from '../lib/types';
+
+type RaceRow = RaceResult & {
+  incidentCount: number;
+  driverPenalties: RaceResult['session']['penalties'];
+};
 
 interface RaceResultsViewProps {
   files: RaceFile[];
@@ -20,9 +27,15 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   const [filter, setFilter] = useState<'all' | 'online' | 'rated'>('all');
   const allResults = useMemo(() => getRaceResults(files, driverNames), [files, driverNames]);
   const results = useMemo(() => {
-    if (filter === 'online') return allResults.filter(r => r.file.setting === 'Multiplayer');
-    if (filter === 'rated') return allResults.filter(r => isRatedRace(r.file));
-    return allResults;
+    let filtered = allResults;
+    if (filter === 'online') filtered = allResults.filter(r => isOnline(r.file));
+    if (filter === 'rated') filtered = allResults.filter(r => isRatedRace(r.file));
+    // Precompute per-row incident/penalty data once, so columns don't re-filter in sortValue/render
+    return filtered.map((r): RaceRow => ({
+      ...r,
+      incidentCount: r.session.incidents.filter(i => isDriverIncident(i, r.driver.name)).length,
+      driverPenalties: r.session.penalties.filter(p => p.driver === r.driver.name),
+    }));
   }, [allResults, filter]);
 
   const positionData = useMemo(() => results.map((r, i) => ({
@@ -40,9 +53,9 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   const avgPosition = totalRaces > 0
     ? (results.reduce((sum, r) => sum + r.classPosition, 0) / totalRaces).toFixed(1)
     : '--';
-  const dnfs = results.filter(r => r.driver.finishStatus !== 'Finished Normally').length;
+  const dnfs = results.filter(r => isDnf(r.driver.finishStatus)).length;
 
-  const raceColumns: Column<RaceResult>[] = [
+  const raceColumns: Column<RaceRow>[] = useMemo(() => [
     { key: 'date', label: 'Date', width: '13%', sortValue: r => r.file.timeString,
       render: r => <span className="text-racing-muted text-xs">{r.file.timeString}</span> },
     { key: 'track', label: 'Track', width: '18%', sortValue: r => r.file.trackCourse,
@@ -69,22 +82,18 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
     { key: 'pits', label: 'Pits', align: 'right', width: '45px', sortValue: r => r.driver.pitstops,
       render: r => <span className="text-racing-muted">{r.driver.pitstops}</span> },
     { key: 'incidents', label: 'Inc', align: 'center', width: '45px',
-      sortValue: r => r.session.incidents.filter(i => isDriverIncident(i, r.driver.name)).length,
-      render: r => {
-        const count = r.session.incidents.filter(i => isDriverIncident(i, r.driver.name)).length;
-        return count > 0 ? <span className="text-racing-orange font-mono">{count}</span> : <span className="text-racing-muted/30">0</span>;
-      } },
+      sortValue: r => r.incidentCount,
+      render: r => r.incidentCount > 0 ? <span className="text-racing-orange font-mono">{r.incidentCount}</span> : <span className="text-racing-muted/30">0</span> },
     { key: 'penalties', label: 'Pen', align: 'center', width: '45px',
-      sortValue: r => r.session.penalties.filter(p => p.driver === r.driver.name).length,
+      sortValue: r => r.driverPenalties.length,
       render: r => {
-        const pens = r.session.penalties.filter(p => p.driver === r.driver.name);
-        if (pens.length === 0) return <span className="text-racing-muted/30">0</span>;
-        const types = pens.map(p => p.type).join(', ');
-        return <span className="text-racing-red font-mono" title={types}>{pens.length}</span>;
+        if (r.driverPenalties.length === 0) return <span className="text-racing-muted/30">0</span>;
+        const types = r.driverPenalties.map(p => p.type).join(', ');
+        return <span className="text-racing-red font-mono" title={types}>{r.driverPenalties.length}</span>;
       } },
     { key: 'status', label: 'Status', width: '10%', sortValue: r => r.driver.finishStatus,
       render: r => <span className={`text-xs ${r.driver.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'}`}>{r.driver.finishStatus}</span> },
-  ];
+  ], []);
 
   return (
     <div className="space-y-6">
@@ -97,30 +106,12 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
 
       {/* Race Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">Races</p>
-          <p className="text-2xl font-bold text-white">{totalRaces}</p>
-        </div>
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">Wins</p>
-          <p className="text-2xl font-bold text-racing-gold">{wins}</p>
-        </div>
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">Podiums</p>
-          <p className="text-2xl font-bold text-racing-orange">{podiums}</p>
-        </div>
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">Top 5</p>
-          <p className="text-2xl font-bold text-racing-blue">{top5}</p>
-        </div>
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">Avg Pos</p>
-          <p className="text-2xl font-bold text-white">{avgPosition}</p>
-        </div>
-        <div className="data-card carbon-fiber p-4 text-center">
-          <p className="text-racing-muted text-xs uppercase">DNFs</p>
-          <p className={`text-2xl font-bold ${dnfs > 0 ? 'text-racing-red' : 'text-racing-green'}`}>{dnfs}</p>
-        </div>
+        <StatCard variant="center" label="Races" value={totalRaces} />
+        <StatCard variant="center" label="Wins" value={wins} accent="text-racing-gold" />
+        <StatCard variant="center" label="Podiums" value={podiums} accent="text-racing-orange" />
+        <StatCard variant="center" label="Top 5" value={top5} accent="text-racing-blue" />
+        <StatCard variant="center" label="Avg Pos" value={avgPosition} />
+        <StatCard variant="center" label="DNFs" value={dnfs} accent={dnfs > 0 ? 'text-racing-red' : 'text-racing-green'} />
       </div>
 
       {/* Position Chart */}
@@ -129,9 +120,9 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
           <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">CLASS POSITION HISTORY</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={positionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-              <XAxis dataKey="race" tick={{ fill: '#6b7280', fontSize: 9 }} angle={-45} textAnchor="end" height={80} />
-              <YAxis reversed tick={{ fill: '#6b7280', fontSize: 11 }} domain={[1, 'auto']} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="race" tick={{ fill: CHART_AXIS_TICK, fontSize: 9 }} angle={-45} textAnchor="end" height={80} />
+              <YAxis reversed tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[1, 'auto']} allowDecimals={false} />
               <Tooltip
                 contentStyle={getChartTooltipStyle()}
                 formatter={(v: unknown, _: unknown, entry: unknown) => [`P${v} / ${(entry as { payload: { total: number } }).payload.total}`, 'Position']}
@@ -155,11 +146,11 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
           <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{results.length} races</span>
           <ExportButton columns={raceColumns} data={results} filename="lmu-race-results" />
         </DataCardHeader>
-        <SortableTable<RaceResult>
+        <SortableTable<RaceRow>
           columns={raceColumns}
           data={results}
           rowKey={(r, i) => `${r.file.fileName}-${i}`}
-          onRowClick={onNavigate ? (row) => onNavigate('session', `${row.file.fileName}::${row.session.sessionIndex}::${encodeURIComponent(row.driver.name)}`) : undefined}
+          onRowClick={onNavigate ? (row) => onNavigate('session', buildSessionContext(row.file.fileName, row.session.sessionIndex, row.driver.name)) : undefined}
         />
       </div>
 

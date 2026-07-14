@@ -7,8 +7,9 @@ import {
   getTrackStats,
   getCarStats,
   getDriverSessions,
+  buildSectorMins,
 } from './analytics';
-import { DataIndexContext, type DataIndex } from './dataIndexContext';
+import { DataIndexContext, type DataIndex } from './dataIndexStore';
 
 export function DataIndexProvider({
   files,
@@ -26,6 +27,7 @@ export function DataIndexProvider({
     trackStats: getTrackStats(files, driverNames),
     carStats: getCarStats(files, driverNames),
     driverSessions: getDriverSessions(files, driverNames),
+    sectorMins: buildSectorMins(files, driverNames),
   }), [files, driverNames]);
 
   return (

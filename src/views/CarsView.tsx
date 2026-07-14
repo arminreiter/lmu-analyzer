@@ -3,10 +3,10 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { PillSelector } from '../components/PillSelector';
-import { SessionLink } from '../components/SessionLink';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { formatLapTime, formatSector, formatSpeed, formatDistance } from '../lib/formatting';
+import { buildLapColumns } from '../components/lapColumns';
+import { formatDistance } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
@@ -37,27 +37,14 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
   const carLaps = useMemo(() => lapSource.filter(b => b.carType === car), [lapSource, car]);
 
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
-    { key: 'track', label: 'Track', width: '22%', sortValue: r => r.trackCourse,
-      render: r => onNavigate
+    { key: 'track', label: 'Track', width: '22%', sortValue: (r: PersonalBest) => r.trackCourse,
+      render: (r: PersonalBest) => onNavigate
         ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackCourse); }} className="text-white cursor-pointer">{r.trackCourse}</button>
         : <span className="text-white">{r.trackCourse}</span> },
-    { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '95px', sortValue: r => r.lapTime,
-      render: r => <span className="text-white font-bold">{formatLapTime(r.lapTime)}</span> },
-    { key: 's1', label: 'S1', align: 'right', mono: true, width: '70px', sortValue: r => r.sector1,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector1)}</span> },
-    { key: 's2', label: 'S2', align: 'right', mono: true, width: '70px', sortValue: r => r.sector2,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector2)}</span> },
-    { key: 's3', label: 'S3', align: 'right', mono: true, width: '70px', sortValue: r => r.sector3,
-      render: r => <span className="text-racing-muted">{formatSector(r.sector3)}</span> },
-    { key: 'speed', label: 'Speed', align: 'right', mono: true, width: '75px', sortValue: r => r.topSpeed,
-      render: r => <span className="text-white/70">{formatSpeed(r.topSpeed)}</span> },
-    { key: 'session', label: 'Session', width: '85px', sortValue: r => r.sessionType,
-      render: r => onNavigate
-        ? <SessionLink fileName={r.fileName} sessionIndex={r.sessionIndex} driverName={r.driverName} onNavigate={onNavigate}>{r.sessionType} L{r.lapNumber}</SessionLink>
-        : <span className="text-racing-muted text-xs">{r.sessionType} L{r.lapNumber}</span> },
-    { key: 'date', label: 'Date', width: '105px', sortValue: r => r.date,
-      render: r => <span className="text-racing-muted/60 text-xs">{r.date}</span> },
+    ...buildLapColumns(onNavigate),
   ], [onNavigate]);
+
+  const validLaps = useMemo(() => allLaps.filter(l => l.carType === car).length, [allLaps, car]);
 
   const sortedCarLaps = useMemo(() =>
     [...carLaps].sort((a, b) => a.trackCourse.localeCompare(b.trackCourse) || a.lapTime - b.lapTime),
@@ -80,7 +67,6 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
               <ClassBadge carClass={carInfo.carClass} />
             </div>
             {(() => {
-              const validLaps = allLaps.filter(l => l.carType === car).length;
               const invalidLaps = carInfo.totalLaps - validLaps;
               return (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
@@ -122,7 +108,7 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
                 value={lapMode}
                 onChange={setLapMode}
               />
-              <ExportButton columns={lapColumns} data={sortedCarLaps} filename={`lmu-car-${(car ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`} />
+              <ExportButton columns={lapColumns} data={sortedCarLaps} filename={`lmu-car-${car ?? 'unknown'}`} />
             </DataCardHeader>
             <SortableTable<PersonalBest>
               columns={lapColumns}

@@ -5,8 +5,9 @@ import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { isOnline, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
 import { formatLapTime, formatSpeed, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
+import { buildSessionContext } from '../lib/sessionContext';
 import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
 
@@ -16,7 +17,10 @@ interface SessionsViewProps {
   onNavigate?: (view: string, context?: string) => void;
 }
 
-type SessionRow = { file: RaceFile; session: SessionData; driver: DriverResult };
+type SessionRow = {
+  file: RaceFile; session: SessionData; driver: DriverResult;
+  topSpeed: number | null; consistency: number | null;
+};
 
 export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsViewProps) {
   const [filterSetting, setFilterSetting] = useState<'all' | 'online' | 'rated'>('all');
@@ -28,12 +32,14 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
 
   const filtered = useMemo(() => allSessions
     .filter(s => {
-      if (filterSetting === 'online') return s.file.setting === 'Multiplayer';
+      if (filterSetting === 'online') return isOnline(s.file);
       if (filterSetting === 'rated') return isRatedRace(s.file);
       return true;
     })
     .filter(s => filterType === 'All' || s.session.type === filterType)
     .filter(s => filterTrack === 'All' || s.file.trackCourse === filterTrack)
+    // Precompute per-row derived values once, so columns don't recompute in sortValue/render
+    .map((s): SessionRow => ({ ...s, topSpeed: getTopSpeed(s.driver.laps), consistency: calculateConsistency(s.driver.laps) }))
     .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
 
   const columns: Column<SessionRow>[] = useMemo(() => [
@@ -66,12 +72,12 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
       render: r => <span className="text-racing-muted">{r.driver.totalLaps}</span>,
     },
     { key: 'topspeed', label: 'Top Speed', align: 'right', width: '85px',
-      sortValue: r => getTopSpeed(r.driver.laps) ?? 0,
-      render: r => { const top = getTopSpeed(r.driver.laps); return top ? <span className="text-white/70 text-xs">{formatSpeed(top)}</span> : <span className="text-racing-muted">--</span>; },
+      sortValue: r => r.topSpeed ?? 0,
+      render: r => r.topSpeed ? <span className="text-white/70 text-xs">{formatSpeed(r.topSpeed)}</span> : <span className="text-racing-muted">--</span>,
     },
     { key: 'consistency', label: 'Consist.', align: 'right', width: '70px',
-      sortValue: r => calculateConsistency(r.driver.laps) ?? 0,
-      render: r => { const c = calculateConsistency(r.driver.laps); if (c === null) return <span className="text-racing-muted">--</span>; return <span className={`text-xs ${getConsistencyColor(c)}`}>{c.toFixed(1)}%</span>; },
+      sortValue: r => r.consistency ?? 0,
+      render: r => r.consistency === null ? <span className="text-racing-muted">--</span> : <span className={`text-xs ${getConsistencyColor(r.consistency)}`}>{r.consistency.toFixed(1)}%</span>,
     },
     { key: 'pos', label: 'Pos', align: 'right', width: '45px',
       sortValue: r => r.session.type === 'Race' ? r.driver.classPosition : Infinity,
@@ -125,7 +131,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
           columns={columns}
           data={filtered}
           rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}-${r.driver.name}`}
-          onRowClick={r => onNavigate?.('session', `${r.file.fileName}::${r.session.sessionIndex}::${encodeURIComponent(r.driver.name)}`)}
+          onRowClick={r => onNavigate?.('session', buildSessionContext(r.file.fileName, r.session.sessionIndex, r.driver.name))}
         />
       </div>
     </div>

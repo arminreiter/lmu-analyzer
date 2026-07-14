@@ -3,6 +3,16 @@ import type { RaceFile, PersonalBest, DriverSummary, DriverResult, LapData, Sess
 /** Car classes ordered by speed (fastest first) */
 export const CLASS_SPEED_ORDER: CarClass[] = ['Hyper', 'LMP2-WEC', 'LMP2-ELMS', 'LMP3', 'GTE', 'GT3'];
 
+/** True when a finish status indicates the driver did not finish normally */
+export function isDnf(finishStatus: string): boolean {
+  return finishStatus !== '' && finishStatus !== 'Finished Normally' && finishStatus !== 'None';
+}
+
+/** True when a lap has a usable lap time (matches the `lapTime && lapTime > 0` convention) */
+export function isValidLap(lap: LapData): lap is LapData & { lapTime: number } {
+  return lap.lapTime !== null && lap.lapTime > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Session deduplication / merging
 // ---------------------------------------------------------------------------
@@ -10,8 +20,8 @@ export const CLASS_SPEED_ORDER: CarClass[] = ['Hyper', 'LMP2-WEC', 'LMP2-ELMS', 
 function mergeDriverResult(entries: DriverResult[]): DriverResult {
   // Pick the entry with the best finish as the base for metadata
   const sorted = [...entries].sort((a, b) => {
-    const aOk = a.finishStatus === 'Finished Normally' || a.finishStatus === '' || a.finishStatus === 'None';
-    const bOk = b.finishStatus === 'Finished Normally' || b.finishStatus === '' || b.finishStatus === 'None';
+    const aOk = !isDnf(a.finishStatus);
+    const bOk = !isDnf(b.finishStatus);
     if (aOk !== bOk) return aOk ? -1 : 1;
     return b.totalLaps - a.totalLaps;
   });
@@ -35,8 +45,8 @@ function mergeDriverResult(entries: DriverResult[]): DriverResult {
   // Recalculate best lap from merged data
   let best: number | null = null;
   for (const lap of base.laps) {
-    if (lap.lapTime && lap.lapTime > 0 && (best === null || lap.lapTime < best)) {
-      best = lap.lapTime;
+    if (isValidLap(lap) && (best === null || lap.lapTime! < best)) {
+      best = lap.lapTime!;
     }
   }
   base.bestLapTime = best;
@@ -186,13 +196,18 @@ function toLapRecord(file: RaceFile, session: SessionData, driver: DriverResult,
 }
 
 
+/** Average, standard deviation, and consistency score (0-100%) of lap times */
+export function lapTimeStats(times: number[]): { avg: number; stdDev: number; consistency: number } {
+  const avg = times.reduce((a, b) => a + b, 0) / times.length;
+  const stdDev = Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length);
+  return { avg, stdDev, consistency: 100 - (stdDev / avg) * 100 };
+}
+
 /** Consistency score (0-100%) based on coefficient of variation of valid lap times */
 export function calculateConsistency(laps: LapData[]): number | null {
-  const times = laps.filter(l => l.lapTime && l.lapTime > 0).map(l => l.lapTime!);
+  const times = laps.filter(isValidLap).map(l => l.lapTime!);
   if (times.length < 2) return null;
-  const avg = times.reduce((a, b) => a + b, 0) / times.length;
-  const std = Math.sqrt(times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length);
-  return 100 - (std / avg) * 100;
+  return lapTimeStats(times).consistency;
 }
 
 /** Highest top speed from a set of laps, or null if none recorded */
@@ -206,20 +221,16 @@ export function isDriverIncident(incident: { driver1: string; description: strin
 }
 
 
-export function isRatedRace(file: RaceFile): boolean {
-  return file.setting === 'Multiplayer' && file.freeSettings !== 2147483647;
+/** Max-int32 value the game writes when a numeric setting is unset/unlimited */
+export const MAX_INT32_SENTINEL = 2147483647;
+
+/** True when a session file was recorded in online multiplayer */
+export function isOnline(file: RaceFile): boolean {
+  return file.setting === 'Multiplayer';
 }
 
-export function getAllClasses(files: RaceFile[]): CarClass[] {
-  const classes = new Set<CarClass>();
-  for (const file of files) {
-    for (const session of file.sessions) {
-      for (const driver of session.drivers) {
-        if (driver.carClass !== 'Unknown') classes.add(driver.carClass);
-      }
-    }
-  }
-  return CLASS_SPEED_ORDER.filter(c => classes.has(c));
+export function isRatedRace(file: RaceFile): boolean {
+  return isOnline(file) && file.freeSettings !== MAX_INT32_SENTINEL;
 }
 
 export function filterFilesByClasses(files: RaceFile[], classes: CarClass[]): RaceFile[] {
@@ -312,7 +323,7 @@ export function getPersonalBests(files: RaceFile[], driverNames: string | string
 
   for (const { file, session, driver } of forEachDriverSession(files, nameSet)) {
     for (const lap of driver.laps) {
-      if (!lap.lapTime || lap.lapTime <= 0) continue;
+      if (!isValidLap(lap)) continue;
 
       const key = `${file.trackCourse}|${driver.carType}`;
       const existing = bests.get(key);
@@ -335,7 +346,7 @@ export function getAllSessionBests(files: RaceFile[], driverNames: string | stri
   for (const { file, session, driver } of forEachDriverSession(files, nameSet)) {
     let bestLap: LapData | null = null;
     for (const lap of driver.laps) {
-      if (!lap.lapTime || lap.lapTime <= 0) continue;
+      if (!isValidLap(lap)) continue;
       if (!bestLap || lap.lapTime < bestLap.lapTime!) bestLap = lap;
     }
     if (bestLap) {
@@ -353,7 +364,7 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
 
   for (const { file, session, driver } of forEachDriverSession(files, nameSet)) {
     for (const lap of driver.laps) {
-      if (!lap.lapTime || lap.lapTime <= 0) continue;
+      if (!isValidLap(lap)) continue;
       results.push(toLapRecord(file, session, driver, lap));
     }
   }
@@ -362,32 +373,63 @@ export function getAllLaps(files: RaceFile[], driverNames: string | string[]): P
   return results;
 }
 
-export function getTheoreticalBest(files: RaceFile[], driverNames: string | string[], trackCourse: string, carType: string): {
-  s1: number | null; s2: number | null; s3: number | null; total: number | null;
-} {
-  const nameSet = toNameSet(driverNames);
-  let bestS1: number | null = null;
-  let bestS2: number | null = null;
-  let bestS3: number | null = null;
+/** Minimum sector times for one track+car combination */
+export interface SectorMins {
+  s1: number | null;
+  s2: number | null;
+  s3: number | null;
+}
 
-  for (const file of files) {
-    if (file.trackCourse !== trackCourse) continue;
-    for (const session of file.sessions) {
-      for (const driver of session.drivers) {
-        if (!nameSet.has(driver.name) || driver.carType !== carType) continue;
-        for (const lap of driver.laps) {
-          if (lap.sector1 !== null && (bestS1 === null || lap.sector1 < bestS1)) bestS1 = lap.sector1;
-          if (lap.sector2 !== null && (bestS2 === null || lap.sector2 < bestS2)) bestS2 = lap.sector2;
-          if (lap.sector3 !== null && (bestS3 === null || lap.sector3 < bestS3)) bestS3 = lap.sector3;
+function updateSectorMins(entry: SectorMins, lap: LapData) {
+  if (lap.sector1 !== null && (entry.s1 === null || lap.sector1 < entry.s1)) entry.s1 = lap.sector1;
+  if (lap.sector2 !== null && (entry.s2 === null || lap.sector2 < entry.s2)) entry.s2 = lap.sector2;
+  if (lap.sector3 !== null && (entry.s3 === null || lap.sector3 < entry.s3)) entry.s3 = lap.sector3;
+}
+
+/**
+ * Best sector times per track+car in one pass over all laps.
+ * Keyed by `${trackCourse}|${carType}` — matches how getTheoreticalBest is called.
+ */
+export function buildSectorMins(files: RaceFile[], driverNames: string | string[]): Map<string, SectorMins> {
+  const nameSet = toNameSet(driverNames);
+  const map = new Map<string, SectorMins>();
+  for (const { file, driver } of forEachDriverSession(files, nameSet)) {
+    const key = `${file.trackCourse}|${driver.carType}`;
+    let entry = map.get(key);
+    if (!entry) { entry = { s1: null, s2: null, s3: null }; map.set(key, entry); }
+    for (const lap of driver.laps) updateSectorMins(entry, lap);
+  }
+  return map;
+}
+
+export function getTheoreticalBest(
+  files: RaceFile[],
+  driverNames: string | string[],
+  trackCourse: string,
+  carType: string,
+  // Optional precomputed entry (from buildSectorMins / DataIndex.sectorMins) — skips the full scan
+  precomputed?: SectorMins,
+): SectorMins & { total: number | null } {
+  let mins = precomputed;
+  if (!mins) {
+    const nameSet = toNameSet(driverNames);
+    const entry: SectorMins = { s1: null, s2: null, s3: null };
+    for (const file of files) {
+      if (file.trackCourse !== trackCourse) continue;
+      for (const session of file.sessions) {
+        for (const driver of session.drivers) {
+          if (!nameSet.has(driver.name) || driver.carType !== carType) continue;
+          for (const lap of driver.laps) updateSectorMins(entry, lap);
         }
       }
     }
+    mins = entry;
   }
 
-  const total = bestS1 !== null && bestS2 !== null && bestS3 !== null
-    ? bestS1 + bestS2 + bestS3 : null;
+  const total = mins.s1 !== null && mins.s2 !== null && mins.s3 !== null
+    ? mins.s1 + mins.s2 + mins.s3 : null;
 
-  return { s1: bestS1, s2: bestS2, s3: bestS3, total };
+  return { s1: mins.s1, s2: mins.s2, s3: mins.s3, total };
 }
 
 export interface TrackStats {
@@ -437,7 +479,7 @@ export function getTrackStats(files: RaceFile[], driverNames: string | string[])
     existing.classes.add(driver.carClass);
 
     for (const lap of driver.laps) {
-      if (!lap.lapTime || lap.lapTime <= 0) continue;
+      if (!isValidLap(lap)) continue;
       if (!existing.bestLapTime || lap.lapTime < existing.bestLapTime) {
         existing.bestLapTime = lap.lapTime;
         existing.bestS1 = lap.sector1;
@@ -514,6 +556,7 @@ export interface OverviewStats {
 
 export function getOverviewStats(files: RaceFile[], driverNames: string | string[]): OverviewStats {
   const nameSet = toNameSet(driverNames);
+  const names = [...nameSet]; // hoisted — avoids re-spreading the set per incident
   let totalSessions = 0;
   let totalLaps = 0;
   let totalRaces = 0;
@@ -551,7 +594,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
     else if (isNewSession && session.type === 'Qualifying') totalQualifying++;
 
     totalIncidents += session.incidents.filter(
-      i => nameSet.has(i.driver1) || [...nameSet].some(n => i.description.includes(n))
+      i => nameSet.has(i.driver1) || names.some(n => i.description.includes(n))
     ).length;
     const driverPenalties = session.penalties.filter(p => nameSet.has(p.driver));
     totalPenalties += driverPenalties.length;
@@ -562,7 +605,7 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
     totalTrackLimits += session.trackLimits.filter(tl => nameSet.has(tl.driver)).length;
 
     for (const lap of driver.laps) {
-      if (lap.lapTime && lap.lapTime > 0) {
+      if (isValidLap(lap)) {
         lapTimeSum += lap.lapTime;
         lapTimeCount++;
         if (!bestLap || lap.lapTime < bestLap.lapTime) {
@@ -640,7 +683,7 @@ export interface TrackBest {
   theoS3: number | null;
 }
 
-export interface RaceStats {
+interface RaceStats {
   races: number;
   wins: number;
   podiums: number;
@@ -655,13 +698,13 @@ function emptyRaceStats(): RaceStats {
   return { races: 0, wins: 0, podiums: 0, classWins: 0, classPodiums: 0, dnfs: 0, fastestLaps: 0, poles: 0 };
 }
 
-function accumulateRaceStats(stats: RaceStats, driver: DriverResult, isDnf: boolean, hasFastestLap: boolean, hasPole: boolean) {
+function accumulateRaceStats(stats: RaceStats, driver: DriverResult, dnf: boolean, hasFastestLap: boolean, hasPole: boolean) {
   stats.races++;
   if (driver.position === 1) stats.wins++;
   if (driver.position <= 3) stats.podiums++;
   if (driver.classPosition === 1) stats.classWins++;
   if (driver.classPosition <= 3) stats.classPodiums++;
-  if (isDnf) stats.dnfs++;
+  if (dnf) stats.dnfs++;
   if (hasFastestLap) stats.fastestLaps++;
   if (hasPole) stats.poles++;
 }
@@ -694,7 +737,8 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
   const trackBestMap = new Map<string, { lapTime: number; s1: number | null; s2: number | null; s3: number | null; car: string; carClass: CarClass }>();
   const trackLapsMap = new Map<string, number>();
   const trackVenueMap = new Map<string, string>();
-  const trackCarLaps = new Map<string, { car: string; laps: { s1: number | null; s2: number | null; s3: number | null }[] }[]>();
+  // Best sector times per `${trackCourse}|${carType}` — only the minimums are ever consumed
+  const trackCarSectorMins = new Map<string, SectorMins>();
 
   for (const file of files) {
     if (!trackVenueMap.has(file.trackCourse)) {
@@ -716,9 +760,8 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
         trackLapsMap.set(file.trackCourse, (trackLapsMap.get(file.trackCourse) ?? 0) + driver.totalLaps);
 
         if (session.type === 'Race') {
-          const isOnline = file.setting === 'Multiplayer';
-          const isDnf = driver.finishStatus !== '' && driver.finishStatus !== 'Finished Normally'
-              && driver.finishStatus !== 'None';
+          const onlineRace = isOnline(file);
+          const dnf = isDnf(driver.finishStatus);
 
           // Fastest lap: check if this driver had the best lap in their class
           const classDrivers = session.drivers.filter(d => d.carClass === driver.carClass);
@@ -733,19 +776,19 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
 
           const hasPole = driver.classGridPosition === 1;
 
-          accumulateRaceStats(total, driver, isDnf, hasFastestLap, hasPole);
-          if (isOnline) accumulateRaceStats(online, driver, isDnf, hasFastestLap, hasPole);
-          if (isRatedRace(file)) accumulateRaceStats(rated, driver, isDnf, hasFastestLap, hasPole);
+          accumulateRaceStats(total, driver, dnf, hasFastestLap, hasPole);
+          if (onlineRace) accumulateRaceStats(online, driver, dnf, hasFastestLap, hasPole);
+          if (isRatedRace(file)) accumulateRaceStats(rated, driver, dnf, hasFastestLap, hasPole);
         }
 
-        // Collect sector data for theoretical best (grouped by track+car)
-        const sectorLaps = driver.laps.map(lap => ({ s1: lap.sector1, s2: lap.sector2, s3: lap.sector3 }));
-        let trackEntries = trackCarLaps.get(file.trackCourse);
-        if (!trackEntries) { trackEntries = []; trackCarLaps.set(file.trackCourse, trackEntries); }
-        trackEntries.push({ car: driver.carType, laps: sectorLaps });
+        // Collect sector minimums for theoretical best (grouped by track+car)
+        const sectorKey = `${file.trackCourse}|${driver.carType}`;
+        let sectorEntry = trackCarSectorMins.get(sectorKey);
+        if (!sectorEntry) { sectorEntry = { s1: null, s2: null, s3: null }; trackCarSectorMins.set(sectorKey, sectorEntry); }
+        for (const lap of driver.laps) updateSectorMins(sectorEntry, lap);
 
         for (const lap of driver.laps) {
-          if (!lap.lapTime || lap.lapTime <= 0) continue;
+          if (!isValidLap(lap)) continue;
           const existing = trackBestMap.get(file.trackCourse);
           if (!existing || lap.lapTime < existing.lapTime) {
             trackBestMap.set(file.trackCourse, {
@@ -763,7 +806,7 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
   }
 
   // Build theoretical bests from collected sector data
-  const trackBests = buildTrackBests(trackBestMap, trackCarLaps, trackLapsMap, trackVenueMap);
+  const trackBests = buildTrackBests(trackBestMap, trackCarSectorMins, trackLapsMap, trackVenueMap);
 
   return {
     driverName: [...nameSet].join(', '),
@@ -781,29 +824,14 @@ export function getDriverProfileStats(files: RaceFile[], driverNames: string | s
 
 function buildTrackBests(
   trackBestMap: Map<string, { lapTime: number; s1: number | null; s2: number | null; s3: number | null; car: string; carClass: CarClass }>,
-  trackCarLaps: Map<string, { car: string; laps: { s1: number | null; s2: number | null; s3: number | null }[] }[]>,
+  trackCarSectorMins: Map<string, SectorMins>,
   trackLapsMap: Map<string, number>,
   trackVenueMap: Map<string, string>,
 ): TrackBest[] {
-  const theoMap = new Map<string, { s1: number | null; s2: number | null; s3: number | null }>();
-  for (const [trackCourse, entries] of trackCarLaps) {
-    const best = trackBestMap.get(trackCourse);
-    if (!best) continue;
-    const entry: { s1: number | null; s2: number | null; s3: number | null } = { s1: null, s2: null, s3: null };
-    for (const group of entries) {
-      if (group.car !== best.car) continue;
-      for (const lap of group.laps) {
-        if (lap.s1 !== null && (entry.s1 === null || lap.s1 < entry.s1)) entry.s1 = lap.s1;
-        if (lap.s2 !== null && (entry.s2 === null || lap.s2 < entry.s2)) entry.s2 = lap.s2;
-        if (lap.s3 !== null && (entry.s3 === null || lap.s3 < entry.s3)) entry.s3 = lap.s3;
-      }
-    }
-    theoMap.set(trackCourse, entry);
-  }
-
   const trackBests: TrackBest[] = [];
   for (const [trackCourse, best] of trackBestMap) {
-    const theo = theoMap.get(trackCourse);
+    // Theoretical best uses the sector minimums of the car that set the fastest lap
+    const theo = trackCarSectorMins.get(`${trackCourse}|${best.car}`);
     const theoTotal = theo?.s1 != null && theo?.s2 != null && theo?.s3 != null
       ? theo.s1 + theo.s2 + theo.s3 : null;
     trackBests.push({

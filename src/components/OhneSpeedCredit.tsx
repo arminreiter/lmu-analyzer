@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { SHEET_HTML_URL } from '../lib/racepace';
 
 export function OhneSpeedCredit() {
   return (
@@ -35,6 +36,17 @@ export function OhneSpeedCredit() {
           >
             <ExternalLink className="w-3 h-3" />
             Discord
+          </a>
+          <a
+            href={SHEET_HTML_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+              bg-white/5 border border-racing-border text-racing-text
+              hover:bg-white/10 hover:text-white hover:border-racing-muted/50"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Spreadsheet
           </a>
         </div>
       </div>

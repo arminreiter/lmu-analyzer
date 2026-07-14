@@ -40,11 +40,15 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 ### Key Files
 
 - `src/lib/types.ts` — All TypeScript types (`RaceFile`, `SessionData`, `DriverResult`, `LapData`, `PersonalBest`, `CarClass`, etc.)
-- `src/lib/parser.ts` — XML→TypeScript parser. Handles session types (Practice/Qualifying/Race/Warmup), lap data with sectors/tire wear/fuel, incidents, penalties, track limits. Includes `deduplicateRaces()` to merge duplicate Race sessions (same track, within 60 min, matching driver lap times)
-- `src/lib/analytics.ts` — All data computations. Functions accept `driverNames: string | string[]` to support multi-driver selection. Key functions: `getOverviewStats()`, `getPersonalBests()`, `getAllSessionBests()`, `getTheoreticalBest()`, `getTrackStats()`, `getCarStats()`, `detectPlayerDrivers()`
-- `src/lib/storage.ts` — Persistence layer: IndexedDB for parsed files + FileSystemDirectoryHandle (refresh from folder), localStorage for filter preferences and profile. Graceful fallback if IndexedDB unavailable
-- `src/lib/racepace.ts` — Community benchmark integration. Fetches pace tiers from ohne_speed's Google Sheet CSV. Rates laps as Alien/Competitive/Good/Midpack/Tail-ender/Offline
-- `src/lib/useInstallPrompt.ts` — PWA install prompt hook
+- `src/lib/parser.ts` — XML→TypeScript parser (`loadFolder()`, `parseUploadedFiles()`, both return `{ files, failedFiles }`). Handles session types (Practice/Qualifying/Race/Warmup), lap data with sectors/tire wear/fuel, incidents, penalties, track limits
+- `src/lib/analytics.ts` — All data computations. Functions accept `driverNames: string | string[]` to support multi-driver selection. Key functions: `getOverviewStats()`, `getPersonalBests()`, `getAllSessionBests()`, `getTheoreticalBest()`, `getTrackStats()`, `getCarStats()`, `detectPlayerDrivers()`, plus shared predicates `isDnf()`, `isValidLap()`, `isOnline()`, `isRatedRace()`. Includes `deduplicateSessions()` to merge duplicate Race sessions (same track, within 60 min, matching driver lap times)
+- `src/lib/storage.ts` — Persistence layer: IndexedDB for parsed files (versioned cache) + FileSystemDirectoryHandle (refresh from folder), localStorage for filter preferences and profile via exported `KEYS` registry (all localStorage keys must be registered there so `clearAll()` sees them). Graceful fallback if IndexedDB unavailable
+- `src/lib/racepace.ts` — Community benchmark integration. Fetches pace tiers from ohne_speed's Google Sheet CSV. Rates laps as Alien/Competitive/Good/Midpack/Tail-ender/Offline. Single source of truth for tier order (`RATING_ORDER`), tier colors, and benchmark lookup (`buildBenchmarkMap()`)
+- `src/lib/DataIndexContext.tsx` + `dataIndexStore.ts` + `useDataIndex.ts` — Context providing precomputed indices over the loaded files (per-driver sessions, all laps, sector minimums for theoretical bests)
+- `src/lib/useBenchmarks.ts` — Hook wrapping the benchmark fetch (returns `benchmarks`, `benchmarkMap`, `loading`, `error`)
+- `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
+- `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
+- `src/lib/useInstallPrompt.ts` — PWA install prompt hook; `useTheme.ts` — light/dark theme; `useClickOutside.ts` — shared outside-click hook (use this, don't hand-roll listeners)
 
 ### Components
 
@@ -54,13 +58,20 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/components/SearchableMultiSelect.tsx` — Multi-select dropdown with search
 - `src/components/SearchableSelect.tsx` — Single-select dropdown with search
 - `src/components/ClassBadge.tsx` — Color-coded car class badge
-- `src/components/StatCard.tsx` — Dashboard stat widget (label, value, icon, subtext)
-- `src/components/ExportButton.tsx` — Export table data as CSV/XLSX
+- `src/components/StatCard.tsx` — Stat widget (label, value, icon, subtext) with variants `default`/`tile`/`center`; use these instead of hand-built stat divs
+- `src/components/ExportButton.tsx` — Export table data as CSV/XLSX (slugifies the `filename` prop itself — pass raw names)
 - `src/components/Footer.tsx` — Build time, links, copyright
+- `src/components/DataCardHeader.tsx` — Standard card header (title, actions slot) used by all data cards
+- `src/components/RatingBadge.tsx` — Pace-tier badge (sizes `sm`/`md`)
+- `src/components/PaceSubNav.tsx` — Overview/Per-Track tab bar shared by Race Pace and Track Mode
+- `src/components/PillSelector.tsx`, `FilterButtonGroup.tsx` — Shared filter controls
+- `src/components/SessionLink.tsx` — Link into Session Detail (uses `sessionContext.ts`)
+- `src/components/OhneSpeedCredit.tsx` — Benchmark data attribution
+- `src/components/lapColumns.tsx` — Shared lap-table column definitions for Tracks/Cars views
 
 ### Views
 
-Ten views: Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
+Eleven views: Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
 
 - `OverviewView` — Dashboard with stat cards (sessions, laps, races, tracks, cars, distance, best lap) + track/car stats tables
 - `PersonalBestsView` — Best laps per track/car with theoretical best (combined best sectors), filterable by track/car/mode
@@ -70,6 +81,7 @@ Ten views: Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Rac
 - `CarsView` — Per-car usage, best laps, track visits, sessions, distance
 - `RaceResultsView` — Race outcomes with position progress chart, wins/podiums/top-5s stats, DNF tracking
 - `RacePaceView` — Community benchmark comparison (ohne_speed pace tiers), rating badges, delta to next target
+- `TrackModeView` — Per-track deep dive: your times vs benchmark tiers and theoretical best for a selected track
 - `DriverProfileView` — Name/avatar editor, session stats, class breakdown, track frequency, incident summary
 - `AboutView` — App info, links, build time
 
@@ -93,7 +105,7 @@ Purple is reserved — don't use it for general "best" highlighting. It only app
 - `data-card` CSS class for card styling with hover effects (angular clip-path cuts, red glow on hover)
 - Car class badges are color-coded: Hyper=red, GT3=blue, GTE=orange, LMP3=green
 - Visual effects: scanline animation, carbon fiber texture, checkered pattern, racing stripes
-- Animations via `motion` library
+- Animations are pure CSS (scanline, hover effects) — no animation library
 
 ### Persistence
 

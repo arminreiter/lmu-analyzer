@@ -35,6 +35,15 @@ export function formatDistance(km: number): string {
   return `${Math.round(km).toLocaleString()} km`;
 }
 
+// Shared Recharts theme values — centralized so all views use the same chart chrome
+export const CHART_AXIS_TICK = '#6b7280';
+export const CHART_GRID_STROKE = '#2a2a3a';
+
+/** Human-readable message from an unknown thrown value */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function getChartTooltipStyle() {
   return {
     background: 'var(--color-racing-card)',

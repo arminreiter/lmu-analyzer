@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { DataIndexContext, type DataIndex } from './dataIndexContext';
+import { DataIndexContext, type DataIndex } from './dataIndexStore';
 
 export function useDataIndex(): DataIndex {
   const ctx = useContext(DataIndexContext);

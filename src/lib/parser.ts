@@ -188,6 +188,8 @@ function parseSession(sessionEl: Element, sourceTag: string, type: SessionType, 
 export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'text/xml');
+  // DOMParser signals malformed XML via a <parsererror> element instead of throwing
+  if (doc.querySelector('parsererror')) throw new Error(`Invalid race file: ${fileName}`);
   const root = doc.getElementsByTagName('RaceResults')[0];
 
   if (!root) throw new Error(`Invalid race file: ${fileName}`);
@@ -229,8 +231,15 @@ export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
   };
 }
 
-export async function loadFolder(dirHandle: FileSystemDirectoryHandle): Promise<RaceFile[]> {
+export interface ParseResult {
+  files: RaceFile[];
+  /** Names of files that failed to parse (corrupt/invalid XML) — skipped, not fatal */
+  failedFiles: string[];
+}
+
+export async function loadFolder(dirHandle: FileSystemDirectoryHandle): Promise<ParseResult> {
   const files: RaceFile[] = [];
+  const failedFiles: string[] = [];
 
   for await (const entry of dirHandle.values()) {
     if (entry.kind === 'file' && entry.name.endsWith('.xml')) {
@@ -240,16 +249,18 @@ export async function loadFolder(dirHandle: FileSystemDirectoryHandle): Promise<
         files.push(parseRaceFile(text, entry.name));
       } catch (e) {
         console.warn(`Failed to parse ${entry.name}:`, e);
+        failedFiles.push(entry.name);
       }
     }
   }
 
   files.sort((a, b) => a.timeString.localeCompare(b.timeString));
-  return files;
+  return { files, failedFiles };
 }
 
-export async function loadFiles(fileList: File[]): Promise<RaceFile[]> {
+export async function parseUploadedFiles(fileList: File[]): Promise<ParseResult> {
   const files: RaceFile[] = [];
+  const failedFiles: string[] = [];
 
   for (const file of fileList) {
     if (!file.name.endsWith('.xml')) continue;
@@ -258,9 +269,10 @@ export async function loadFiles(fileList: File[]): Promise<RaceFile[]> {
       files.push(parseRaceFile(text, file.name));
     } catch (e) {
       console.warn(`Failed to parse ${file.name}:`, e);
+      failedFiles.push(file.name);
     }
   }
 
   files.sort((a, b) => a.timeString.localeCompare(b.timeString));
-  return files;
+  return { files, failedFiles };
 }
