@@ -119,6 +119,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             sortValue: r => r.lapTime,
             render: (r, i) => r.rowType === 'theoretical' ? <Zap className="w-3 h-3 text-racing-purple" /> : i === 0 ? <Trophy className="w-4 h-4 text-racing-gold" /> : i === 1 ? <Trophy className="w-4 h-4 text-racing-silver" /> : i === 2 ? <Trophy className="w-4 h-4 text-racing-bronze" /> : <span className="text-racing-muted/40 font-mono text-xs">{i + 1}</span> },
           { key: 'car', label: 'Car', width: '22%', sortValue: r => r.carType,
+            exportValue: r => r.rowType === 'theoretical' ? `${r.carType} (theoretical)` : r.carType,
             render: r => r.rowType === 'theoretical'
               ? <span className="text-racing-purple/80 text-xs">{r.carType} (theoretical)</span>
               : <span className="text-white text-xs">{r.carType}</span> },

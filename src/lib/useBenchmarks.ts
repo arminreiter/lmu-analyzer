@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { fetchBenchmarks, buildBenchmarkMap, type PaceBenchmark } from './racepace';
+import { errorMessage } from './formatting';
 
 /** Shared benchmark-loading state machine for the pace views. */
 export function useBenchmarks() {
@@ -10,7 +11,7 @@ export function useBenchmarks() {
     let cancelled = false;
     fetchBenchmarks()
       .then(data => { if (!cancelled) setBenchmarks(data); })
-      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
+      .catch((e: unknown) => { if (!cancelled) setError(errorMessage(e)); });
     return () => { cancelled = true; };
   }, []);
 

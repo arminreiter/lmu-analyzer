@@ -28,6 +28,9 @@ const buildHash = (view: string, context: string | null) =>
   '#' + view + (context ? '/' + encodeURIComponent(context) : '');
 
 // Short summary line for files that failed to parse
+const LEGACY_CACHE_NOTICE =
+  'Cached data was saved by an older app version — refresh from your folder or re-import your files for best results.';
+
 const failedFilesNotice = (failed: string[]) =>
   `${failed.length} file${failed.length === 1 ? '' : 's'} could not be parsed and ${failed.length === 1 ? 'was' : 'were'} skipped: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? ', …' : ''}`;
 
@@ -49,13 +52,20 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Non-blocking warning (skipped files, stale cache, caching failure) — dismissible toast
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
+  const addNotice = useCallback((msg: string) => {
+    setNotices(prev => (prev.includes(msg) ? prev : [...prev, msg]));
+  }, []);
+  const dismissNotice = useCallback((msg: string) => {
+    setNotices(prev => prev.filter(n => n !== msg));
+  }, []);
   const [activeView, setActiveView] = useState('overview');
   const [viewContext, setViewContext] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [hasCachedData, setHasCachedData] = useState(false);
   const [racePaceEnabled, setRacePaceEnabled] = useState(() => {
-    try { const v = localStorage.getItem(storage.KEYS.benchmarks); return v === null || v === '1'; } catch { return true; }
+    const v = storage.lsGet(storage.KEYS.benchmarks);
+    return v === null || v === '1';
   });
   const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
@@ -115,20 +125,21 @@ function App() {
     storage.saveFiles(parsed).then(ok => {
       if (!ok) {
         console.warn('Failed to cache parsed files');
-        setNotice('Could not cache your data — "Resume last session" will not be available.');
+        addNotice('Could not cache your data — "Resume last session" will not be available.');
       }
     });
-  }, []);
+  }, [addNotice]);
 
   // Auto-restore cached data on mount
   useEffect(() => {
     (async () => {
       const [cached, handle] = await Promise.all([storage.loadCachedFiles(), storage.loadDirectoryHandle()]);
-      if (cached && cached.length > 0) {
-        setHasCachedData(true);
-        applyParsedData(cached, true);
-        // Directory handle enables the refresh button
-        if (!handle) return;
+      if (!cached || cached.files.length === 0) return;
+      setHasCachedData(true);
+      applyParsedData(cached.files, true);
+      let legacyCache = cached.legacy;
+      // Directory handle enables the refresh button
+      if (handle) {
         setDirHandle(handle);
         // If data came from a directory, try to re-read fresh data
         if (storage.loadDataSource() === 'directory') {
@@ -138,14 +149,18 @@ function App() {
             if (perm === 'granted') {
               const { files: fresh, failedFiles } = await loadFolder(handle);
               const deduped = applyParsedData(fresh, true);
-              if (deduped) persistFiles(deduped);
-              if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
+              if (deduped) {
+                persistFiles(deduped);
+                legacyCache = false; // fresh parse replaced the stale cache
+              }
+              if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
             }
           } catch {
-            setNotice('Showing cached data — folder could not be re-read.');
+            addNotice('Showing cached data — folder could not be re-read.');
           }
         }
       }
+      if (legacyCache) addNotice(LEGACY_CACHE_NOTICE);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -168,13 +183,13 @@ function App() {
         storage.saveDataSource('directory');
         storage.saveDirectoryHandle(handle);
       }
-      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
+      if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
     } catch (e) {
       setError(`Failed to load data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData, persistFiles]);
+  }, [applyParsedData, persistFiles, addNotice]);
 
   const handleFilesUploaded = useCallback(async (uploadedFiles: File[]) => {
     setLoading(true);
@@ -188,13 +203,13 @@ function App() {
         storage.saveDataSource('upload');
         storage.clearDirectoryHandle();
       }
-      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
+      if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
     } catch (e) {
       setError(`Failed to load data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData, persistFiles]);
+  }, [applyParsedData, persistFiles, addNotice]);
 
   const handleRefresh = useCallback(async () => {
     const handle = dirHandle;
@@ -211,31 +226,34 @@ function App() {
       const { files: parsed, failedFiles } = await loadFolder(handle);
       const deduped = applyParsedData(parsed, true);
       if (deduped) persistFiles(deduped);
-      if (failedFiles.length > 0) setNotice(failedFilesNotice(failedFiles));
+      if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
     } catch (e) {
       setError(`Failed to refresh data: ${errorMessage(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [applyParsedData, persistFiles, dirHandle]);
+  }, [applyParsedData, persistFiles, dirHandle, addNotice]);
 
   const handleResumeCached = useCallback(async () => {
     const cached = await storage.loadCachedFiles();
-    if (!cached || cached.length === 0) return;
-    applyParsedData(cached, true);
+    if (!cached || cached.files.length === 0) return;
+    applyParsedData(cached.files, true);
+    if (cached.legacy) addNotice(LEGACY_CACHE_NOTICE);
     const handle = await storage.loadDirectoryHandle();
     if (handle) setDirHandle(handle);
-  }, [applyParsedData]);
+  }, [applyParsedData, addNotice]);
 
   const handleReload = useCallback(() => {
+    if (!window.confirm('This clears the cached data, filters, and your driver profile. Continue?')) return;
     setFiles([]);
     setDrivers([]);
     setSelectedDrivers([]);
     setSelectedClasses([]);
     setLoaded(false);
     setError(null);
-    setNotice(null);
+    setNotices([]);
     storage.clearAll();
+    setRacePaceEnabled(true); // matches the default when the cleared key is absent
     setDirHandle(null);
     setHasCachedData(false);
   }, []);
@@ -243,7 +261,7 @@ function App() {
   const handleToggleRacePace = useCallback(() => {
     setRacePaceEnabled(prev => {
       const next = !prev;
-      try { localStorage.setItem(storage.KEYS.benchmarks, next ? '1' : '0'); } catch { /* ignore */ }
+      storage.lsSet(storage.KEYS.benchmarks, next ? '1' : '0');
       if (!next && activeView === 'benchmarks') setActiveView('overview');
       return next;
     });
@@ -310,30 +328,35 @@ function App() {
     window.history.back();
   }, []);
 
-  const updateToast = needRefresh && (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-racing-card border border-racing-red/50 px-4 py-3 rounded-lg shadow-lg shadow-racing-red/20">
-      <span className="text-sm text-racing-light">A new version is available</span>
-      <button
-        onClick={() => updateServiceWorker(true)}
-        className="px-3 py-1 text-sm font-bold bg-racing-red text-white rounded hover:bg-racing-red/80 transition-colors"
-      >
-        Update
-      </button>
+  // One stacked container so update + warning toasts never overlap
+  const toasts = (needRefresh || notices.length > 0) && (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+      {needRefresh && (
+        <div className="flex items-center gap-3 bg-racing-card border border-racing-red/50 px-4 py-3 rounded-lg shadow-lg shadow-racing-red/20">
+          <span className="text-sm text-racing-light">A new version is available</span>
+          <button
+            onClick={() => updateServiceWorker(true)}
+            className="px-3 py-1 text-sm font-bold bg-racing-red text-white rounded hover:bg-racing-red/80 transition-colors"
+          >
+            Update
+          </button>
+        </div>
+      )}
+      {/* Non-blocking warnings (skipped files, stale cache, caching failure) */}
+      {notices.map(msg => (
+        <div key={msg} className="flex items-center gap-3 bg-racing-card border border-racing-yellow/50 px-4 py-3 rounded-lg shadow-lg">
+          <span className="text-sm text-racing-light">{msg}</span>
+          <button
+            onClick={() => dismissNotice(msg)}
+            className="px-3 py-1 text-sm font-bold bg-racing-yellow/20 text-racing-yellow rounded hover:bg-racing-yellow/30 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      ))}
     </div>
   );
 
-  // Non-blocking warning toast (skipped files, stale cache, caching failure)
-  const noticeToast = notice && (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-racing-card border border-racing-yellow/50 px-4 py-3 rounded-lg shadow-lg">
-      <span className="text-sm text-racing-light">{notice}</span>
-      <button
-        onClick={() => setNotice(null)}
-        className="px-3 py-1 text-sm font-bold bg-racing-yellow/20 text-racing-yellow rounded hover:bg-racing-yellow/30 transition-colors"
-      >
-        Dismiss
-      </button>
-    </div>
-  );
 
   if (!loaded) {
     return (
@@ -345,8 +368,7 @@ function App() {
           loading={loading}
           error={error}
         />
-        {updateToast}
-        {noticeToast}
+        {toasts}
       </>
     );
   }
@@ -398,8 +420,7 @@ function App() {
       </main>
 
       <Footer />
-      {updateToast}
-      {noticeToast}
+      {toasts}
     </div>
   );
 }

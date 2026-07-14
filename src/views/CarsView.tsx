@@ -6,6 +6,7 @@ import { PillSelector } from '../components/PillSelector';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { buildLapColumns } from '../components/lapColumns';
+import { StatCell, LapValidityCell } from '../components/StatCell';
 import { formatDistance } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
@@ -70,30 +71,11 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
               const invalidLaps = carInfo.totalLaps - validLaps;
               return (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Sessions</p>
-                    <p className="text-white text-lg font-bold">{carInfo.sessionCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Total Laps</p>
-                    <p className="text-white text-lg font-bold">{carInfo.totalLaps}</p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Valid / Invalid</p>
-                    <p className="text-lg font-bold">
-                      <span className="text-racing-green">{validLaps}</span>
-                      <span className="text-racing-muted mx-1">/</span>
-                      <span className={invalidLaps > 0 ? 'text-racing-muted' : 'text-racing-green'}>{invalidLaps}</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Distance</p>
-                    <p className="text-white text-lg font-bold font-mono">{formatDistance(carInfo.totalDistanceKm)}</p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Tracks</p>
-                    <p className="text-white text-lg font-bold">{carInfo.tracks.size}</p>
-                  </div>
+                  <StatCell label="Sessions" value={carInfo.sessionCount} />
+                  <StatCell label="Total Laps" value={carInfo.totalLaps} />
+                  <LapValidityCell valid={validLaps} invalid={invalidLaps} />
+                  <StatCell label="Distance" mono value={formatDistance(carInfo.totalDistanceKm)} />
+                  <StatCell label="Tracks" value={carInfo.tracks.size} />
                 </div>
               );
             })()}

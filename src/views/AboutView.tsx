@@ -1,5 +1,6 @@
 import { Shield, Coffee, FileText, Lock, Cpu, Code2, Download, Timer } from 'lucide-react';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
+import { SHEET_HTML_URL } from '../lib/racepace';
 
 export function AboutView() {
   const { canInstall, install } = useInstallPrompt();
@@ -99,7 +100,7 @@ export function AboutView() {
             </p>
             <div className="flex flex-wrap gap-3">
               <a
-                href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml#gid=1766901750"
+                href={SHEET_HTML_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all

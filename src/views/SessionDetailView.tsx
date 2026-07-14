@@ -5,7 +5,7 @@ import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
+import { isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
 import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
 
@@ -173,7 +173,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
       { key: 'strategy', label: 'Strategy', width: '180px', sortValue: (r: DriverResult) => r.pitstops,
         render: (r: DriverResult) => <TireStrategy laps={r.laps} /> },
       { key: 'status', label: 'Status', width: '120px', sortValue: (r: DriverResult) => r.finishStatus,
-        render: (r: DriverResult) => <span className={`text-xs ${r.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
+        render: (r: DriverResult) => <span className={`text-xs ${!isDnf(r.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
     ] : []),
   ], [session.type, driver.name]);
 
@@ -188,7 +188,7 @@ function OverviewTab({ file, session, driver, stats, standings }: {
             <InfoRow label="Team" value={driver.teamName} />
             <InfoRow label="Car #" value={driver.carNumber} />
             <InfoRow label="Status" value={driver.finishStatus}
-              valueClass={driver.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'} />
+              valueClass={!isDnf(driver.finishStatus) ? 'text-racing-green' : 'text-racing-red'} />
             <InfoRow label="Pitstops" value={String(driver.pitstops)} />
             {session.type === 'Race' && (
               <>

@@ -12,13 +12,13 @@ import { useDataIndex } from '../lib/useDataIndex';
 import { useBenchmarks } from '../lib/useBenchmarks';
 import { formatLapTime, formatDelta, formatSector } from '../lib/formatting';
 import { getTheoreticalBest, isValidLap } from '../lib/analytics';
-import { KEYS } from '../lib/storage';
+import { KEYS, lsGet, lsSet, lsRemove } from '../lib/storage';
 import {
   mapTrackName,
   rateLapTime,
   getNextTarget,
   getRatingColor,
-  getRatingBgColor,
+  getRatingRowClass,
   RATING_ORDER,
   type PaceBenchmark,
   type PaceRating,
@@ -71,16 +71,14 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
   const { trackStats, personalBests, allLaps, driverSessions, sectorMins } = useDataIndex();
 
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(
-    initialTrack ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(KEYS.trackModeSelected) : null),
+    initialTrack ?? lsGet(KEYS.trackModeSelected),
   );
   const setSelectedTrackId = (id: string | null) => {
     setSelectedTrackIdState(id);
-    try {
-      if (id) localStorage.setItem(KEYS.trackModeSelected, id);
-      else localStorage.removeItem(KEYS.trackModeSelected);
-    } catch { /* ignore */ }
+    if (id) lsSet(KEYS.trackModeSelected, id);
+    else lsRemove(KEYS.trackModeSelected);
   };
-  const { benchmarks, benchmarkMap, loading: benchmarkLoading } = useBenchmarks();
+  const { benchmarks, benchmarkMap, loading: benchmarkLoading, error: benchmarkError } = useBenchmarks();
   const [lapLimit, setLapLimit] = useState<LapLimit>('10');
   const [showBenchmarks, setShowBenchmarks] = useState(true);
   const [showTheoretical, setShowTheoretical] = useState(true);
@@ -436,6 +434,13 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
             </div>
           )}
 
+          {benchmarkError && (
+            <div className="text-center py-8">
+              <p className="text-racing-red text-sm">Failed to load pace data: {benchmarkError}</p>
+              <p className="text-racing-muted text-xs mt-2">Check your internet connection and try again.</p>
+            </div>
+          )}
+
           {trackBenchmarks.length > 0 && (
             <div className="data-card carbon-fiber overflow-hidden">
               <DataCardHeader title="PACE REFERENCE">
@@ -489,7 +494,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
                   return `${r.pb.carType}-${r.pb.fileName}-${r.pb.lapNumber}-${i}`;
                 }}
                 rowClass={r => {
-                  if (r.rowType === 'benchmark') return `${getRatingBgColor(r.tierLabel).split(' ')[0]}/[0.03]`;
+                  if (r.rowType === 'benchmark') return getRatingRowClass(r.tierLabel);
                   if (r.rowType === 'theoretical') return 'bg-racing-purple/[0.04]';
                   return '';
                 }}

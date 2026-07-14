@@ -326,6 +326,19 @@ export function getRatingBgColor(rating: PaceRating | 'Hotlap'): string {
   }
 }
 
+/** Faint row tint per tier — literal classes so the Tailwind JIT can generate them */
+export function getRatingRowClass(rating: PaceRating | 'Hotlap'): string {
+  switch (rating) {
+    case 'Hotlap': return 'bg-white/[0.03]';
+    case 'Alien': return 'bg-racing-purple/[0.03]';
+    case 'Competitive': return 'bg-racing-green/[0.03]';
+    case 'Good': return 'bg-racing-green/[0.03]';
+    case 'Midpack': return 'bg-white/[0.03]';
+    case 'Tail-ender': return 'bg-racing-yellow/[0.03]';
+    case 'Offline': return 'bg-racing-orange/[0.03]';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Lookup helpers
 // ---------------------------------------------------------------------------

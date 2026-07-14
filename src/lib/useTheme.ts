@@ -1,14 +1,12 @@
 import { useState, useLayoutEffect } from 'react';
-import { KEYS } from './storage';
+import { KEYS, lsGet, lsSet } from './storage';
 
 const THEME_KEY = KEYS.theme;
 type Theme = 'dark' | 'light';
 
 function getInitialTheme(): Theme {
-  try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === 'light' || saved === 'dark') return saved;
-  } catch { /* localStorage unavailable */ }
+  const saved = lsGet(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
@@ -19,7 +17,7 @@ export function useTheme() {
     document.documentElement.classList.toggle('light', theme === 'light');
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', theme === 'light' ? '#e4e5ec' : '#0a0a0f');
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* localStorage unavailable */ }
+    lsSet(THEME_KEY, theme);
   }, [theme]);
 
   const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark');

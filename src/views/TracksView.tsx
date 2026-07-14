@@ -7,6 +7,7 @@ import { PillSelector } from '../components/PillSelector';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { buildLapColumns } from '../components/lapColumns';
+import { StatCell, LapValidityCell } from '../components/StatCell';
 import { isValidLap } from '../lib/analytics';
 import { formatLapTime, formatSpeed, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
@@ -97,34 +98,11 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
               const { totalLaps, validLaps, invalidLaps } = lapCounts;
               return (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Sessions</p>
-                    <p className="text-white text-lg font-bold">{trackSessions.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Total Laps</p>
-                    <p className="text-white text-lg font-bold">{totalLaps}</p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Valid / Invalid</p>
-                    <p className="text-lg font-bold">
-                      <span className="text-racing-green">{validLaps}</span>
-                      <span className="text-racing-muted mx-1">/</span>
-                      <span className={invalidLaps > 0 ? 'text-racing-muted' : 'text-racing-green'}>{invalidLaps}</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Best Lap</p>
-                    <p className="text-white text-lg font-bold font-mono">
-                      {formatLapTime(trackLaps[0]?.lapTime ?? null)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-racing-muted text-xs uppercase">Track Length</p>
-                    <p className="text-white text-lg font-bold">
-                      {((files.find(f => f.trackCourse === track)?.trackLength ?? 0) / 1000).toFixed(2)} km
-                    </p>
-                  </div>
+                  <StatCell label="Sessions" value={trackSessions.length} />
+                  <StatCell label="Total Laps" value={totalLaps} />
+                  <LapValidityCell valid={validLaps} invalid={invalidLaps} />
+                  <StatCell label="Best Lap" mono value={formatLapTime(trackLaps[0]?.lapTime ?? null)} />
+                  <StatCell label="Track Length" value={`${((files.find(f => f.trackCourse === track)?.trackLength ?? 0) / 1000).toFixed(2)} km`} />
                 </div>
               );
             })()}

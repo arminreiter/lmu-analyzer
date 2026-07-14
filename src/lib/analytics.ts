@@ -45,8 +45,8 @@ function mergeDriverResult(entries: DriverResult[]): DriverResult {
   // Recalculate best lap from merged data
   let best: number | null = null;
   for (const lap of base.laps) {
-    if (isValidLap(lap) && (best === null || lap.lapTime! < best)) {
-      best = lap.lapTime!;
+    if (isValidLap(lap) && (best === null || lap.lapTime < best)) {
+      best = lap.lapTime;
     }
   }
   base.bestLapTime = best;
@@ -205,7 +205,7 @@ export function lapTimeStats(times: number[]): { avg: number; stdDev: number; co
 
 /** Consistency score (0-100%) based on coefficient of variation of valid lap times */
 export function calculateConsistency(laps: LapData[]): number | null {
-  const times = laps.filter(isValidLap).map(l => l.lapTime!);
+  const times = laps.filter(isValidLap).map(l => l.lapTime);
   if (times.length < 2) return null;
   return lapTimeStats(times).consistency;
 }
@@ -230,7 +230,8 @@ export function isOnline(file: RaceFile): boolean {
 }
 
 export function isRatedRace(file: RaceFile): boolean {
-  return isOnline(file) && file.freeSettings !== MAX_INT32_SENTINEL;
+  // freeSettings may be missing on files from legacy caches — treat unknown as unrated
+  return isOnline(file) && file.freeSettings != null && file.freeSettings !== MAX_INT32_SENTINEL;
 }
 
 export function filterFilesByClasses(files: RaceFile[], classes: CarClass[]): RaceFile[] {

@@ -7,7 +7,7 @@ import { ExportButton } from '../components/ExportButton';
 import { StatCard } from '../components/StatCard';
 import { getDriverProfileStats, type DriverProfileStats, type TrackBest } from '../lib/analytics';
 import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
-import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar, KEYS } from '../lib/storage';
+import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar, KEYS, lsGet, lsSet } from '../lib/storage';
 import { useClickOutside } from '../lib/useClickOutside';
 import type { RaceFile } from '../lib/types';
 
@@ -31,14 +31,14 @@ const defaultSettings: ProfileSettings = {
 
 function loadSettings(): ProfileSettings {
   try {
-    const raw = localStorage.getItem(KEYS.profileSettings);
+    const raw = lsGet(KEYS.profileSettings);
     if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
+  } catch { /* corrupt JSON */ }
   return defaultSettings;
 }
 
 function saveSettings(s: ProfileSettings) {
-  try { localStorage.setItem(KEYS.profileSettings, JSON.stringify(s)); } catch { /* ignore */ }
+  lsSet(KEYS.profileSettings, JSON.stringify(s));
 }
 
 interface DriverProfileViewProps {

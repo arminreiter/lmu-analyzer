@@ -26,15 +26,15 @@ const FILES_KEY = 'race-files';
 
 // --- localStorage helpers (Safari lockdown / quota can throw on any access) ---
 
-function lsGet(key: string): string | null {
+export function lsGet(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
-function lsSet(key: string, value: string): void {
+export function lsSet(key: string, value: string): void {
   try { localStorage.setItem(key, value); } catch { /* quota exceeded or unavailable */ }
 }
 
-function lsRemove(key: string): void {
+export function lsRemove(key: string): void {
   try { localStorage.removeItem(key); } catch { /* unavailable */ }
 }
 
@@ -87,32 +87,43 @@ export async function saveFiles(files: RaceFile[]): Promise<boolean> {
   }
 }
 
-function unwrapCache(raw: unknown): RaceFile[] | null {
-  // Unversioned caches (plain arrays from older app versions) are discarded
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const cache = raw as FilesCache;
-  if (cache.version !== CACHE_VERSION || !Array.isArray(cache.files)) return null;
-  return cache.files;
+interface CachedFiles {
+  files: RaceFile[];
+  /** True when the cache was written by an app version predating the versioned format. */
+  legacy: boolean;
 }
 
-export async function loadCachedFiles(): Promise<RaceFile[] | null> {
+function unwrapCache(raw: unknown): CachedFiles | null {
+  // Legacy caches were a plain RaceFile[] with the same shape as version 1 — accept them;
+  // loadCachedFiles rewrites them in versioned form and flags them to the caller.
+  // ponytail: valid only while CACHE_VERSION === 1; on the first version bump, discard plain arrays instead.
+  if (Array.isArray(raw)) return { files: raw as RaceFile[], legacy: true };
+  if (!raw || typeof raw !== 'object') return null;
+  const cache = raw as FilesCache;
+  if (cache.version !== CACHE_VERSION || !Array.isArray(cache.files)) return null;
+  return { files: cache.files, legacy: false };
+}
+
+export async function loadCachedFiles(): Promise<CachedFiles | null> {
   try {
     const raw = await idbGet(DB_FILES_STORE, FILES_KEY);
-    const files = unwrapCache(raw);
-    if (files) return files;
+    const cached = unwrapCache(raw);
+    if (cached) {
+      // Rewrite legacy caches in versioned form so a future version bump doesn't discard them
+      if (cached.legacy) void saveFiles(cached.files);
+      return cached;
+    }
   } catch {
     // IndexedDB unavailable
   }
-  // Fallback: try localStorage (migrates old data)
+  // Fallback: try localStorage (migrates old data to IndexedDB)
   try {
     const data = lsGet(KEYS.files);
     if (!data) return null;
-    // Cast is safe: the version check above guarantees we wrote this shape ourselves
-    const files = unwrapCache(JSON.parse(data));
-    if (!files) return null;
-    // Migrate to IndexedDB
-    saveFiles(files);
-    return files;
+    const cached = unwrapCache(JSON.parse(data));
+    if (!cached) return null;
+    saveFiles(cached.files);
+    return cached;
   } catch {
     return null;
   }
@@ -146,11 +157,9 @@ export function clearProfileAvatar() {
   lsRemove(KEYS.profileAvatar);
 }
 
-// Keys that survive a data reload: theme and profile are user identity/preference,
-// everything else (files, filters, benchmarks toggle, track-mode selection) is data-related.
-const KEEP_ON_CLEAR: ReadonlySet<string> = new Set([
-  KEYS.theme, KEYS.profileName, KEYS.profileAvatar, KEYS.profileSettings,
-]);
+// Only the theme survives a data reload (pure UI preference); everything else —
+// files, filters, profile, benchmarks toggle, track-mode selection — is wiped.
+const KEEP_ON_CLEAR: ReadonlySet<string> = new Set([KEYS.theme]);
 
 export async function clearAll() {
   Object.values(KEYS).forEach(k => { if (!KEEP_ON_CLEAR.has(k)) lsRemove(k); });

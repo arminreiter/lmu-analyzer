@@ -92,7 +92,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
         return <span className="text-racing-red font-mono" title={types}>{r.driverPenalties.length}</span>;
       } },
     { key: 'status', label: 'Status', width: '10%', sortValue: r => r.driver.finishStatus,
-      render: r => <span className={`text-xs ${r.driver.finishStatus === 'Finished Normally' ? 'text-racing-green' : 'text-racing-red'}`}>{r.driver.finishStatus}</span> },
+      render: r => <span className={`text-xs ${!isDnf(r.driver.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.driver.finishStatus}</span> },
   ], []);
 
   return (
