@@ -186,6 +186,10 @@ function parseSession(sessionEl: Element, sourceTag: string, type: SessionType, 
 }
 
 export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
+  // LMU sometimes writes stray bytes after the closing root tag (e.g. a lone "4"),
+  // which makes DOMParser reject the whole document — truncate at the root close tag
+  const rootEnd = xmlString.lastIndexOf('</rFactorXML>');
+  if (rootEnd !== -1) xmlString = xmlString.slice(0, rootEnd + '</rFactorXML>'.length);
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlString, 'text/xml');
   // DOMParser signals malformed XML via a <parsererror> element instead of throwing

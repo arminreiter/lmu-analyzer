@@ -15,6 +15,8 @@ import { getTheoreticalBest, isValidLap } from '../lib/analytics';
 import { KEYS, lsGet, lsSet, lsRemove } from '../lib/storage';
 import {
   mapTrackName,
+  trackOption,
+  trackLabel,
   rateLapTime,
   getNextTarget,
   getRatingColor,
@@ -100,7 +102,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       if (bmName) coveredBenchmarkNames.add(bmName);
       items.push({
         id: ts.trackCourse,
-        label: ts.trackCourse,
+        label: trackLabel(ts.trackCourse),
         trackCourse: ts.trackCourse,
         benchmarkName: bmName,
         hasUserData: true,
@@ -365,7 +367,10 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
         <div className="ml-4 flex items-center gap-2 py-1">
           <SearchableSelect
             value={trackId ?? ''}
-            options={allTracks.map(t => ({ value: t.id, label: t.hasUserData ? t.label : `${t.label} (no data)` }))}
+            options={allTracks.map(t => {
+              const o = t.trackCourse ? trackOption(t.trackCourse) : { label: t.label, keywords: undefined };
+              return { value: t.id, label: t.hasUserData ? o.label : `${o.label} (no data)`, keywords: o.keywords };
+            })}
             onChange={setSelectedTrackId}
           />
         </div>

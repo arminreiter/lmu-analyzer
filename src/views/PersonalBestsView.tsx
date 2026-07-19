@@ -5,6 +5,7 @@ import { DataCardHeader } from '../components/DataCardHeader';
 import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SessionLink } from '../components/SessionLink';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { trackOption, trackLabel } from '../lib/racepace';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { getTheoreticalBest } from '../lib/analytics';
@@ -55,7 +56,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Track:</label>
-          <SearchableSelect value={filterTrack} options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(t => ({ value: t, label: t }))]} onChange={setFilterTrack} />
+          <SearchableSelect value={filterTrack} options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(trackOption)]} onChange={setFilterTrack} />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-[10px] uppercase tracking-wider">Car:</label>
@@ -153,7 +154,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
-            <DataCardHeader title={track.toUpperCase()}>
+            <DataCardHeader title={trackLabel(track).toUpperCase()}>
               <span className="ml-auto" />
               <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track}`} />
             </DataCardHeader>

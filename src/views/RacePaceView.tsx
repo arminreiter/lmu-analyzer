@@ -15,6 +15,8 @@ import { useDataIndex } from '../lib/useDataIndex';
 import { useBenchmarks } from '../lib/useBenchmarks';
 import {
   mapTrackName,
+  trackOption,
+  trackLabel,
   rateLapTime,
   ratingFromPercent,
   getNextTarget,
@@ -393,7 +395,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
                             })}
                             className="accent-racing-red w-3 h-3 cursor-pointer"
                           />
-                          <span className="text-racing-muted">{opt}</span>
+                          <span className="text-racing-muted">{group.label === 'Tracks' ? trackLabel(opt) : opt}</span>
                         </label>
                       ))}
                     </div>
@@ -469,7 +471,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
             <label className="text-racing-muted text-[10px] uppercase tracking-wider">Track:</label>
             <SearchableSelect
               value={selectedTrack}
-              options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(t => ({ value: t, label: t }))]}
+              options={[{ value: 'All', label: 'All Tracks' }, ...tracks.map(trackOption)]}
               onChange={v => { setSelectedTrack(v); setSelectedCar('All'); }}
             />
           </div>
@@ -500,7 +502,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
-            <DataCardHeader title={track.toUpperCase()}>
+            <DataCardHeader title={trackLabel(track).toUpperCase()}>
               <div className="ml-auto flex items-center gap-3 text-[10px]">
                 {classes.map(c => <ClassBadge key={c} carClass={c} />)}
                 <RatingBadge rating={bestItem.rating}>Best: {bestItem.rating}</RatingBadge>

@@ -6,6 +6,7 @@ import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { SessionLink } from '../components/SessionLink';
+import { trackLabel } from '../lib/racepace';
 import { getTireWearPerLap, getTopSpeed, isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
 import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
@@ -107,7 +108,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
             <span className={`px-2.5 py-1 rounded text-xs font-bold ${getSessionTypeStyle(session.type)}`}>
               {session.type}
             </span>
-            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{file.trackCourse}</h1>
+            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{trackLabel(file.trackCourse)}</h1>
             <ClassBadge carClass={driver.carClass} />
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
@@ -218,7 +219,7 @@ function DriverSessionCards({ file, session, driver, stats }: {
         <div className="data-card carbon-fiber p-5">
           <h3 className="text-xs uppercase tracking-wider text-racing-muted mb-3 font-medium">Session Settings</h3>
           <div className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-sm">
-            <InfoRow label="Track" value={`${file.trackVenue} — ${file.trackCourse}`} />
+            <InfoRow label="Track" value={`${file.trackVenue} — ${trackLabel(file.trackCourse)}`} />
             <InfoRow label="Setting" value={file.setting} />
             {file.serverName && <InfoRow label="Server" value={file.serverName} />}
             <InfoRow label="Track Length" value={`${(file.trackLength / 1000).toFixed(2)} km`} />

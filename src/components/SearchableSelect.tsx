@@ -4,7 +4,7 @@ import { useClickOutside } from '../lib/useClickOutside';
 
 interface SearchableSelectProps {
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; keywords?: string }[];
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
@@ -23,7 +23,7 @@ export function SearchableSelect({ value, options, onChange, placeholder = 'Sele
   }, [open]);
 
   const filtered = options.filter(o =>
-    o.label.toLowerCase().includes(search.toLowerCase())
+    `${o.label} ${o.keywords ?? ''}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const selectedLabel = options.find(o => o.value === value)?.label ?? placeholder;

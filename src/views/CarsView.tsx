@@ -9,6 +9,7 @@ import { buildLapColumns } from '../components/lapColumns';
 import { StatCell, LapValidityCell } from '../components/StatCell';
 import { formatDistance } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
+import { trackLabel } from '../lib/racepace';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'track' | 'session' | 'all';
@@ -40,8 +41,8 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
     { key: 'track', label: 'Track', width: '22%', sortValue: (r: PersonalBest) => r.trackCourse,
       render: (r: PersonalBest) => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackCourse); }} className="text-white cursor-pointer">{r.trackCourse}</button>
-        : <span className="text-white">{r.trackCourse}</span> },
+        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackCourse); }} className="text-white cursor-pointer">{trackLabel(r.trackCourse)}</button>
+        : <span className="text-white">{trackLabel(r.trackCourse)}</span> },
     ...buildLapColumns(onNavigate),
   ], [onNavigate]);
 

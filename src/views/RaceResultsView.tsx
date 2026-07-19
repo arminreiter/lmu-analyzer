@@ -10,6 +10,7 @@ import { StatCard } from '../components/StatCard';
 import { getRaceResults, isDnf, isOnline, isRatedRace, isDriverIncident, type RaceResult } from '../lib/analytics';
 import { formatLapTime, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import { buildSessionContext } from '../lib/sessionContext';
+import { trackLabel, trackAlias } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
 
 type RaceRow = RaceResult & {
@@ -39,7 +40,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
   }, [allResults, filter]);
 
   const positionData = useMemo(() => results.map((r, i) => ({
-    race: `${r.file.trackCourse.slice(0, 12)} ${r.file.timeString.slice(5, 10)}`,
+    race: `${(trackAlias(r.file.trackCourse) ?? r.file.trackCourse).slice(0, 12)} ${r.file.timeString.slice(5, 10)}`,
     position: r.classPosition,
     total: r.classDrivers,
     idx: i,
@@ -59,7 +60,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
     { key: 'date', label: 'Date', width: '13%', sortValue: r => r.file.timeString,
       render: r => <span className="text-racing-muted text-xs">{r.file.timeString}</span> },
     { key: 'track', label: 'Track', width: '18%', sortValue: r => r.file.trackCourse,
-      render: r => <span className="text-white">{r.file.trackCourse}</span> },
+      render: r => <span className="text-white">{trackLabel(r.file.trackCourse)}</span> },
     { key: 'car', label: 'Car', width: '18%', sortValue: r => r.driver.carType,
       render: r => <div className="flex items-center gap-2"><span className="text-racing-text text-xs">{r.driver.carType}</span><ClassBadge carClass={r.driver.carClass} /></div> },
     { key: 'grid', label: 'Grid', align: 'center', width: '55px', sortValue: r => r.driver.classGridPosition ?? 999,

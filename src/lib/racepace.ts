@@ -127,6 +127,32 @@ export function mapTrackName(trackCourse: string, trackVenue?: string): string |
   return COURSE_MAP[trackCourse] ?? (trackVenue ? VENUE_FALLBACK[trackVenue] : null) ?? null;
 }
 
+/** Aliases not derivable from the benchmark mapping */
+const EXTRA_ALIASES: Record<string, string> = {
+  'Circuit de la Sarthe': 'Le Mans',
+  'Circuit de la Sarthe Mulsanne': 'Le Mans',
+  'Circuit de la Sarthe without chicanes': 'Le Mans',
+};
+
+/** Common short name (e.g. "Portimao" for "Algarve International Circuit"), or null if the official name already contains it */
+export function trackAlias(trackCourse: string, trackVenue?: string): string | null {
+  const base = (EXTRA_ALIASES[trackCourse] ?? mapTrackName(trackCourse, trackVenue))
+    ?.replace(/\s*\(.*\)$/, '') ?? null;
+  if (!base || trackCourse.toLowerCase().includes(base.toLowerCase())) return null;
+  return base;
+}
+
+/** Display name for a track: "Algarve International Circuit (Portimao)" */
+export function trackLabel(trackCourse: string): string {
+  const alias = trackAlias(trackCourse);
+  return alias ? `${trackCourse} (${alias})` : trackCourse;
+}
+
+/** Dropdown option for a track: label shows the common name, keywords make it searchable */
+export function trackOption(trackCourse: string): { value: string; label: string; keywords?: string } {
+  return { value: trackCourse, label: trackLabel(trackCourse), keywords: trackAlias(trackCourse) ?? undefined };
+}
+
 // ---------------------------------------------------------------------------
 // CSV URL (published Google Sheet)
 // ---------------------------------------------------------------------------

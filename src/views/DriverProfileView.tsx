@@ -9,6 +9,7 @@ import { getDriverProfileStats, type DriverProfileStats, type TrackBest } from '
 import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
 import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar, clearProfileAvatar, KEYS, lsGet, lsSet } from '../lib/storage';
 import { useClickOutside } from '../lib/useClickOutside';
+import { trackLabel } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
 
 interface ProfileSettings {
@@ -52,7 +53,7 @@ const circuitColumn: Column<TrackBest> = {
   sortValue: t => t.trackCourse,
   render: t => (
     <div>
-      <span className="text-white font-medium">{t.trackCourse}</span>
+      <span className="text-white font-medium">{trackLabel(t.trackCourse)}</span>
       <div className="flex items-center gap-1.5 mt-0.5">
         <span className="text-racing-muted text-[10px]">{t.bestCar}</span>
         <ClassBadge carClass={t.bestCarClass} />
@@ -255,7 +256,7 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
                 {profile.trackBests.map(t => (
                   <SettingsToggle
                     key={t.trackCourse}
-                    label={t.trackCourse}
+                    label={trackLabel(t.trackCourse)}
                     checked={!settings.hiddenCircuits.includes(t.trackCourse)}
                     onChange={() => toggleCircuit(t.trackCourse)}
                   />

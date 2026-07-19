@@ -6,6 +6,7 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { isOnline, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { trackOption, trackLabel } from '../lib/racepace';
 import { formatLapTime, formatSpeed, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
 import { buildSessionContext } from '../lib/sessionContext';
 import { useDataIndex } from '../lib/useDataIndex';
@@ -53,7 +54,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
     },
     { key: 'track', label: 'Track', width: '25%',
       sortValue: r => r.file.trackCourse,
-      render: r => <span className="text-white text-sm font-medium">{r.file.trackCourse}</span>,
+      render: r => <span className="text-white text-sm font-medium">{trackLabel(r.file.trackCourse)}</span>,
     },
     { key: 'class', label: 'Class', width: '100px',
       sortValue: r => r.driver.carClass,
@@ -114,7 +115,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
             value={filterTrack}
             options={[
               { value: 'All', label: 'All Tracks' },
-              ...tracks.map(t => ({ value: t, label: t })),
+              ...tracks.map(trackOption),
             ]}
             onChange={setFilterTrack}
           />

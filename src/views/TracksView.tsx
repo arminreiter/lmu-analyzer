@@ -11,6 +11,7 @@ import { StatCell, LapValidityCell } from '../components/StatCell';
 import { isValidLap } from '../lib/analytics';
 import { formatLapTime, formatSpeed, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
+import { trackLabel } from '../lib/racepace';
 import type { RaceFile, PersonalBest } from '../lib/types';
 
 type LapMode = 'car' | 'session' | 'all';
@@ -86,14 +87,14 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
     <div className="space-y-6">
       {/* Track Selector */}
       <PillSelector items={tracks} itemKey={t => t.trackCourse} selected={track} onSelect={setSelectedTrack}>
-        {t => t.trackCourse}
+        {t => trackLabel(t.trackCourse)}
       </PillSelector>
 
       {track && (
         <>
           {/* Track Stats */}
           <div className="data-card carbon-fiber p-6">
-            <h2 className="font-racing text-xl font-bold text-white tracking-wider mb-4">{track}</h2>
+            <h2 className="font-racing text-xl font-bold text-white tracking-wider mb-4">{trackLabel(track)}</h2>
             {(() => {
               const { totalLaps, validLaps, invalidLaps } = lapCounts;
               return (

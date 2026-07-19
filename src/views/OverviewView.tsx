@@ -8,13 +8,14 @@ import { ExportButton } from '../components/ExportButton';
 import { getOverviewStats, type TrackStats, type CarStats } from '../lib/analytics';
 import { formatLapTime, formatSector, formatDistance } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
+import { trackLabel } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
 
 const trackColumns: Column<TrackStats>[] = [
   {
     key: 'track', label: 'Circuit',
     sortValue: t => t.trackCourse,
-    render: t => <span className="text-racing-text">{t.trackCourse}</span>,
+    render: t => <span className="text-racing-text">{trackLabel(t.trackCourse)}</span>,
   },
   {
     key: 'car', label: 'Car',
