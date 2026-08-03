@@ -103,6 +103,10 @@ const COURSE_MAP: Record<string, string> = {
   'Paul Ricard - 1A-V2': 'Paul Ricard (1A v2)',
   'Paul Ricard - 1A-V2-Short': 'Paul Ricard (1A v2 short)',
   'Paul Ricard - 3A': 'Paul Ricard (3A)',
+  // Daytona
+  'Daytona International Speedway Road Course': 'Daytona',
+  // Laguna Seca
+  'WeatherTech Raceway Laguna Seca': 'Laguna Seca',
 };
 
 /** Fallback map by trackVenue (when trackCourse matches venue name) */
@@ -121,6 +125,8 @@ const VENUE_FALLBACK: Record<string, string> = {
   'Lusail International Circuit': 'Qatar',
   'Autódromo José Carlos Pace': 'Interlagos',
   'Circuit Paul Ricard': 'Paul Ricard',
+  'Daytona International Speedway': 'Daytona',
+  'WeatherTech Raceway Laguna Seca': 'Laguna Seca',
 };
 
 export function mapTrackName(trackCourse: string, trackVenue?: string): string | null {
