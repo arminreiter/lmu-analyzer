@@ -125,6 +125,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
               <XAxis dataKey="race" tick={{ fill: CHART_AXIS_TICK, fontSize: 9 }} angle={-45} textAnchor="end" height={80} />
               <YAxis reversed tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={[1, 'auto']} allowDecimals={false} />
               <Tooltip
+                wrapperClassName="race-results-position-tooltip"
                 contentStyle={getChartTooltipStyle()}
                 formatter={(v: unknown, _: unknown, entry: unknown) => [`P${v} / ${(entry as { payload: { total: number } }).payload.total}`, 'Position']}
               />

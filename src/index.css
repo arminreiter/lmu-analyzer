@@ -109,6 +109,19 @@ body {
 /* Glow utilities — racing semantic */
 .glow-purple { text-shadow: 0 0 10px rgba(168,85,247,0.6), 0 0 30px rgba(168,85,247,0.15); }
 
+/* Race Results has a single-series tooltip; force readable text without affecting multi-series tooltips. */
+.race-results-position-tooltip .recharts-tooltip-label {
+  color: var(--color-racing-muted) !important;
+}
+
+.race-results-position-tooltip .recharts-tooltip-item-list,
+.race-results-position-tooltip .recharts-tooltip-item,
+.race-results-position-tooltip .recharts-tooltip-item-name,
+.race-results-position-tooltip .recharts-tooltip-item-separator,
+.race-results-position-tooltip .recharts-tooltip-item-value {
+  color: var(--color-racing-text) !important;
+}
+
 /* Carbon fiber texture — repeating diagonal weave */
 .carbon-fiber {
   background-image:
