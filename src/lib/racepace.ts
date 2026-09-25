@@ -107,6 +107,10 @@ const COURSE_MAP: Record<string, string> = {
   'Daytona International Speedway Road Course': 'Daytona',
   // Laguna Seca
   'WeatherTech Raceway Laguna Seca': 'Laguna Seca',
+  // Road Atlanta
+  'Michelin Raceway Road Atlanta': 'Road Atlanta',
+  // Long Beach
+  'Grand Prix of Long Beach': 'Long Beach',
 };
 
 /** Fallback map by trackVenue (when trackCourse matches venue name) */
@@ -127,6 +131,8 @@ const VENUE_FALLBACK: Record<string, string> = {
   'Circuit Paul Ricard': 'Paul Ricard',
   'Daytona International Speedway': 'Daytona',
   'WeatherTech Raceway Laguna Seca': 'Laguna Seca',
+  'Michelin Raceway Road Atlanta': 'Road Atlanta',
+  'Grand Prix of Long Beach': 'Long Beach',
 };
 
 export function mapTrackName(trackCourse: string, trackVenue?: string): string | null {
