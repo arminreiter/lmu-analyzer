@@ -11,6 +11,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // Tauri sets TAURI_ENV_* during its build; the desktop app updates via its own updater, not a service worker
+      disable: !!process.env.TAURI_ENV_PLATFORM,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.svg'],
       manifest: {

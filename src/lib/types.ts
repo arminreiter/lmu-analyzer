@@ -1,3 +1,6 @@
+/** A results folder: browser FSA handle, or an absolute path in the Tauri desktop app */
+export type ResultsFolder = FileSystemDirectoryHandle | string;
+
 export type SessionType = 'Practice' | 'Qualifying' | 'Race' | 'Warmup';
 export type CarClass = 'Hyper' | 'LMP2-WEC' | 'LMP2-ELMS' | 'GT3' | 'GTE' | 'LMP3' | 'Unknown';
 

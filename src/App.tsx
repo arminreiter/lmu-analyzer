@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useDesktopUpdate } from './lib/useDesktopUpdate';
 import { FolderPicker } from './components/FolderPicker';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -21,7 +22,7 @@ import { parseSessionContext } from './lib/sessionContext';
 import { DataIndexProvider } from './lib/DataIndexContext';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
-import type { RaceFile, DriverSummary, CarClass } from './lib/types';
+import type { RaceFile, DriverSummary, CarClass, ResultsFolder } from './lib/types';
 
 // Build a URL hash from view + context
 const buildHash = (view: string, context: string | null) =>
@@ -67,7 +68,7 @@ function App() {
     const v = storage.lsGet(storage.KEYS.benchmarks);
     return v === null || v === '1';
   });
-  const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [dirHandle, setDirHandle] = useState<ResultsFolder | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const {
     needRefresh: [needRefresh],
@@ -80,6 +81,8 @@ function App() {
       }
     },
   });
+  const desktopUpdate = useDesktopUpdate();
+  const updateAvailable = needRefresh || desktopUpdate.available;
 
   // Applies a parsed dataset to app state; returns the deduplicated array (or null if empty)
   // so callers can persist the deduplicated data instead of the raw parse.
@@ -145,7 +148,7 @@ function App() {
         if (storage.loadDataSource() === 'directory') {
           try {
             // Permission not granted needs a user gesture (refresh button) — stay silent
-            const perm = await handle.queryPermission({ mode: 'read' });
+            const perm = typeof handle === 'string' ? 'granted' : await handle.queryPermission({ mode: 'read' });
             if (perm === 'granted') {
               const { files: fresh, failedFiles } = await loadFolder(handle);
               const deduped = applyParsedData(fresh, true);
@@ -171,7 +174,7 @@ function App() {
     }
   }, [selectedDrivers, selectedClasses, activeView, loaded]);
 
-  const handleFolderSelected = useCallback(async (handle: FileSystemDirectoryHandle) => {
+  const handleFolderSelected = useCallback(async (handle: ResultsFolder) => {
     setLoading(true);
     setError(null);
     setDirHandle(handle);
@@ -217,7 +220,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const perm = await handle.requestPermission({ mode: 'read' });
+      const perm = typeof handle === 'string' ? 'granted' : await handle.requestPermission({ mode: 'read' });
       if (perm !== 'granted') {
         setError('Permission to read folder was denied.');
         setLoading(false);
@@ -329,16 +332,17 @@ function App() {
   }, []);
 
   // One stacked container so update + warning toasts never overlap
-  const toasts = (needRefresh || notices.length > 0) && (
+  const toasts = (updateAvailable || notices.length > 0) && (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
-      {needRefresh && (
+      {updateAvailable && (
         <div className="flex items-center gap-3 bg-racing-card border border-racing-red/50 px-4 py-3 rounded-lg shadow-lg shadow-racing-red/20">
           <span className="text-sm text-racing-light">A new version is available</span>
           <button
-            onClick={() => updateServiceWorker(true)}
-            className="px-3 py-1 text-sm font-bold bg-racing-red text-white rounded hover:bg-racing-red/80 transition-colors"
+            onClick={() => (desktopUpdate.available ? desktopUpdate.install() : updateServiceWorker(true))}
+            disabled={desktopUpdate.installing}
+            className="px-3 py-1 text-sm font-bold bg-racing-red text-white rounded hover:bg-racing-red/80 transition-colors disabled:opacity-50"
           >
-            Update
+            {desktopUpdate.installing ? 'Updating…' : 'Update'}
           </button>
         </div>
       )}

@@ -1,4 +1,4 @@
-import type { RaceFile, CarClass } from './types';
+import type { RaceFile, CarClass, ResultsFolder } from './types';
 
 /** All localStorage keys used by the app. Register new keys here. */
 export const KEYS = {
@@ -222,7 +222,7 @@ function idbDelete(store: string, key: string): Promise<undefined> {
   return idbOp(store, 'readwrite', os => os.delete(key));
 }
 
-export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle) {
+export async function saveDirectoryHandle(handle: ResultsFolder) {
   try {
     await idbPut(DB_STORE, DIR_HANDLE_KEY, handle);
   } catch {
@@ -230,9 +230,9 @@ export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle) {
   }
 }
 
-export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+export async function loadDirectoryHandle(): Promise<ResultsFolder | null> {
   try {
-    return ((await idbGet(DB_STORE, DIR_HANDLE_KEY)) as FileSystemDirectoryHandle | null) ?? null;
+    return ((await idbGet(DB_STORE, DIR_HANDLE_KEY)) as ResultsFolder | null) ?? null;
   } catch {
     return null;
   }

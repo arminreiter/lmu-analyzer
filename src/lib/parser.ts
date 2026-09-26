@@ -1,7 +1,8 @@
 import type {
   RaceFile, SessionData, SessionType, DriverResult, LapData,
-  CarClass, IncidentData, PenaltyData, TrackLimitData,
+  CarClass, IncidentData, PenaltyData, TrackLimitData, ResultsFolder,
 } from './types';
+import { invoke } from '@tauri-apps/api/core';
 
 function getText(el: Element, tag: string): string {
   return el.getElementsByTagName(tag)[0]?.textContent?.trim() ?? '';
@@ -241,10 +242,25 @@ export interface ParseResult {
   failedFiles: string[];
 }
 
-export async function loadFolder(dirHandle: FileSystemDirectoryHandle): Promise<ParseResult> {
+export async function loadFolder(dir: ResultsFolder): Promise<ParseResult> {
   const files: RaceFile[] = [];
   const failedFiles: string[] = [];
 
+  if (typeof dir === 'string') {
+    // Tauri: Rust reads the folder (webview has no FS Access API)
+    for (const [name, text] of await invoke<[string, string][]>('read_results', { dir })) {
+      try {
+        files.push(parseRaceFile(text, name));
+      } catch (e) {
+        console.warn(`Failed to parse ${name}:`, e);
+        failedFiles.push(name);
+      }
+    }
+    files.sort((a, b) => a.timeString.localeCompare(b.timeString));
+    return { files, failedFiles };
+  }
+
+  const dirHandle = dir;
   for await (const entry of dirHandle.values()) {
     if (entry.kind === 'file' && entry.name.endsWith('.xml')) {
       try {

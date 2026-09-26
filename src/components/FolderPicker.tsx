@@ -1,8 +1,13 @@
 import { useRef } from 'react';
 import { FolderOpen, Import, Shield, Zap, RotateCcw } from 'lucide-react';
+import { isTauri } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+import type { ResultsFolder } from '../lib/types';
+
+const DEFAULT_RESULTS_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Log\\Results';
 
 interface FolderPickerProps {
-  onFolderSelected: (handle: FileSystemDirectoryHandle) => void;
+  onFolderSelected: (folder: ResultsFolder) => void;
   onFilesUploaded: (files: File[]) => void;
   onResumeCached?: () => void;
   loading: boolean;
@@ -11,10 +16,16 @@ interface FolderPickerProps {
 
 export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached, loading, error }: FolderPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isSupported = 'showDirectoryPicker' in window;
+  const desktop = isTauri();
+  const isSupported = desktop || 'showDirectoryPicker' in window;
 
   const handleFolderClick = async () => {
     try {
+      if (desktop) {
+        const path = await open({ directory: true, defaultPath: DEFAULT_RESULTS_DIR });
+        if (path) onFolderSelected(path);
+        return;
+      }
       const handle = await window.showDirectoryPicker({
         id: 'lmu-results',
         startIn: 'desktop',
@@ -169,7 +180,7 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
           )}
 
           <p className="mt-6 text-racing-muted/70 text-[10px] font-mono tracking-wide">
-            DEFAULT: C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Log\Results
+            DEFAULT: {DEFAULT_RESULTS_DIR}
           </p>
         </div>
 
