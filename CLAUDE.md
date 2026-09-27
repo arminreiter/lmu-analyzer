@@ -45,6 +45,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/lib/storage.ts` — Persistence layer: IndexedDB for parsed files (versioned cache) + FileSystemDirectoryHandle (refresh from folder), localStorage for filter preferences and profile via exported `KEYS` registry (all localStorage keys must be registered there so `clearAll()` sees them). Graceful fallback if IndexedDB unavailable
 - `src/lib/racepace.ts` — Community benchmark integration. Fetches pace tiers from ohne_speed's Google Sheet CSV. Rates laps as Alien/Competitive/Good/Midpack/Tail-ender/Offline. Single source of truth for tier order (`RATING_ORDER`), tier colors, and benchmark lookup (`buildBenchmarkMap()`)
 - `src/lib/DataIndexContext.tsx` + `dataIndexStore.ts` + `useDataIndex.ts` — Context providing precomputed indices over the loaded files (per-driver sessions, all laps, sector minimums for theoretical bests)
+- `src/lib/live.ts` — Desktop live telemetry: `useLiveTelemetry()` (polls `lmu_live`, tracks session laps/sectors), `useLiveReferences()` (my PBs, theoretical best, benchmark tiers for the live track+class), `timingClass()` (purple/green/yellow sector colors), `toggleOverlay()`
 - `src/lib/useBenchmarks.ts` — Hook wrapping the benchmark fetch (returns `benchmarks`, `benchmarkMap`, `loading`, `error`)
 - `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
 - `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
@@ -76,6 +77,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 Twelve views: Live (desktop only), Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
 
 - `LiveView` — Desktop only. Polls `lmu_live` every 250ms; shows the running lap and gaps (live at sector splits, last lap, session best) to my PB, theoretical best and benchmark tiers for the current track+class
+- `OverlayView` — Not a tab: the always-on-top, transparent overlay window (`index.html?overlay`, routed in `main.tsx`). Loads cached files itself; user picks one target, sees per-sector times + deltas. Game must run borderless/windowed to see it
 - `OverviewView` — Dashboard with stat cards (sessions, laps, races, tracks, cars, distance, best lap) + track/car stats tables
 - `PersonalBestsView` — Best laps per track/car with theoretical best (combined best sectors), filterable by track/car/mode
 - `SessionsView` — All sessions with filters (setting, type, track); click row → SessionDetailView
@@ -99,7 +101,7 @@ Follow F1/WEC timing screen semantics:
 - **Orange** (`--color-racing-orange`) — Incidents, warnings
 - **White** — Normal data values in tables
 
-Purple is reserved — don't use it for general "best" highlighting. It only appears in the Personal Bests view for theoretical times.
+Purple is reserved — don't use it for general "best" highlighting. It only appears for theoretical times (Personal Bests view) and, live, for a sector that beats my all-time best sector (i.e. improves the theoretical best).
 
 ### Design
 

@@ -13,6 +13,8 @@ export const KEYS = {
   benchmarks: 'lmu-analyzer-benchmarks',
   theme: 'lmu-analyzer-theme',
   notifications: 'lmu-analyzer-notifications', // desktop only
+  overlayTarget: 'lmu-analyzer-overlay-target', // desktop only — Reference id
+  overlayPosition: 'lmu-analyzer-overlay-position', // desktop only — logical {x, y}
   trackModeSelected: 'lmu_trackmode_selected', // legacy name — renaming would lose users' stored value
 } as const;
 

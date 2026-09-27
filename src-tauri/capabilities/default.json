@@ -3,13 +3,17 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": [
-    "main"
+    "main",
+    "overlay"
   ],
   "permissions": [
     "core:default",
     "dialog:default",
     "updater:default",
     "process:allow-restart",
-    "notification:default"
+    "notification:default",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
   ]
 }
