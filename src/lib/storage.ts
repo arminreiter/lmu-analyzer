@@ -17,6 +17,7 @@ export const KEYS = {
   overlayPosition: 'lmu-analyzer-overlay-position', // desktop only — logical {x, y}
   liveHiddenTargets: 'lmu-analyzer-live-hidden-targets', // desktop only — JSON array of Reference ids
   overlayHiddenParts: 'lmu-analyzer-overlay-hidden-parts', // desktop only — JSON array of overlay section ids
+  purpleMode: 'lmu-analyzer-purple-mode', // desktop only — 'targets' | 'personal'
   trackModeSelected: 'lmu_trackmode_selected', // legacy name — renaming would lose users' stored value
 } as const;
 

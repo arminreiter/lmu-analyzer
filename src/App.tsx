@@ -28,6 +28,9 @@ import { useTheme } from './lib/useTheme';
 import { notifyNewSessions } from './lib/sessionNotifications';
 import type { RaceFile, DriverSummary, CarClass, ResultsFolder } from './lib/types';
 
+// The Live view needs the desktop app's LMU connection — a #live link in the browser lands on Overview
+const desktopOnlyFallback = (view: string) => (view === 'live' && !isTauri() ? 'overview' : view);
+
 // Build a URL hash from view + context
 const buildHash = (view: string, context: string | null) =>
   '#' + view + (context ? '/' + encodeURIComponent(context) : '');
@@ -122,10 +125,10 @@ function App() {
     // URL hash wins over saved view so deep links / reloads land on the right view
     const fromHash = parseHash(window.location.hash);
     if (fromHash) {
-      setActiveView(fromHash.view);
+      setActiveView(desktopOnlyFallback(fromHash.view));
       setViewContext(fromHash.context);
     } else if (savedFilters) {
-      setActiveView(savedFilters.activeView || 'overview');
+      setActiveView(desktopOnlyFallback(savedFilters.activeView || 'overview'));
     }
     setLoaded(true);
     return parsed;
@@ -340,7 +343,7 @@ function App() {
       const state = (e.state as { view: string; context: string | null } | null) ?? parseHash(window.location.hash);
       if (!state) return;
       isPoppingRef.current = true;
-      setActiveView(state.view);
+      setActiveView(desktopOnlyFallback(state.view));
       setViewContext(state.context);
     };
     window.addEventListener('popstate', onPop);

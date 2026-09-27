@@ -3,7 +3,7 @@ import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { X, Settings2 } from 'lucide-react';
 import { LapClock } from '../components/LapClock';
 import {
-  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, useOverlayHiddenParts, activeTargets, displayedLap, lastLapOf,
+  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, useOverlayHiddenParts, usePurpleMode, activeTargets, displayedLap, lastLapOf,
   refSectors, sectorDeltas, totalDelta, timingClass, targetSectorClass, sessionBestSectors, time, type Reference,
 } from '../lib/live';
 import { getRatingColor } from '../lib/racepace';
@@ -50,6 +50,7 @@ export function OverlayView() {
   const [selected, toggleTarget] = useLiveTargets();
   const [hidden] = useHiddenTargets();
   const [hiddenParts, togglePart] = useOverlayHiddenParts();
+  const [purpleMode, setPurpleMode] = usePurpleMode();
   const show = (part: typeof PARTS[number]['id']) => !hiddenParts.has(part);
   // Read once — a fresh array each render would recompute the lap history on every poll
   const [driverNames] = useState(() => storage.loadFilters()?.selectedDrivers ?? []);
@@ -115,6 +116,13 @@ export function OverlayView() {
               <span className="flex-1 truncate">{part.label}</span>
             </label>
           ))}
+          <div className="text-[10px] uppercase tracking-wider text-racing-muted mt-2 mb-1">Purple sector when</div>
+          {([['targets', 'Faster than all targets + my best'], ['personal', 'Faster than my best sector']] as const).map(([mode, label]) => (
+            <label key={mode} className="flex items-center gap-2 py-0.5 cursor-pointer">
+              <input type="radio" name="purple-mode" checked={purpleMode === mode} onChange={() => setPurpleMode(mode)} className="accent-racing-purple" />
+              <span className="flex-1 truncate">{label}</span>
+            </label>
+          ))}
           <div className="text-[10px] uppercase tracking-wider text-racing-muted mt-2 mb-1">Targets</div>
           {visible.length === 0 && <div className="text-racing-muted">No targets for this track yet</div>}
           {visible.map(r => (
@@ -145,7 +153,7 @@ export function OverlayView() {
             {shown.sectors.map((s, i) => {
               const fill = s === null ? 'bg-white/10 text-racing-muted'
                 : shown.invalid ? 'bg-racing-muted/50 text-white'
-                : `${SECTOR_FILL[targetSectorClass(s, bestSectors[i], targetSectors.map(ts => ts[i]), sessionBests[i])] ?? 'bg-white/10'} text-black`;
+                : `${SECTOR_FILL[targetSectorClass(s, bestSectors[i], targetSectors.map(ts => ts[i]), sessionBests[i], purpleMode)] ?? 'bg-white/10'} text-black`;
               return (
                 <div key={i} data-tauri-drag-region className={`py-0.5 ${fill}`}>
                   <div data-tauri-drag-region>S{i + 1}</div>

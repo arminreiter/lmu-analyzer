@@ -9,7 +9,7 @@ import { RatingBadge } from '../components/RatingBadge';
 import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
 import { LapClock } from '../components/LapClock';
 import {
-  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, activeTargets, displayedLap, lastLapOf, refSectors, sectorDeltas, totalDelta,
+  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, usePurpleMode, activeTargets, displayedLap, lastLapOf, refSectors, sectorDeltas, totalDelta,
   sessionBestSectors, time, toggleOverlay, timingClass, targetSectorClass, type Sectors, type Reference, type SessionLap,
 } from '../lib/live';
 import { formatLapTime, formatDelta, formatSector, errorMessage } from '../lib/formatting';
@@ -32,6 +32,7 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
   const { references, pb, shape, carClass, bestSectors } = useLiveReferences(files, driverNames, benchmarksEnabled, live);
   const [selected, toggleTarget] = useLiveTargets();
   const [hidden, toggleHidden] = useHiddenTargets();
+  const [purpleMode] = usePurpleMode();
   const [overlayError, setOverlayError] = useState<string | null>(null);
   const [lapLimit, setLapLimit] = useState<LapLimit>('targets');
   const openOverlay = () => { setOverlayError(null); toggleOverlay().catch(e => setOverlayError(errorMessage(e))); };
@@ -183,7 +184,7 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
             <div key={i} className="px-4 py-3 text-center">
               <div className="text-[10px] font-sans uppercase tracking-[0.12em] text-racing-muted">S{i + 1}</div>
               <div className={`text-xl font-bold ${shown.invalid ? 'text-racing-muted'
-                : targetSectorClass(sec, bestSectors[i], targets.map(t => refSectors(t, shape)[i]), sessionBests[i])}`}>{formatSector(sec)}</div>
+                : targetSectorClass(sec, bestSectors[i], targets.map(t => refSectors(t, shape)[i]), sessionBests[i], purpleMode)}`}>{formatSector(sec)}</div>
             </div>
           ))}
           <div className="px-4 py-3 text-center">

@@ -283,17 +283,33 @@ export function timingClass(t: number | null, allTimeBest: number | null, sessio
 }
 
 /**
- * Color of a live sector against the selected targets' sector times (`targetTimes`):
- * purple beats my all-time best sector, green is faster than every target, yellow beats some,
- * orange is slower than all. Without any target sector times, falls back to timingClass.
+ * When a live sector turns purple: 'targets' — faster than every selected target *and* my all-time
+ * best sector; 'personal' — whenever it beats my all-time best sector, whatever the targets say.
  */
-export function targetSectorClass(t: number | null, allTimeBest: number | null, targetTimes: Array<number | null>, sessionBest: number | null): string {
+export type PurpleMode = 'targets' | 'personal';
+
+export function usePurpleMode(): [PurpleMode, (m: PurpleMode) => void] {
+  const [raw, set] = useSyncedLocal(KEYS.purpleMode, 'targets');
+  return [raw === 'personal' ? 'personal' : 'targets', set];
+}
+
+/**
+ * Color of a live sector against the selected targets' sector times (`targetTimes`): green is faster
+ * than every target, yellow beats some, orange is slower than all; purple per `purpleMode`.
+ * Without any target sector times, falls back to timingClass (purple / session best / slower).
+ */
+export function targetSectorClass(
+  t: number | null, allTimeBest: number | null, targetTimes: Array<number | null>, sessionBest: number | null,
+  purpleMode: PurpleMode = 'targets',
+): string {
   if (t === null) return 'text-racing-muted';
-  if (allTimeBest !== null && t < allTimeBest) return 'text-racing-purple';
+  const personalBest = allTimeBest !== null && t < allTimeBest;
+  if (purpleMode === 'personal' && personalBest) return 'text-racing-purple';
   const known = targetTimes.filter((x): x is number => x !== null);
   if (!known.length) return timingClass(t, allTimeBest, sessionBest);
   const beaten = known.filter(x => t <= x).length;
-  return beaten === known.length ? 'text-racing-green' : beaten > 0 ? 'text-racing-yellow' : 'text-racing-orange';
+  if (beaten < known.length) return beaten > 0 ? 'text-racing-yellow' : 'text-racing-orange';
+  return personalBest ? 'text-racing-purple' : 'text-racing-green';
 }
 
 /** Per-sector minimum over the laps completed this session */
