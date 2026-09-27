@@ -48,6 +48,8 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/lib/useBenchmarks.ts` — Hook wrapping the benchmark fetch (returns `benchmarks`, `benchmarkMap`, `loading`, `error`)
 - `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
 - `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
+- `src/lib/sessionNotifications.ts` — Desktop only: diffs datasets before/after a folder-watch refresh and sends Windows notifications for new PBs/sessions
+- `src-tauri/src/lib.rs` — Desktop commands: `read_results` (read XMLs), `find_results_dir` (auto-detect LMU folder across Steam libraries), `watch_results` (emits `results-changed` on new XMLs)
 - `src/lib/useInstallPrompt.ts` — PWA install prompt hook; `useTheme.ts` — light/dark theme; `useClickOutside.ts` — shared outside-click hook (use this, don't hand-roll listeners)
 
 ### Components

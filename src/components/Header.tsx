@@ -1,4 +1,4 @@
-import { FolderOpen, User, Layers, RefreshCw, Gauge, Download, Sun, Moon } from 'lucide-react';
+import { FolderOpen, User, Layers, RefreshCw, Gauge, Download, Sun, Moon, Bell, BellOff } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { DriverSummary, CarClass } from '../lib/types';
 import { CLASS_SPEED_ORDER } from '../lib/analytics';
@@ -19,6 +19,9 @@ interface HeaderProps {
   onViewChange: (view: string) => void;
   racePaceEnabled: boolean;
   onToggleRacePace: () => void;
+  notificationsEnabled: boolean;
+  /** Desktop only — omitted in the browser, which hides the toggle */
+  onToggleNotifications?: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
 }
@@ -35,7 +38,7 @@ const VIEWS = [
   { id: 'about', label: 'About' },
 ];
 
-export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, theme, onToggleTheme }: HeaderProps) {
+export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange, selectedClasses, onClassChange, onReload, onRefresh, refreshing, activeView, onViewChange, racePaceEnabled, onToggleRacePace, notificationsEnabled, onToggleNotifications, theme, onToggleTheme }: HeaderProps) {
   const { canInstall, install } = useInstallPrompt();
   const driverOptions = drivers.map(d => ({
     value: d.name,
@@ -97,6 +100,16 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
             >
               <Gauge className="w-3.5 h-3.5" />
             </button>
+
+            {onToggleNotifications && (
+              <button
+                onClick={onToggleNotifications}
+                className={`p-2 transition-colors cursor-pointer ${notificationsEnabled ? 'text-racing-green' : 'text-racing-muted/50 hover:text-racing-green'}`}
+                title={notificationsEnabled ? 'Disable notifications for new sessions' : 'Enable notifications for new sessions'}
+              >
+                {notificationsEnabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+              </button>
+            )}
 
             {onRefresh && (
               <button

@@ -182,6 +182,16 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
           <p className="mt-6 text-racing-muted/70 text-[10px] font-mono tracking-wide">
             DEFAULT: {DEFAULT_RESULTS_DIR}
           </p>
+          {/* Chrome blocks Program Files via its own dialog — nothing reaches our catch, so hint up front */}
+          {!desktop && (
+            <p className="mt-2 text-racing-muted/70 text-[10px] leading-relaxed">
+              Browsers block system folders like Program Files. Use IMPORT FILES or the{' '}
+              <a href="https://github.com/arminreiter/lmu-analyzer/releases/latest" target="_blank" rel="noopener noreferrer"
+                className="text-racing-text hover:text-racing-red underline transition-colors">
+                desktop app
+              </a>.
+            </p>
+          )}
         </div>
 
         {/* Trust */}

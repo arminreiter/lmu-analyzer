@@ -1,4 +1,11 @@
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs;
+use std::path::Path;
+use std::sync::Mutex;
+use tauri::{Emitter, State};
+
+const STEAM_ROOT: &str = r"C:\Program Files (x86)\Steam";
+const RESULTS_SUBDIR: &str = r"steamapps\common\Le Mans Ultimate\UserData\Log\Results";
 
 /// Reads every `*.xml` in `dir` and returns `(file name, contents)` pairs.
 /// Unreadable files are skipped; the frontend reports parse failures itself.
@@ -21,13 +28,57 @@ fn read_results(dir: String) -> Result<Vec<(String, String)>, String> {
   )
 }
 
+/// Library roots from Steam's libraryfolders.vdf (`"path"  "D:\\SteamLibrary"` lines).
+fn library_paths(vdf: &str) -> Vec<String> {
+  vdf
+    .lines()
+    .filter_map(|l| l.trim().strip_prefix("\"path\""))
+    .map(|rest| rest.trim().trim_matches('"').replace(r"\\", r"\"))
+    .collect()
+}
+
+/// First existing LMU results folder across the default Steam install and all Steam libraries.
+#[tauri::command]
+fn find_results_dir() -> Option<String> {
+  // ponytail: assumes Steam itself is in its default location; read HKCU\Software\Valve\Steam\SteamPath if users move it
+  let vdf = fs::read_to_string(Path::new(STEAM_ROOT).join(r"steamapps\libraryfolders.vdf")).unwrap_or_default();
+  std::iter::once(STEAM_ROOT.to_string())
+    .chain(library_paths(&vdf))
+    .map(|root| Path::new(&root).join(RESULTS_SUBDIR))
+    .find(|p| p.is_dir())
+    .map(|p| p.to_string_lossy().into_owned())
+}
+
+#[derive(Default)]
+struct ResultsWatcher(Mutex<Option<RecommendedWatcher>>);
+
+/// Emits `results-changed` whenever an XML in `dir` is created or modified. Replaces any previous watch.
+#[tauri::command]
+fn watch_results(app: tauri::AppHandle, state: State<ResultsWatcher>, dir: String) -> Result<(), String> {
+  let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+    let Ok(event) = res else { return };
+    if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_))
+      && event.paths.iter().any(|p| p.extension().is_some_and(|x| x == "xml"))
+    {
+      let _ = app.emit("results-changed", ());
+    }
+  })
+  .map_err(|e| e.to_string())?;
+  watcher.watch(Path::new(&dir), RecursiveMode::NonRecursive).map_err(|e| format!("{dir}: {e}"))?;
+  // Dropping the old watcher stops it
+  *state.0.lock().unwrap() = Some(watcher);
+  Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .manage(ResultsWatcher::default())
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
-    .invoke_handler(tauri::generate_handler![read_results])
+    .invoke_handler(tauri::generate_handler![read_results, find_results_dir, watch_results])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -53,5 +104,14 @@ mod tests {
     let got = super::read_results(dir.to_string_lossy().into_owned()).unwrap();
     assert_eq!(got, vec![("a.xml".to_string(), "<RaceResults/>".to_string())]);
     assert!(super::read_results("/does/not/exist".into()).is_err());
+  }
+
+  #[test]
+  fn parses_steam_library_paths() {
+    let vdf = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"C:\\\\Program Files (x86)\\\\Steam\"\n\t\t\"label\"\t\t\"\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"D:\\\\SteamLibrary\"\n\t}\n}";
+    assert_eq!(
+      super::library_paths(vdf),
+      vec![r"C:\Program Files (x86)\Steam".to_string(), r"D:\SteamLibrary".to_string()]
+    );
   }
 }

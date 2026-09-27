@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useDesktopUpdate } from './lib/useDesktopUpdate';
 import { FolderPicker } from './components/FolderPicker';
 import { Header } from './components/Header';
@@ -22,6 +24,7 @@ import { parseSessionContext } from './lib/sessionContext';
 import { DataIndexProvider } from './lib/DataIndexContext';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
+import { notifyNewSessions } from './lib/sessionNotifications';
 import type { RaceFile, DriverSummary, CarClass, ResultsFolder } from './lib/types';
 
 // Build a URL hash from view + context
@@ -69,6 +72,10 @@ function App() {
     return v === null || v === '1';
   });
   const [dirHandle, setDirHandle] = useState<ResultsFolder | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => storage.lsGet(storage.KEYS.notifications) !== '0');
+  // Latest dataset for the folder watcher's before/after diff, without re-subscribing on every load
+  const filesRef = useRef<RaceFile[]>([]);
+  useEffect(() => { filesRef.current = files; }, [files]);
   const { theme, toggle: toggleTheme } = useTheme();
   const {
     needRefresh: [needRefresh],
@@ -133,11 +140,45 @@ function App() {
     });
   }, [addNotice]);
 
+  // Persist filters whenever they change (skip initial empty state)
+  useEffect(() => {
+    if (loaded) {
+      storage.saveFilters(selectedDrivers, selectedClasses, activeView === 'session' ? 'sessions' : activeView);
+    }
+  }, [selectedDrivers, selectedClasses, activeView, loaded]);
+
+  const handleFolderSelected = useCallback(async (handle: ResultsFolder) => {
+    setLoading(true);
+    setError(null);
+    setDirHandle(handle);
+    try {
+      const { files: parsed, failedFiles } = await loadFolder(handle);
+      const deduped = applyParsedData(parsed, true);
+      if (deduped) {
+        persistFiles(deduped);
+        storage.saveDataSource('directory');
+        storage.saveDirectoryHandle(handle);
+      }
+      if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
+    } catch (e) {
+      setError(`Failed to load data: ${errorMessage(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [applyParsedData, persistFiles, addNotice]);
+
   // Auto-restore cached data on mount
   useEffect(() => {
     (async () => {
       const [cached, handle] = await Promise.all([storage.loadCachedFiles(), storage.loadDirectoryHandle()]);
-      if (!cached || cached.files.length === 0) return;
+      if (!cached || cached.files.length === 0) {
+        // Desktop first run: load the LMU results folder straight away if it's in a Steam library
+        if (isTauri()) {
+          const found = await invoke<string | null>('find_results_dir').catch(() => null);
+          if (found) handleFolderSelected(found);
+        }
+        return;
+      }
       setHasCachedData(true);
       applyParsedData(cached.files, true);
       let legacyCache = cached.legacy;
@@ -167,33 +208,6 @@ function App() {
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist filters whenever they change (skip initial empty state)
-  useEffect(() => {
-    if (loaded) {
-      storage.saveFilters(selectedDrivers, selectedClasses, activeView === 'session' ? 'sessions' : activeView);
-    }
-  }, [selectedDrivers, selectedClasses, activeView, loaded]);
-
-  const handleFolderSelected = useCallback(async (handle: ResultsFolder) => {
-    setLoading(true);
-    setError(null);
-    setDirHandle(handle);
-    try {
-      const { files: parsed, failedFiles } = await loadFolder(handle);
-      const deduped = applyParsedData(parsed, true);
-      if (deduped) {
-        persistFiles(deduped);
-        storage.saveDataSource('directory');
-        storage.saveDirectoryHandle(handle);
-      }
-      if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
-    } catch (e) {
-      setError(`Failed to load data: ${errorMessage(e)}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [applyParsedData, persistFiles, addNotice]);
-
   const handleFilesUploaded = useCallback(async (uploadedFiles: File[]) => {
     setLoading(true);
     setError(null);
@@ -214,9 +228,10 @@ function App() {
     }
   }, [applyParsedData, persistFiles, addNotice]);
 
-  const handleRefresh = useCallback(async () => {
+  // Resolves to the refreshed dataset (null on failure) so the folder watcher can diff it
+  const handleRefresh = useCallback(async (): Promise<RaceFile[] | null> => {
     const handle = dirHandle;
-    if (!handle) return;
+    if (!handle) return null;
     setLoading(true);
     setError(null);
     try {
@@ -224,18 +239,47 @@ function App() {
       if (perm !== 'granted') {
         setError('Permission to read folder was denied.');
         setLoading(false);
-        return;
+        return null;
       }
       const { files: parsed, failedFiles } = await loadFolder(handle);
       const deduped = applyParsedData(parsed, true);
       if (deduped) persistFiles(deduped);
       if (failedFiles.length > 0) addNotice(failedFilesNotice(failedFiles));
+      return deduped;
     } catch (e) {
       setError(`Failed to refresh data: ${errorMessage(e)}`);
+      return null;
     } finally {
       setLoading(false);
     }
   }, [applyParsedData, persistFiles, dirHandle, addNotice]);
+
+  // Desktop: re-read the folder whenever LMU writes a results XML, and notify about what's new
+  useEffect(() => {
+    if (typeof dirHandle !== 'string') return;
+    invoke('watch_results', { dir: dirHandle }).catch(e => console.warn('Folder watch failed:', e));
+    let timer: number | undefined;
+    const unlisten = listen('results-changed', () => {
+      clearTimeout(timer);
+      // LMU writes the XML in several chunks — wait until it settles
+      timer = window.setTimeout(async () => {
+        const prev = filesRef.current;
+        const next = await handleRefresh();
+        if (next && notificationsEnabled) notifyNewSessions(prev, next);
+      }, 2000);
+    });
+    return () => {
+      clearTimeout(timer);
+      unlisten.then(off => off());
+    };
+  }, [dirHandle, handleRefresh, notificationsEnabled]);
+
+  const handleToggleNotifications = useCallback(() => {
+    setNotificationsEnabled(prev => {
+      storage.lsSet(storage.KEYS.notifications, prev ? '0' : '1');
+      return !prev;
+    });
+  }, []);
 
   const handleResumeCached = useCallback(async () => {
     const cached = await storage.loadCachedFiles();
@@ -393,6 +437,8 @@ function App() {
         onViewChange={(view: string) => { setActiveView(view); setViewContext(null); }}
         racePaceEnabled={racePaceEnabled}
         onToggleRacePace={handleToggleRacePace}
+        notificationsEnabled={notificationsEnabled}
+        onToggleNotifications={isTauri() ? handleToggleNotifications : undefined}
         theme={theme}
         onToggleTheme={toggleTheme}
       />

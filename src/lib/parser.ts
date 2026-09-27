@@ -242,6 +242,18 @@ export interface ParseResult {
   failedFiles: string[];
 }
 
+// Result files are write-once, so refresh only needs to parse new/changed ones.
+// ponytail: in-memory only — first load after a page reload still parses everything
+const parseCache = new Map<string, { stamp: string; file: RaceFile }>();
+
+async function parseCached(name: string, stamp: string, getText: () => Promise<string>): Promise<RaceFile> {
+  const hit = parseCache.get(name);
+  if (hit?.stamp === stamp) return hit.file;
+  const file = parseRaceFile(await getText(), name);
+  parseCache.set(name, { stamp, file });
+  return file;
+}
+
 export async function loadFolder(dir: ResultsFolder): Promise<ParseResult> {
   const files: RaceFile[] = [];
   const failedFiles: string[] = [];
@@ -250,7 +262,8 @@ export async function loadFolder(dir: ResultsFolder): Promise<ParseResult> {
     // Tauri: Rust reads the folder (webview has no FS Access API)
     for (const [name, text] of await invoke<[string, string][]>('read_results', { dir })) {
       try {
-        files.push(parseRaceFile(text, name));
+        // ponytail: Rust still ships every file's text; stamp by length since there's no mtime here
+        files.push(await parseCached(name, String(text.length), async () => text));
       } catch (e) {
         console.warn(`Failed to parse ${name}:`, e);
         failedFiles.push(name);
@@ -265,8 +278,7 @@ export async function loadFolder(dir: ResultsFolder): Promise<ParseResult> {
     if (entry.kind === 'file' && entry.name.endsWith('.xml')) {
       try {
         const file = await entry.getFile();
-        const text = await file.text();
-        files.push(parseRaceFile(text, entry.name));
+        files.push(await parseCached(entry.name, `${file.lastModified}:${file.size}`, () => file.text()));
       } catch (e) {
         console.warn(`Failed to parse ${entry.name}:`, e);
         failedFiles.push(entry.name);

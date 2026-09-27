@@ -12,6 +12,7 @@ export const KEYS = {
   profileSettings: 'lmu-analyzer-profile-settings',
   benchmarks: 'lmu-analyzer-benchmarks',
   theme: 'lmu-analyzer-theme',
+  notifications: 'lmu-analyzer-notifications', // desktop only
   trackModeSelected: 'lmu_trackmode_selected', // legacy name — renaming would lose users' stored value
 } as const;
 
