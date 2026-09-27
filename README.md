@@ -46,6 +46,31 @@ pnpm run build
 pnpm run preview
 ```
 
+## Desktop App (Windows)
+
+A [Tauri](https://tauri.app/) build (`src-tauri/`) reads the results folder directly from disk, with no browser folder-access limits. Installed apps update themselves from the latest GitHub Release.
+
+```bash
+pnpm tauri dev    # run the desktop app locally
+```
+
+### Creating a Release
+
+```bash
+pnpm version patch            # or minor / major — bumps package.json, commits, tags vX.Y.Z
+git push --follow-tags       # pushing the tag triggers the release workflow
+```
+
+`.github/workflows/release.yml` builds the Windows installer, signs the update, and publishes a GitHub Release with `latest.json`. Running apps show an "Update" toast on their next start. The tag must match the `package.json` version, or the workflow fails.
+
+**One-time setup:** the repo secret `TAURI_SIGNING_PRIVATE_KEY` must contain the updater signing key (`~/.tauri/lmu-analyzer.key`; its public key is in `src-tauri/tauri.conf.json`):
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lmu-analyzer.key
+```
+
+Keep a backup of that key — if it's lost, installed apps can no longer verify updates.
+
 ## How It Works
 
 Le Mans Ultimate exports XML files containing detailed session data — lap times, sector splits, tire wear, fuel levels, incidents, penalties, and more. LMU Analyzer parses these files entirely in your browser and presents the data through an interactive dashboard with charts and sortable tables, letting you track your progress and identify areas for improvement.
