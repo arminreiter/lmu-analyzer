@@ -1,0 +1,40 @@
+# Builds the portable Windows exe on pushes to `staging` without publishing a release.
+# Download it from the run's "Artifacts" section in the Actions tab.
+name: Staging Build
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      # --no-bundle: exe only, no installer — so no updater signing key needed
+      - run: pnpm tauri build --no-bundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LMU-Analyzer-staging-${{ github.sha }}
+          path: src-tauri/target/release/lmu-analyzer.exe
+          retention-days: 14
