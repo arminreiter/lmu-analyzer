@@ -30,11 +30,12 @@ export function OverlayView() {
 
   useEffect(() => {
     storage.loadCachedFiles().then(c => { if (c) setFiles(c.files); });
-    // Let the game show through, and remember where the user dragged the window
-    document.documentElement.style.background = document.body.style.background = 'transparent';
+    // Remember where the user dragged the window
     const win = getCurrentWindow();
     const unlisten = win.onMoved(async ({ payload }) => {
       const { x, y } = payload.toLogical(await win.scaleFactor());
+      // Windows parks minimized windows at -32000 — don't reopen off-screen
+      if (x < -10000 || y < -10000) return;
       storage.lsSet(storage.KEYS.overlayPosition, JSON.stringify({ x, y }));
     });
     return () => { void unlisten.then(f => f()); };
@@ -53,7 +54,7 @@ export function OverlayView() {
   const lapClass = running ? 'text-white' : timingClass(lapTime, pb?.time ?? null, sessionBestLap, 'text-racing-gold');
 
   return (
-    <div data-tauri-drag-region className="h-screen p-3 bg-racing-black/85 border border-racing-border text-sm font-mono select-none cursor-move">
+    <div data-tauri-drag-region className="h-screen p-3 bg-racing-black border border-racing-border text-sm font-mono select-none cursor-move">
       <div data-tauri-drag-region className="flex items-center gap-2 mb-2">
         <select value={target?.id ?? ''} onChange={e => pickTarget(e.target.value)}
           className="flex-1 min-w-0 bg-racing-dark border border-racing-border text-xs text-white px-1 py-0.5 font-sans cursor-pointer">

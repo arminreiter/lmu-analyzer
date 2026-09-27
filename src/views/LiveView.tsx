@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Radio, PictureInPicture2, EyeOff, Eye } from 'lucide-react';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { StatCard } from '../components/StatCard';
@@ -9,7 +10,7 @@ import {
   useLiveTelemetry, useLiveReferences, useLiveTarget, useHiddenTargets, displayedLap, refSectors, sectorDeltas, totalDelta,
   sessionBestSectors, time, toggleOverlay, timingClass, type Sectors,
 } from '../lib/live';
-import { formatLapTime, formatDelta, formatSector } from '../lib/formatting';
+import { formatLapTime, formatDelta, formatSector, errorMessage } from '../lib/formatting';
 import { ratingFromPercent } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
 
@@ -27,6 +28,9 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
   const { references, pb, carClass, bestSectors } = useLiveReferences(files, driverNames, benchmarksEnabled, live);
   const [targetId, setTargetId] = useLiveTarget();
   const [hidden, toggleHidden] = useHiddenTargets();
+  const [overlayError, setOverlayError] = useState<string | null>(null);
+  const openOverlay = () => { setOverlayError(null); toggleOverlay().catch(e => setOverlayError(errorMessage(e))); };
+  const overlayErrorNote = overlayError && <p className="text-racing-red text-xs mt-2">Overlay failed: {overlayError}</p>;
   const player = live?.player ?? null;
   const trackName = live?.trackName ?? '';
 
@@ -38,9 +42,10 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
         <p className="text-sm text-racing-muted mt-1">
           {error ? 'Game not reachable — start LMU and get in the car.' : 'Connected — join a session and drive out.'}
         </p>
-        <button onClick={() => void toggleOverlay()} className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-racing-muted hover:text-racing-green border border-racing-border transition-colors cursor-pointer">
+        <button onClick={openOverlay} className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-racing-muted hover:text-racing-green border border-racing-border transition-colors cursor-pointer">
           <PictureInPicture2 className="w-3.5 h-3.5" /> Overlay
         </button>
+        {overlayErrorNote}
       </div>
     );
   }
@@ -68,10 +73,11 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
         <span className="text-racing-muted text-sm">{player.vehicleName}</span>
         {carClass && <ClassBadge carClass={carClass} />}
         <span className="ml-auto text-racing-muted text-xs uppercase">{live?.session}</span>
-        <button onClick={() => void toggleOverlay()} title="Show/hide the always-on-top overlay"
+        <button onClick={openOverlay} title="Show/hide the always-on-top overlay"
           className="flex items-center gap-1.5 px-2 py-1 text-xs text-racing-muted hover:text-racing-green border border-racing-border transition-colors cursor-pointer">
           <PictureInPicture2 className="w-3.5 h-3.5" /> Overlay
         </button>
+        {overlayError && <div className="basis-full">{overlayErrorNote}</div>}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

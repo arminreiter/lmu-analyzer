@@ -176,24 +176,30 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
   return { references, pb, carClass, bestSectors };
 }
 
-/** Opens the always-on-top overlay window at its last position, or closes it if already open. */
-export async function toggleOverlay() {
+/**
+ * Opens the always-on-top overlay window at its last position, or closes it if already open.
+ * Rejects when Tauri can't create the window (it reports that via `tauri://error`, not by throwing).
+ */
+export async function toggleOverlay(): Promise<void> {
   const existing = await WebviewWindow.getByLabel('overlay');
   if (existing) { await existing.close(); return; }
   let pos: { x?: number; y?: number } = {};
   try { pos = JSON.parse(lsGet(KEYS.overlayPosition) ?? '{}'); } catch { /* default position */ }
-  new WebviewWindow('overlay', {
+  // ponytail: opaque on purpose — transparent WebView2 windows can render invisible on some Windows setups
+  const win = new WebviewWindow('overlay', {
     url: 'index.html?overlay',
     title: 'LMU Overlay',
     width: 300,
     height: 190,
     ...pos,
     decorations: false,
-    transparent: true,
-    shadow: false,
     alwaysOnTop: true,
-    skipTaskbar: true,
     resizable: false,
+    focus: true,
+  });
+  await new Promise<void>((resolve, reject) => {
+    void win.once('tauri://created', () => resolve());
+    void win.once<string>('tauri://error', e => reject(new Error(String(e.payload))));
   });
 }
 
