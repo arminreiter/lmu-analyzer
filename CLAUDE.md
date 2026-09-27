@@ -45,7 +45,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/lib/storage.ts` — Persistence layer: IndexedDB for parsed files (versioned cache) + FileSystemDirectoryHandle (refresh from folder), localStorage for filter preferences and profile via exported `KEYS` registry (all localStorage keys must be registered there so `clearAll()` sees them). Graceful fallback if IndexedDB unavailable
 - `src/lib/racepace.ts` — Community benchmark integration. Fetches pace tiers from ohne_speed's Google Sheet CSV. Rates laps as Alien/Competitive/Good/Midpack/Tail-ender/Offline. Single source of truth for tier order (`RATING_ORDER`), tier colors, and benchmark lookup (`buildBenchmarkMap()`)
 - `src/lib/DataIndexContext.tsx` + `dataIndexStore.ts` + `useDataIndex.ts` — Context providing precomputed indices over the loaded files (per-driver sessions, all laps, sector minimums for theoretical bests)
-- `src/lib/live.ts` — Desktop live telemetry: `useLiveTelemetry()` (polls `lmu_live`, tracks session laps/sectors), `useLiveReferences()` (my PBs, theoretical best, benchmark tiers for the live track+class), `timingClass()` (purple/green/yellow sector colors), `toggleOverlay()`
+- `src/lib/live.ts` — Desktop live telemetry: `useLiveTelemetry()` (polls `lmu_live`, tracks session laps/sectors), `useLiveReferences()` (my PBs, theoretical best, benchmark tiers for the live track+class), `timingClass()` (purple/green/yellow sector colors), `displayedLap()`/`refSectors()`/`sectorDeltas()`, `useLiveTarget()`/`useHiddenTargets()` (synced between main and overlay window via the `storage` event), `toggleOverlay()`
 - `src/lib/useBenchmarks.ts` — Hook wrapping the benchmark fetch (returns `benchmarks`, `benchmarkMap`, `loading`, `error`)
 - `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
 - `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
@@ -70,6 +70,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/components/PillSelector.tsx`, `FilterButtonGroup.tsx` — Shared filter controls
 - `src/components/SessionLink.tsx` — Link into Session Detail (uses `sessionContext.ts`)
 - `src/components/OhneSpeedCredit.tsx` — Benchmark data attribution
+- `src/components/LapClock.tsx` — Running lap time, interpolated per frame between telemetry polls (writes the DOM directly, no re-render)
 - `src/components/lapColumns.tsx` — Shared lap-table column definitions for Tracks/Cars views
 
 ### Views

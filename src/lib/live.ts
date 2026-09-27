@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { KEYS, lsGet } from './storage';
+import { KEYS, lsGet, lsSet } from './storage';
 import { useBenchmarks } from './useBenchmarks';
 import { getAllLaps } from './analytics';
 import { resolveCarClass } from './parser';
@@ -47,8 +47,9 @@ export interface Reference {
 
 export type Sectors = [number | null, number | null, number | null];
 
-// ponytail: 250ms polling of localhost; switch to LMU shared memory if we ever need per-frame data
-const POLL_MS = 250;
+// ponytail: 100ms polling of the game's web server (sector times only change at splits; the lap clock
+// is interpolated by LapClock). Lower it if LMU copes; switch to shared memory for per-frame data.
+const POLL_MS = 100;
 
 const TIERS: Array<[keyof PaceBenchmark['racePace'], PaceRating]> =
   [['alien', 'Alien'], ['competitive', 'Competitive'], ['good', 'Good'], ['midpack', 'Midpack'], ['tailEnder', 'Tail-ender'], ['offline', 'Offline']];
@@ -164,7 +165,8 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
     if (benchmark) {
       for (const [key, rating] of TIERS) refs.push({ id: key, label: rating, time: benchmark.racePace[key], splits: null, rating });
     }
-    return refs;
+    // Fastest first, so the table reads top-down from the hardest target
+    return refs.sort((a, b) => a.time - b.time);
   }, [history, benchmarkMap, benchmarksEnabled, carClass, trackName]);
 
   const pb = references.find(r => r.splits && !r.rating) ?? null;
@@ -212,4 +214,64 @@ export function sessionBestSectors(laps: Array<{ sectors: Sectors }>): Sectors {
     const v = l.sectors[i];
     return v !== null && (m === null || v < m) ? v : m;
   }, null)) as Sectors;
+}
+
+/**
+ * The lap to show sector-by-sector: the running one, or — until S1 of the new lap is done —
+ * the lap just finished, so its S3 and lap time stay visible.
+ */
+export function displayedLap(p: LiveVehicle | null): { running: boolean; sectors: Sectors; lapTime: number | null } {
+  if (!p) return { running: false, sectors: [null, null, null], lapTime: null };
+  if (time(p.currentSectorTime1) !== null) {
+    return { running: true, sectors: toSectors(time(p.currentSectorTime1), time(p.currentSectorTime2), null), lapTime: time(p.timeIntoLap) };
+  }
+  const lapTime = time(p.lastLapTime);
+  return { running: false, sectors: toSectors(time(p.lastSectorTime1), time(p.lastSectorTime2), lapTime), lapTime };
+}
+
+/** Individual sector times of a reference (benchmarks scaled from `shape`) */
+export function refSectors(ref: Reference | null, shape: Reference | null): Sectors {
+  const splits = ref ? refSplits(ref, shape) : null;
+  return ref && splits ? toSectors(splits[0], splits[1], ref.time) : [null, null, null];
+}
+
+export function sectorDeltas(mine: Sectors, target: Sectors): Sectors {
+  return mine.map((s, i) => (s !== null && target[i] !== null ? s - target[i]! : null)) as Sectors;
+}
+
+/** Sum of the known sector deltas — the gap at the last completed split */
+export function totalDelta(deltas: Sectors): number | null {
+  const known = deltas.filter((d): d is number => d !== null);
+  return known.length ? known.reduce((a, b) => a + b, 0) : null;
+}
+
+/** A localStorage string kept in sync between the main window and the overlay window */
+function useSyncedLocal(key: string, fallback: string): [string, (v: string) => void] {
+  const [value, setValue] = useState(() => lsGet(key) ?? fallback);
+  useEffect(() => {
+    // `storage` fires in the *other* window when one of them changes the key
+    const onStorage = (e: StorageEvent) => { if (e.key === key) setValue(e.newValue ?? fallback); };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key, fallback]);
+  return [value, (v: string) => { setValue(v); lsSet(key, v); }];
+}
+
+/** Selected target (Reference id), shared by the Live view and the overlay */
+export function useLiveTarget() {
+  return useSyncedLocal(KEYS.overlayTarget, 'pb');
+}
+
+/** Targets the user hid (Reference ids), shared by the Live view and the overlay */
+export function useHiddenTargets(): [Set<string>, (id: string) => void] {
+  const [raw, setRaw] = useSyncedLocal(KEYS.liveHiddenTargets, '[]');
+  const hidden = useMemo(() => {
+    try { return new Set<string>(JSON.parse(raw)); } catch { return new Set<string>(); }
+  }, [raw]);
+  const toggle = (id: string) => {
+    const next = new Set(hidden);
+    if (!next.delete(id)) next.add(id);
+    setRaw(JSON.stringify([...next]));
+  };
+  return [hidden, toggle];
 }
