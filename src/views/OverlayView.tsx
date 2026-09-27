@@ -4,7 +4,7 @@ import { X, Settings2 } from 'lucide-react';
 import { LapClock } from '../components/LapClock';
 import {
   useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, activeTargets, displayedLap, lastLapOf,
-  refSectors, sectorDeltas, totalDelta, timingClass, sessionBestSectors, time,
+  refSectors, sectorDeltas, totalDelta, timingClass, targetSectorClass, sessionBestSectors, time,
 } from '../lib/live';
 import { formatLapTime, formatDelta } from '../lib/formatting';
 import * as storage from '../lib/storage';
@@ -20,6 +20,7 @@ const SECTOR_FILL: Record<string, string> = {
   'text-racing-purple': 'bg-racing-purple',
   'text-racing-green': 'bg-racing-green',
   'text-racing-yellow': 'bg-racing-yellow',
+  'text-racing-orange': 'bg-racing-orange',
 };
 
 /**
@@ -63,6 +64,7 @@ export function OverlayView() {
   // Individual history laps are picked in the Live view; here only the selected ones are listed
   const visible = references.filter(r => !hidden.has(r.id) && (!r.id.startsWith('lap:') || selected.has(r.id)));
   const targets = activeTargets(visible, selected);
+  const targetSectors = targets.map(t => refSectors(t, shape));
 
   const p = live?.player ?? null;
   const shown = displayedLap(p, sessionLaps[0]);
@@ -116,7 +118,7 @@ export function OverlayView() {
             {shown.sectors.map((s, i) => {
               const fill = s === null ? 'bg-white/10 text-racing-muted'
                 : shown.invalid ? 'bg-racing-muted/50 text-white'
-                : `${SECTOR_FILL[timingClass(s, bestSectors[i], sessionBests[i])] ?? 'bg-white/10'} text-black`;
+                : `${SECTOR_FILL[targetSectorClass(s, bestSectors[i], targetSectors.map(ts => ts[i]), sessionBests[i])] ?? 'bg-white/10'} text-black`;
               return <div key={i} data-tauri-drag-region className={`py-0.5 ${fill}`}>S{i + 1}</div>;
             })}
           </div>

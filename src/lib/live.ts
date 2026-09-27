@@ -269,6 +269,20 @@ export function timingClass(t: number | null, allTimeBest: number | null, sessio
   return 'text-racing-yellow';
 }
 
+/**
+ * Color of a live sector against the selected targets' sector times (`targetTimes`):
+ * purple beats my all-time best sector, green is faster than every target, yellow beats some,
+ * orange is slower than all. Without any target sector times, falls back to timingClass.
+ */
+export function targetSectorClass(t: number | null, allTimeBest: number | null, targetTimes: Array<number | null>, sessionBest: number | null): string {
+  if (t === null) return 'text-racing-muted';
+  if (allTimeBest !== null && t < allTimeBest) return 'text-racing-purple';
+  const known = targetTimes.filter((x): x is number => x !== null);
+  if (!known.length) return timingClass(t, allTimeBest, sessionBest);
+  const beaten = known.filter(x => t <= x).length;
+  return beaten === known.length ? 'text-racing-green' : beaten > 0 ? 'text-racing-yellow' : 'text-racing-orange';
+}
+
 /** Per-sector minimum over the laps completed this session */
 export function sessionBestSectors(laps: SessionLap[]): Sectors {
   return [0, 1, 2].map(i => laps.reduce<number | null>((m, l) => {

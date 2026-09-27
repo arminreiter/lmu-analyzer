@@ -10,7 +10,7 @@ import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
 import { LapClock } from '../components/LapClock';
 import {
   useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, activeTargets, displayedLap, lastLapOf, refSectors, sectorDeltas, totalDelta,
-  sessionBestSectors, time, toggleOverlay, timingClass, type Sectors, type Reference, type SessionLap,
+  sessionBestSectors, time, toggleOverlay, timingClass, targetSectorClass, type Sectors, type Reference, type SessionLap,
 } from '../lib/live';
 import { formatLapTime, formatDelta, formatSector, errorMessage } from '../lib/formatting';
 import { ratingFromPercent } from '../lib/racepace';
@@ -181,7 +181,8 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
           {shown.sectors.map((sec, i) => (
             <div key={i} className="px-4 py-3 text-center">
               <div className="text-[10px] font-sans uppercase tracking-[0.12em] text-racing-muted">S{i + 1}</div>
-              <div className={`text-xl font-bold ${sectorClass(shown.sectors, i, shown.invalid)}`}>{formatSector(sec)}</div>
+              <div className={`text-xl font-bold ${shown.invalid ? 'text-racing-muted'
+                : targetSectorClass(sec, bestSectors[i], targets.map(t => refSectors(t, shape)[i]), sessionBests[i])}`}>{formatSector(sec)}</div>
             </div>
           ))}
           <div className="px-4 py-3 text-center">
