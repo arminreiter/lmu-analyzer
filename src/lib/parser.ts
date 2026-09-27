@@ -22,7 +22,7 @@ function getAttrNum(el: Element, attr: string): number {
   return isNaN(val) ? 0 : val;
 }
 
-function resolveCarClass(raw: string): CarClass {
+export function resolveCarClass(raw: string): CarClass {
   const lower = raw.toLowerCase();
   if (lower === 'hyper' || lower === 'hypercar') return 'Hyper';
   if (lower === 'gt3' || lower === 'lmgt3') return 'GT3';

@@ -17,6 +17,7 @@ import { RaceResultsView } from './views/RaceResultsView';
 import { DriverProfileView } from './views/DriverProfileView';
 import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
+import { LiveView } from './views/LiveView';
 import { loadFolder, parseUploadedFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
 import { errorMessage } from './lib/formatting';
@@ -464,6 +465,7 @@ function App() {
             {activeView === 'benchmarks' && <RacePaceView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} onViewChange={setActiveView} />}
             {activeView === 'trackmode' && <TrackModeView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} onViewChange={setActiveView} />}
             {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
+            {activeView === 'live' && isTauri() && <LiveView files={filteredFiles} driverNames={selectedDrivers} benchmarksEnabled={racePaceEnabled} />}
             {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
           </DataIndexProvider>
         )}

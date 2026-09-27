@@ -49,6 +49,25 @@ fn find_results_dir() -> Option<String> {
     .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// LMU's built-in web UI server; runs whenever the game does.
+const LMU_API: &str = "http://localhost:6397/rest/watch";
+
+/// Raw JSON of LMU's `standings` and `sessionInfo` endpoints; the frontend picks the fields it needs.
+/// Proxied through Rust because the game's server sends no CORS headers.
+#[tauri::command]
+async fn lmu_live() -> Result<(String, String), String> {
+  async fn get(path: &str) -> Result<String, String> {
+    let res = reqwest::Client::new()
+      .get(format!("{LMU_API}/{path}"))
+      .timeout(std::time::Duration::from_secs(1))
+      .send()
+      .await
+      .map_err(|e| e.to_string())?;
+    res.error_for_status().map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
+  }
+  Ok((get("standings").await?, get("sessionInfo").await?))
+}
+
 #[derive(Default)]
 struct ResultsWatcher(Mutex<Option<RecommendedWatcher>>);
 
@@ -78,7 +97,7 @@ pub fn run() {
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
-    .invoke_handler(tauri::generate_handler![read_results, find_results_dir, watch_results])
+    .invoke_handler(tauri::generate_handler![read_results, find_results_dir, watch_results, lmu_live])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

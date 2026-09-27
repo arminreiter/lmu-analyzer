@@ -49,7 +49,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
 - `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
 - `src/lib/sessionNotifications.ts` — Desktop only: diffs datasets before/after a folder-watch refresh and sends Windows notifications for new PBs/sessions
-- `src-tauri/src/lib.rs` — Desktop commands: `read_results` (read XMLs), `find_results_dir` (auto-detect LMU folder across Steam libraries), `watch_results` (emits `results-changed` on new XMLs)
+- `src-tauri/src/lib.rs` — Desktop commands: `read_results` (read XMLs), `find_results_dir` (auto-detect LMU folder across Steam libraries), `watch_results` (emits `results-changed` on new XMLs), `lmu_live` (proxies LMU's REST API at `localhost:6397/rest/watch/{standings,sessionInfo}` — the game sends no CORS headers)
 - `src/lib/useInstallPrompt.ts` — PWA install prompt hook; `useTheme.ts` — light/dark theme; `useClickOutside.ts` — shared outside-click hook (use this, don't hand-roll listeners)
 
 ### Components
@@ -73,8 +73,9 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 
 ### Views
 
-Eleven views: Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
+Twelve views: Live (desktop only), Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
 
+- `LiveView` — Desktop only. Polls `lmu_live` every 250ms; shows the running lap and gaps (live at sector splits, last lap, session best) to my PB, theoretical best and benchmark tiers for the current track+class
 - `OverviewView` — Dashboard with stat cards (sessions, laps, races, tracks, cars, distance, best lap) + track/car stats tables
 - `PersonalBestsView` — Best laps per track/car with theoretical best (combined best sectors), filterable by track/car/mode
 - `SessionsView` — All sessions with filters (setting, type, track); click row → SessionDetailView

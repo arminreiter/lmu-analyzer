@@ -4,6 +4,7 @@ import type { DriverSummary, CarClass } from '../lib/types';
 import { CLASS_SPEED_ORDER } from '../lib/analytics';
 import { getClassColor } from '../lib/formatting';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
+import { isTauri } from '@tauri-apps/api/core';
 
 interface HeaderProps {
   selectedDrivers: string[];
@@ -27,6 +28,7 @@ interface HeaderProps {
 }
 
 const VIEWS = [
+  { id: 'live', label: 'Live' },
   { id: 'overview', label: 'Overview' },
   { id: 'bests', label: 'Personal Bests' },
   { id: 'sessions', label: 'Sessions' },
@@ -153,6 +155,7 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
         <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {VIEWS.map(v => {
             if (v.id === 'benchmarks' && !racePaceEnabled) return null;
+            if (v.id === 'live' && !isTauri()) return null;
             const isActive = v.id === 'benchmarks'
               ? activeView === 'benchmarks' || activeView === 'trackmode'
               : activeView === v.id;
