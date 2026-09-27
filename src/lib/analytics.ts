@@ -612,16 +612,19 @@ export function getOverviewStats(files: RaceFile[], driverNames: string | string
     } else if (isNewSession && session.type === 'Practice') totalPractice++;
     else if (isNewSession && session.type === 'Qualifying') totalQualifying++;
 
-    totalIncidents += session.incidents.filter(
-      i => nameSet.has(i.driver1) || names.some(n => i.description.includes(n))
-    ).length;
-    const driverPenalties = session.penalties.filter(p => nameSet.has(p.driver));
-    totalPenalties += driverPenalties.length;
-    for (const pen of driverPenalties) {
-      const t = pen.type || 'Unknown';
-      penaltyTypes.set(t, (penaltyTypes.get(t) ?? 0) + 1);
+    // Session-wide counts already cover every selected driver — count once per session
+    if (isNewSession) {
+      totalIncidents += session.incidents.filter(
+        i => nameSet.has(i.driver1) || names.some(n => i.description.includes(n))
+      ).length;
+      const driverPenalties = session.penalties.filter(p => nameSet.has(p.driver));
+      totalPenalties += driverPenalties.length;
+      for (const pen of driverPenalties) {
+        const t = pen.type || 'Unknown';
+        penaltyTypes.set(t, (penaltyTypes.get(t) ?? 0) + 1);
+      }
+      totalTrackLimits += session.trackLimits.filter(tl => nameSet.has(tl.driver)).length;
     }
-    totalTrackLimits += session.trackLimits.filter(tl => nameSet.has(tl.driver)).length;
 
     for (const lap of driver.laps) {
       if (isValidLap(lap)) {
