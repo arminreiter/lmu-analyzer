@@ -2,7 +2,7 @@ use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 const STEAM_ROOT: &str = r"C:\Program Files (x86)\Steam";
 const RESULTS_SUBDIR: &str = r"steamapps\common\Le Mans Ultimate\UserData\Log\Results";
@@ -98,6 +98,12 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![read_results, find_results_dir, watch_results, lmu_live])
+    // The app lives as long as any window does — closing the main window must also take the overlay down
+    .on_window_event(|window, event| {
+      if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+        window.app_handle().exit(0);
+      }
+    })
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
