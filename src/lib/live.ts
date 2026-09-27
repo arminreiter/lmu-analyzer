@@ -28,6 +28,18 @@ export interface LiveVehicle {
   currentSectorTime2: number;
   lastSectorTime1: number;
   lastSectorTime2: number;
+  /** Elapsed session time when the current lap started */
+  lapStartET: number;
+  /** Whether the running lap counts (rF2 mCountLapFlag) */
+  countLapFlag?: string | number;
+}
+
+/** A lap completed while the view was open. Invalidated laps keep their time but never count as bests. */
+export interface SessionLap {
+  lap: number;
+  time: number;
+  sectors: Sectors;
+  invalid: boolean;
 }
 
 export interface LiveState {
@@ -43,6 +55,8 @@ export interface Reference {
   time: number;
   splits: [number, number] | null;
   rating?: PaceRating;
+  /** Set for individual laps from my history (as opposed to PBs, theoretical best, benchmarks) */
+  lap?: PersonalBest;
 }
 
 export type Sectors = [number | null, number | null, number | null];
@@ -82,12 +96,36 @@ export function liveDelta(current: { s1: number | null; s2: number | null }, ref
   return null;
 }
 
+/**
+ * Whether the running lap still counts. rF2 semantics: 2 / "…AND_TIME" = lap and time count.
+ * ponytail: LMU's exact flag spelling is unverified — a missing flag is treated as valid.
+ */
+export function lapCounts(p: LiveVehicle): boolean {
+  const f = p.countLapFlag;
+  return f === undefined || f === '' || f === 2 || /AND_TIME|^2$/i.test(String(f));
+}
+
+/**
+ * The lap that ended between two samples. LMU may blank the time of an invalidated lap, so fall back
+ * to the lap-start timestamps and the splits seen while it was running.
+ */
+export function completedLap(prev: LiveVehicle, now: LiveVehicle): SessionLap | null {
+  const reported = time(now.lastLapTime);
+  const measured = prev.lapStartET > 0 && now.lapStartET > prev.lapStartET ? now.lapStartET - prev.lapStartET : null;
+  const lapTime = reported ?? measured;
+  if (lapTime === null) return null;
+  const cum1 = time(now.lastSectorTime1) ?? time(prev.currentSectorTime1);
+  const cum2 = time(now.lastSectorTime2) ?? time(prev.currentSectorTime2);
+  return { lap: now.lapsCompleted, time: lapTime, sectors: toSectors(cum1, cum2, lapTime), invalid: reported === null || !lapCounts(prev) };
+}
+
 /** Polls LMU and collects the laps completed while mounted (newest first). */
 export function useLiveTelemetry() {
   const [live, setLive] = useState<LiveState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sessionLaps, setSessionLaps] = useState<Array<{ lap: number; time: number; sectors: Sectors }>>([]);
-  const lastLapsCompleted = useRef<number | null>(null);
+  const [sessionLaps, setSessionLaps] = useState<SessionLap[]>([]);
+  // Previous sample — its lap-in-progress data describes the lap that just ended
+  const prevSample = useRef<LiveVehicle | null>(null);
 
   // Sequential polling — the next request starts only after the previous one settles
   useEffect(() => {
@@ -101,14 +139,14 @@ export function useLiveTelemetry() {
         if (cancelled) return;
         const me = vehicles.find(v => v.player) ?? null;
         setLive({ player: me, trackName: session.trackName ?? '', session: session.session ?? '' });
+        const prev = prevSample.current;
         // A lower lap count means a new session
-        const prev = lastLapsCompleted.current;
-        if (me && prev !== null && me.lapsCompleted < prev) setSessionLaps([]);
-        else if (me && prev !== null && me.lapsCompleted > prev && time(me.lastLapTime) !== null) {
-          const sectors = toSectors(time(me.lastSectorTime1), time(me.lastSectorTime2), me.lastLapTime);
-          setSessionLaps(laps => [{ lap: me.lapsCompleted, time: me.lastLapTime, sectors }, ...laps]);
+        if (me && prev && me.lapsCompleted < prev.lapsCompleted) setSessionLaps([]);
+        else if (me && prev && me.lapsCompleted > prev.lapsCompleted) {
+          const lap = completedLap(prev, me);
+          if (lap) setSessionLaps(laps => [lap, ...laps]);
         }
-        if (me) lastLapsCompleted.current = me.lapsCompleted;
+        if (me) prevSample.current = me;
         setError(null);
       } catch (e) {
         if (!cancelled) setError(errorMessage(e));
@@ -124,7 +162,7 @@ export function useLiveTelemetry() {
 
 /**
  * Reference laps for the live track + class: my PB with this car, my class PB (other car),
- * theoretical best, and benchmark tiers. `pb` is the first one with splits — the shape benchmarks borrow.
+ * theoretical best, benchmark tiers, and every other lap of mine there (`lap` set), fastest first.
  */
 export function useLiveReferences(files: RaceFile[], driverNames: string[], benchmarksEnabled: boolean, live: LiveState | null) {
   const { benchmarkMap } = useBenchmarks();
@@ -149,9 +187,9 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
     if (history) {
       const carLaps = history.laps.filter(l => l.carType === history.carType);
       // getAllLaps is sorted by lap time, so [0] is the best
-      if (carLaps[0]) refs.push({ id: 'pb', label: `My PB · ${carLaps[0].carType}`, time: carLaps[0].lapTime, splits: lapSplits(carLaps[0]) });
+      if (carLaps[0]) refs.push({ id: 'pb', label: `My PB · ${carLaps[0].carType}`, time: carLaps[0].lapTime, splits: lapSplits(carLaps[0]), lap: carLaps[0] });
       if (history.laps[0] && history.laps[0] !== carLaps[0]) {
-        refs.push({ id: 'pb-class', label: `My PB · ${history.laps[0].carType}`, time: history.laps[0].lapTime, splits: lapSplits(history.laps[0]) });
+        refs.push({ id: 'pb-class', label: `My PB · ${history.laps[0].carType}`, time: history.laps[0].lapTime, splits: lapSplits(history.laps[0]), lap: history.laps[0] });
       }
       const pool = carLaps.length ? carLaps : history.laps;
       const min = (pick: (l: PersonalBest) => number | null) =>
@@ -165,15 +203,30 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
     if (benchmark) {
       for (const [key, rating] of TIERS) refs.push({ id: key, label: rating, time: benchmark.racePace[key], splits: null, rating });
     }
+    // Every other lap of mine here, so any of them can be the comparison target
+    if (history) {
+      for (const lap of history.laps) {
+        if (refs.some(r => r.lap === lap)) continue;
+        refs.push({
+          id: `lap:${lap.fileName}:${lap.sessionIndex}:${lap.lapNumber}`,
+          // Date only (timeString is "YYYY/MM/DD HH:MM:SS") — keeps session and lap number visible in narrow cells
+          label: `${lap.date.slice(0, 10)} · ${lap.sessionType} L${lap.lapNumber}`,
+          time: lap.lapTime, splits: lapSplits(lap), lap,
+        });
+      }
+    }
     // Fastest first, so the table reads top-down from the hardest target
     return refs.sort((a, b) => a.time - b.time);
   }, [history, benchmarkMap, benchmarksEnabled, carClass, trackName]);
 
-  const pb = references.find(r => r.splits && !r.rating) ?? null;
+  // My actual PB (this car, else class) — the bar for a gold lap. Not the theoretical best, which sorts first.
+  const pb = references.find(r => r.id === 'pb') ?? references.find(r => r.id === 'pb-class') ?? null;
+  // Sector shape benchmarks are scaled from: my PB lap if it has splits, else the theoretical best
+  const shape = pb?.splits ? pb : references.find(r => r.id === 'theoretical') ?? null;
   // My all-time best individual sectors — beating one improves the theoretical best (purple)
   const theo = references.find(r => r.id === 'theoretical');
   const bestSectors: Sectors = theo?.splits ? toSectors(theo.splits[0], theo.splits[1], theo.time) : [null, null, null];
-  return { references, pb, carClass, bestSectors };
+  return { references, pb, shape, carClass, bestSectors };
 }
 
 /**
@@ -185,14 +238,16 @@ export async function toggleOverlay(): Promise<void> {
   if (existing) { await existing.close(); return; }
   let pos: { x?: number; y?: number } = {};
   try { pos = JSON.parse(lsGet(KEYS.overlayPosition) ?? '{}'); } catch { /* default position */ }
-  // ponytail: opaque on purpose — transparent WebView2 windows can render invisible on some Windows setups
   const win = new WebviewWindow('overlay', {
     url: 'index.html?overlay',
     title: 'LMU Overlay',
-    width: 300,
-    height: 190,
+    // Initial size only — the overlay resizes itself to its content
+    width: 240,
+    height: 200,
     ...pos,
     decorations: false,
+    transparent: true,
+    shadow: false,
     alwaysOnTop: true,
     resizable: false,
     focus: true,
@@ -215,24 +270,32 @@ export function timingClass(t: number | null, allTimeBest: number | null, sessio
 }
 
 /** Per-sector minimum over the laps completed this session */
-export function sessionBestSectors(laps: Array<{ sectors: Sectors }>): Sectors {
+export function sessionBestSectors(laps: SessionLap[]): Sectors {
   return [0, 1, 2].map(i => laps.reduce<number | null>((m, l) => {
-    const v = l.sectors[i];
+    const v = l.invalid ? null : l.sectors[i];
     return v !== null && (m === null || v < m) ? v : m;
   }, null)) as Sectors;
 }
 
 /**
  * The lap to show sector-by-sector: the running one, or — until S1 of the new lap is done —
- * the lap just finished, so its S3 and lap time stay visible.
+ * the lap just finished, so its S3 and lap time stay visible. Prefers our own record of that lap
+ * (`lastLap`), which survives LMU blanking an invalidated lap.
  */
-export function displayedLap(p: LiveVehicle | null): { running: boolean; sectors: Sectors; lapTime: number | null } {
-  if (!p) return { running: false, sectors: [null, null, null], lapTime: null };
+export function displayedLap(p: LiveVehicle | null, lastLap?: SessionLap): { running: boolean; sectors: Sectors; lapTime: number | null; invalid: boolean } {
+  if (!p) return { running: false, sectors: [null, null, null], lapTime: null, invalid: false };
   if (time(p.currentSectorTime1) !== null) {
-    return { running: true, sectors: toSectors(time(p.currentSectorTime1), time(p.currentSectorTime2), null), lapTime: time(p.timeIntoLap) };
+    return { running: true, sectors: toSectors(time(p.currentSectorTime1), time(p.currentSectorTime2), null), lapTime: time(p.timeIntoLap), invalid: !lapCounts(p) };
   }
-  const lapTime = time(p.lastLapTime);
-  return { running: false, sectors: toSectors(time(p.lastSectorTime1), time(p.lastSectorTime2), lapTime), lapTime };
+  const finished = lastLapOf(p, lastLap);
+  return { running: false, sectors: finished?.sectors ?? [null, null, null], lapTime: finished?.time ?? null, invalid: finished?.invalid ?? false };
+}
+
+/** The player's last completed lap: our record if it is that lap, else what LMU reports (assumed valid) */
+export function lastLapOf(p: LiveVehicle, lastLap?: SessionLap): SessionLap | null {
+  if (lastLap && lastLap.lap === p.lapsCompleted) return lastLap;
+  const t = time(p.lastLapTime);
+  return t === null ? null : { lap: p.lapsCompleted, time: t, sectors: toSectors(time(p.lastSectorTime1), time(p.lastSectorTime2), t), invalid: false };
 }
 
 /** Individual sector times of a reference (benchmarks scaled from `shape`) */
@@ -263,21 +326,37 @@ function useSyncedLocal(key: string, fallback: string): [string, (v: string) => 
   return [value, (v: string) => { setValue(v); lsSet(key, v); }];
 }
 
-/** Selected target (Reference id), shared by the Live view and the overlay */
-export function useLiveTarget() {
-  return useSyncedLocal(KEYS.overlayTarget, 'pb');
-}
-
-/** Targets the user hid (Reference ids), shared by the Live view and the overlay */
-export function useHiddenTargets(): [Set<string>, (id: string) => void] {
-  const [raw, setRaw] = useSyncedLocal(KEYS.liveHiddenTargets, '[]');
-  const hidden = useMemo(() => {
-    try { return new Set<string>(JSON.parse(raw)); } catch { return new Set<string>(); }
+/** A set of ids in localStorage, synced between windows. A legacy plain-string value becomes a one-item set. */
+function useSyncedSet(key: string, fallback: string[]): [Set<string>, (id: string) => void] {
+  const [raw, setRaw] = useSyncedLocal(key, JSON.stringify(fallback));
+  const set = useMemo(() => {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return new Set<string>(Array.isArray(parsed) ? parsed : [String(parsed)]);
+    } catch {
+      return new Set<string>([raw]); // pre-multi-select versions stored one bare id
+    }
   }, [raw]);
   const toggle = (id: string) => {
-    const next = new Set(hidden);
+    const next = new Set(set);
     if (!next.delete(id)) next.add(id);
     setRaw(JSON.stringify([...next]));
   };
-  return [hidden, toggle];
+  return [set, toggle];
+}
+
+/** Selected targets (Reference ids) the overlay shows a delta for, shared by the Live view and the overlay */
+export function useLiveTargets() {
+  return useSyncedSet(KEYS.liveTargets, ['pb']);
+}
+
+/** Targets the user hid (Reference ids), shared by the Live view and the overlay */
+export function useHiddenTargets() {
+  return useSyncedSet(KEYS.liveHiddenTargets, []);
+}
+
+/** The selected targets among `visible`, in its order; the first visible one if none of them is available here */
+export function activeTargets(visible: Reference[], selected: Set<string>): Reference[] {
+  const chosen = visible.filter(r => selected.has(r.id));
+  return chosen.length ? chosen : visible.slice(0, 1);
 }
