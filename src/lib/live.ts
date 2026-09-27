@@ -163,6 +163,12 @@ export function useLiveTelemetry() {
   return { live, error, sessionLaps };
 }
 
+/** Best individual sector times over a set of laps */
+function minSectors(laps: PersonalBest[]): Sectors {
+  const pick = [(l: PersonalBest) => l.sector1, (l: PersonalBest) => l.sector2, (l: PersonalBest) => l.sector3];
+  return pick.map(f => laps.reduce<number | null>((m, l) => { const v = f(l); return v !== null && (m === null || v < m) ? v : m; }, null)) as Sectors;
+}
+
 /**
  * Reference laps for the live track + class: my PB with this car, my class PB (other car),
  * theoretical best, benchmark tiers, and every other lap of mine there (`lap` set), fastest first.
@@ -239,7 +245,12 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
   // My all-time best individual sectors — beating one improves the theoretical best (purple)
   const theo = references.find(r => r.id === 'theoretical');
   const bestSectors: Sectors = theo?.splits ? toSectors(theo.splits[0], theo.splits[1], theo.time) : [null, null, null];
-  return { references, pb, shape, carClass, bestSectors };
+  // The same per scope, for the purple setting: this car only / every car of this class here
+  const personalBests = useMemo(() => {
+    const laps = history?.laps ?? [];
+    return { car: minSectors(laps.filter(l => l.carType === history?.carType)), cls: minSectors(laps) };
+  }, [history]);
+  return { references, pb, shape, carClass, bestSectors, personalBests };
 }
 
 /**
@@ -283,33 +294,41 @@ export function timingClass(t: number | null, allTimeBest: number | null, sessio
 }
 
 /**
- * When a live sector turns purple: 'targets' — faster than every selected target *and* my all-time
- * best sector; 'personal' — whenever it beats my all-time best sector, whatever the targets say.
+ * What a live sector must beat to turn purple: every selected target, my best sector with any car of
+ * this class here, or my best sector with this car.
  */
-export type PurpleMode = 'targets' | 'personal';
+export type PurpleMode = 'targets' | 'pb-class' | 'pb-car';
+
+export const PURPLE_MODES: Array<{ value: PurpleMode; label: string }> = [
+  { value: 'targets', label: 'All selected targets' },
+  { value: 'pb-class', label: 'Personal best (all cars)' },
+  { value: 'pb-car', label: 'Personal best (this car)' },
+];
 
 export function usePurpleMode(): [PurpleMode, (m: PurpleMode) => void] {
   const [raw, set] = useSyncedLocal(KEYS.purpleMode, 'targets');
-  return [raw === 'personal' ? 'personal' : 'targets', set];
+  // 'personal' was the earlier this-car-or-class rule — closest match is this car
+  const mode: PurpleMode = raw === 'personal' ? 'pb-car' : PURPLE_MODES.some(m => m.value === raw) ? (raw as PurpleMode) : 'targets';
+  return [mode, set];
 }
 
 /**
- * Color of a live sector against the selected targets' sector times (`targetTimes`): green is faster
- * than every target, yellow beats some, orange is slower than all; purple per `purpleMode`.
- * Without any target sector times, falls back to timingClass (purple / session best / slower).
+ * Color of a live sector. Purple when it beats the `purpleMode` reference; otherwise against the
+ * selected targets' sector times (`targetTimes`): green faster than all, yellow some, orange none.
+ * Without any target sector times: green for a session best, yellow otherwise.
  */
 export function targetSectorClass(
-  t: number | null, allTimeBest: number | null, targetTimes: Array<number | null>, sessionBest: number | null,
-  purpleMode: PurpleMode = 'targets',
+  t: number | null, targetTimes: Array<number | null>, personalBest: { car: number | null; cls: number | null },
+  sessionBest: number | null, purpleMode: PurpleMode,
 ): string {
   if (t === null) return 'text-racing-muted';
-  const personalBest = allTimeBest !== null && t < allTimeBest;
-  if (purpleMode === 'personal' && personalBest) return 'text-racing-purple';
   const known = targetTimes.filter((x): x is number => x !== null);
-  if (!known.length) return timingClass(t, allTimeBest, sessionBest);
+  const purpleRef = purpleMode === 'targets' ? (known.length ? Math.min(...known) : null)
+    : purpleMode === 'pb-class' ? personalBest.cls : personalBest.car;
+  if (purpleRef !== null && t < purpleRef) return 'text-racing-purple';
+  if (!known.length) return sessionBest === null || t <= sessionBest ? 'text-racing-green' : 'text-racing-yellow';
   const beaten = known.filter(x => t <= x).length;
-  if (beaten < known.length) return beaten > 0 ? 'text-racing-yellow' : 'text-racing-orange';
-  return personalBest ? 'text-racing-purple' : 'text-racing-green';
+  return beaten === known.length ? 'text-racing-green' : beaten > 0 ? 'text-racing-yellow' : 'text-racing-orange';
 }
 
 /** Per-sector minimum over the laps completed this session */

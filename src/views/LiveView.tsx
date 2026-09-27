@@ -29,7 +29,7 @@ const deltaClass = (d: number | null) =>
 
 export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProps) {
   const { live, error, sessionLaps } = useLiveTelemetry();
-  const { references, pb, shape, carClass, bestSectors } = useLiveReferences(files, driverNames, benchmarksEnabled, live);
+  const { references, pb, shape, carClass, bestSectors, personalBests } = useLiveReferences(files, driverNames, benchmarksEnabled, live);
   const [selected, toggleTarget] = useLiveTargets();
   const [hidden, toggleHidden] = useHiddenTargets();
   const [purpleMode] = usePurpleMode();
@@ -184,7 +184,7 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
             <div key={i} className="px-4 py-3 text-center">
               <div className="text-[10px] font-sans uppercase tracking-[0.12em] text-racing-muted">S{i + 1}</div>
               <div className={`text-xl font-bold ${shown.invalid ? 'text-racing-muted'
-                : targetSectorClass(sec, bestSectors[i], targets.map(t => refSectors(t, shape)[i]), sessionBests[i], purpleMode)}`}>{formatSector(sec)}</div>
+                : targetSectorClass(sec, targets.map(t => refSectors(t, shape)[i]), { car: personalBests.car[i], cls: personalBests.cls[i] }, sessionBests[i], purpleMode)}`}>{formatSector(sec)}</div>
             </div>
           ))}
           <div className="px-4 py-3 text-center">
