@@ -28,6 +28,9 @@ export interface LiveVehicle {
   currentSectorTime2: number;
   lastSectorTime1: number;
   lastSectorTime2: number;
+  /** Cumulative splits of this session's best lap */
+  bestLapSectorTime1: number;
+  bestLapSectorTime2: number;
   /** Elapsed session time when the current lap started */
   lapStartET: number;
   /** Whether the running lap counts (rF2 mCountLapFlag) */
@@ -169,6 +172,10 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
   const trackName = live?.trackName ?? '';
   const carClass: CarClass | null = live?.player ? resolveCarClass(live.player.carClass) : null;
   const vehicleName = live?.player?.vehicleName ?? '';
+  // Primitives, so the reference list only rebuilds when the session best actually changes
+  const bestLapTime = live?.player?.bestLapTime;
+  const bestSplit1 = live?.player?.bestLapSectorTime1;
+  const bestSplit2 = live?.player?.bestLapSectorTime2;
 
   // My laps at this track in this class, and the car type matching the live vehicle (XML VehName)
   const history = useMemo(() => {
@@ -200,6 +207,12 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
     const benchmark = benchmarksEnabled && carClass && benchmarkMap
       ? benchmarkMap.get(`${mapTrackName(trackName, trackName)}|${carClass}`)
       : undefined;
+    // This session's best lap, straight from LMU — covers laps driven before the view was opened
+    const sessionBest = time(bestLapTime);
+    if (sessionBest !== null) {
+      const c1 = time(bestSplit1), c2 = time(bestSplit2);
+      refs.push({ id: 'session-best', label: 'Session best', time: sessionBest, splits: c1 !== null && c2 !== null ? [c1, c2] : null });
+    }
     if (benchmark) {
       for (const [key, rating] of TIERS) refs.push({ id: key, label: rating, time: benchmark.racePace[key], splits: null, rating });
     }
@@ -217,7 +230,7 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
     }
     // Fastest first, so the table reads top-down from the hardest target
     return refs.sort((a, b) => a.time - b.time);
-  }, [history, benchmarkMap, benchmarksEnabled, carClass, trackName]);
+  }, [history, benchmarkMap, benchmarksEnabled, carClass, trackName, bestLapTime, bestSplit1, bestSplit2]);
 
   // My actual PB (this car, else class) — the bar for a gold lap. Not the theoretical best, which sorts first.
   const pb = references.find(r => r.id === 'pb') ?? references.find(r => r.id === 'pb-class') ?? null;
@@ -367,6 +380,11 @@ export function useLiveTargets() {
 /** Targets the user hid (Reference ids), shared by the Live view and the overlay */
 export function useHiddenTargets() {
   return useSyncedSet(KEYS.liveHiddenTargets, []);
+}
+
+/** Overlay sections the user switched off (ids from OverlayView's PARTS) */
+export function useOverlayHiddenParts() {
+  return useSyncedSet(KEYS.overlayHiddenParts, []);
 }
 
 /** The selected targets among `visible`, in its order; the first visible one if none of them is available here */

@@ -98,6 +98,7 @@ export function LiveView({ files, driverNames, benchmarksEnabled }: LiveViewProp
       key: 'target', label: 'Target', width: '240px', sortValue: r => r.label,
       render: r => r.rating ? <RatingBadge rating={r.rating} size="sm" />
         : r.id === 'theoretical' ? <span className="text-racing-purple">{r.label}</span>
+        : r.id === 'session-best' ? <span className="text-racing-green">{r.label}</span>
         : r.id.startsWith('pb') ? <span className="text-racing-gold">{r.label}</span>
         : <span className="text-white">{r.label}</span>,
     },
