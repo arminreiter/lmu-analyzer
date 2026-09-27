@@ -78,7 +78,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 Twelve views: Live (desktop only), Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
 
 - `LiveView` — Desktop only. Polls `lmu_live` every 100ms; current/last lap sector strip, gap table (SortableTable) to my PB, theoretical best, benchmark tiers and optionally my individual laps (Targets / Top 10 / All) for the current track+class; row click toggles targets (multi-select) shared with the overlay; invalidated laps shown in orange
-- `OverlayView` — Not a tab: the always-on-top, transparent overlay window (`index.html?overlay`, routed in `main.tsx`), styled after LMU's timing widget (Lap/Last/Best/Current, sector bar with sector times, one delta row per selected target); gear menu toggles each section (`PARTS`, persisted via `useOverlayHiddenParts()`), sets the purple rule (`usePurpleMode()`: beat all targets + my best, or just my best sector) and picks targets. Loads cached files itself; resizes its window to the card. Game must run borderless/windowed to see it
+- `OverlayView` — Not a tab: the always-on-top, transparent overlay window (`index.html?overlay`, routed in `main.tsx`), styled after LMU's timing widget (Lap/Last/Best/Current, sector bar with sector times, one delta row per selected target); gear menu toggles each section (`PARTS`, persisted via `useOverlayHiddenParts()`), sets the purple rule (`usePurpleMode()`: beat all selected targets / my best sector with any car of the class / with this car) and picks targets. Loads cached files itself; resizes its window to the card. Game must run borderless/windowed to see it
 - `OverviewView` — Dashboard with stat cards (sessions, laps, races, tracks, cars, distance, best lap) + track/car stats tables
 - `PersonalBestsView` — Best laps per track/car with theoretical best (combined best sectors), filterable by track/car/mode
 - `SessionsView` — All sessions with filters (setting, type, track); click row → SessionDetailView
@@ -102,7 +102,7 @@ Follow F1/WEC timing screen semantics:
 - **Orange** (`--color-racing-orange`) — Incidents, warnings
 - **White** — Normal data values in tables
 
-Purple is reserved — don't use it for general "best" highlighting. It only appears for theoretical times (Personal Bests view) and, live, for a sector that beats my all-time best sector (i.e. improves the theoretical best) — by default only if it also beats every selected target (`PurpleMode` in `live.ts`).
+Purple is reserved — don't use it for general "best" highlighting. It only appears for theoretical times (Personal Bests view) and, live, for a sector that beats my all-time best sector (i.e. improves the theoretical best) — what it must beat is a user setting (`PurpleMode` in `live.ts`: all selected targets, my PB all cars of the class, or my PB this car).
 
 ### Design
 
