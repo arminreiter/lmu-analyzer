@@ -44,6 +44,14 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: LMU Analyzer ${{ github.ref_name }}
-          releaseBody: Download the `.exe` installer below. Installed apps update themselves.
+          releaseBody: Download the `-setup.exe` installer below (updates itself), or the `-portable.exe` (no install, no auto-update).
           # Must be published (not draft) — the updater reads /releases/latest/download/latest.json
           releaseDraft: false
+
+      - name: Upload portable exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp src-tauri/target/release/lmu-analyzer.exe "LMU-Analyzer-${GITHUB_REF_NAME}-portable.exe"
+          gh release upload "$GITHUB_REF_NAME" "LMU-Analyzer-${GITHUB_REF_NAME}-portable.exe"
