@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, memo, useCallback, type ReactNode } from 'react';
-import { Trophy, Flag, Route, Gauge, MapPin, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings } from 'lucide-react';
+import { Trophy, Flag, Route, Gauge, MapPin, Medal, CircleOff, Pencil, Camera, X, Globe, Shield, Zap, Target, Settings, ImageDown, DatabaseBackup, Upload } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
@@ -11,6 +11,10 @@ import { saveProfileName, loadProfileName, saveProfileAvatar, loadProfileAvatar,
 import { useClickOutside } from '../lib/useClickOutside';
 import { trackLabel } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
+import { TrackLink } from '../components/EntityLinks';
+import { downloadShareCard } from '../lib/shareCard';
+import { exportBackup, importBackup } from '../lib/backup';
+import { errorMessage } from '../lib/formatting';
 
 interface ProfileSettings {
   showTotalRaces: boolean;
@@ -33,7 +37,10 @@ const defaultSettings: ProfileSettings = {
 function loadSettings(): ProfileSettings {
   try {
     const raw = lsGet(KEYS.profileSettings);
-    if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
+    if (raw) {
+      const s = { ...defaultSettings, ...JSON.parse(raw) } as ProfileSettings;
+      return Array.isArray(s.hiddenCircuits) ? s : { ...s, hiddenCircuits: [] };
+    }
   } catch { /* corrupt JSON */ }
   return defaultSettings;
 }
@@ -53,7 +60,7 @@ const circuitColumn: Column<TrackBest> = {
   sortValue: t => t.trackCourse,
   render: t => (
     <div>
-      <span className="text-white font-medium">{trackLabel(t.trackCourse)}</span>
+      <TrackLink track={t.trackCourse} className="text-white font-medium" />
       <div className="flex items-center gap-1.5 mt-0.5">
         <span className="text-racing-muted text-[10px]">{t.bestCar}</span>
         <ClassBadge carClass={t.bestCarClass} />
@@ -228,13 +235,54 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
     clearProfileAvatar();
   }
 
+  const [panelStatus, setPanelStatus] = useState<string | null>(null);
+  const restoreRef = useRef<HTMLInputElement>(null);
+
+  function shareProfile() {
+    const t = profile.total;
+    setPanelStatus(null);
+    downloadShareCard({
+      kicker: 'Driver profile',
+      title: displayName,
+      headlineLabel: 'Races',
+      headline: String(t.races),
+      stats: [
+        { label: 'Wins', value: String(t.wins) },
+        { label: 'Podiums', value: String(t.podiums) },
+        { label: 'Poles', value: String(t.poles) },
+        { label: 'Distance', value: formatDistance(profile.totalDistanceKm) },
+      ],
+      footer: `${profile.tracksVisited} tracks · ${profile.carsUsed} cars · ${profile.totalSessions} sessions · ${profile.totalLaps.toLocaleString()} laps`,
+      fileName: `profile-${displayName}`,
+    }).catch(err => {
+      setPanelStatus(`Profile image failed: ${errorMessage(err)}`);
+      setSettingsOpen(true); // the status line lives in the settings panel
+    });
+  }
+
+  async function handleRestore(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !window.confirm('Restoring replaces your loaded results, notes and settings with the backup and disconnects your results folder (pick it again later to sync new results — that replaces the restored ones). Continue?')) return;
+    try {
+      await importBackup(file);
+      window.location.reload();
+    } catch (err) {
+      setPanelStatus(errorMessage(err));
+    }
+  }
+
   const hasOnline = profile.online.races > 0;
   const hasRated = profile.rated.races > 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-5 relative">
       {/* Settings — positioned above the card so overflow-hidden doesn't clip it */}
-      <div ref={settingsRef} className="absolute right-0 top-1 z-30">
+      <div ref={settingsRef} className="absolute right-0 top-1 z-30 flex items-start">
+        <button onClick={shareProfile} title="Download profile as an image"
+          className="p-2 rounded-lg transition-colors cursor-pointer text-racing-muted/30 hover:text-racing-muted">
+          <ImageDown className="w-4 h-4" />
+        </button>
         <button
           onClick={() => setSettingsOpen(o => !o)}
           className={`p-2 rounded-lg transition-colors cursor-pointer ${settingsOpen ? 'bg-racing-highlight/20 text-white' : 'text-racing-muted/30 hover:text-racing-muted'}`}
@@ -243,6 +291,18 @@ export const DriverProfileView = memo(function DriverProfileView({ files, driver
         </button>
         {settingsOpen && (
           <div className="absolute right-0 top-10 w-72 bg-racing-card border border-racing-border rounded-lg shadow-xl py-2 max-h-80 overflow-y-auto">
+            <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-racing-muted/50 font-medium">Backup</div>
+            <button onClick={() => { setPanelStatus('Preparing backup…'); exportBackup().then(() => setPanelStatus(null), err => setPanelStatus(errorMessage(err))); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-xs text-racing-text hover:bg-racing-highlight/10 transition-colors cursor-pointer">
+              <DatabaseBackup className="w-3.5 h-3.5" /> Export results, notes &amp; settings
+            </button>
+            <button onClick={() => restoreRef.current?.click()}
+              className="w-full flex items-center gap-2 px-4 py-2 text-xs text-racing-text hover:bg-racing-highlight/10 transition-colors cursor-pointer">
+              <Upload className="w-3.5 h-3.5" /> Restore from backup…
+            </button>
+            <input ref={restoreRef} type="file" accept=".gz,.json,application/gzip,application/json" onChange={handleRestore} className="hidden" />
+            {panelStatus && <p className="px-4 py-1.5 text-[11px] text-racing-orange">{panelStatus}</p>}
+            <div className="border-t border-racing-border/30 my-1.5" />
             <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-racing-muted/50 font-medium">Sections</div>
             <SettingsToggle label="Total Races" checked={settings.showTotalRaces} onChange={() => updateSetting('showTotalRaces')} />
             <SettingsToggle label="Online Races" checked={settings.showOnlineRaces} onChange={() => updateSetting('showOnlineRaces')} />

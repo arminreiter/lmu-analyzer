@@ -3,7 +3,7 @@
  * plus the reference laps (my PBs, theoretical best, benchmark tiers) the live views compare against.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { KEYS, lsGet, lsSet } from './storage';
@@ -388,7 +388,8 @@ function useSyncedLocal(key: string, fallback: string): [string, (v: string) => 
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [key, fallback]);
-  return [value, (v: string) => { setValue(v); lsSet(key, v); }];
+  const set = useCallback((v: string) => { setValue(v); lsSet(key, v); }, [key]);
+  return [value, set];
 }
 
 /** A set of ids in localStorage, synced between windows. A legacy plain-string value becomes a one-item set. */
@@ -402,11 +403,11 @@ function useSyncedSet(key: string, fallback: string[]): [Set<string>, (id: strin
       return new Set<string>([raw]); // pre-multi-select versions stored one bare id
     }
   }, [raw]);
-  const toggle = (id: string) => {
+  const toggle = useCallback((id: string) => {
     const next = new Set(set);
     if (!next.delete(id)) next.add(id);
     setRaw(JSON.stringify([...next]));
-  };
+  }, [set, setRaw]);
   return [set, toggle];
 }
 

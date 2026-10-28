@@ -19,6 +19,7 @@ export const KEYS = {
   overlayHiddenParts: 'lmu-analyzer-overlay-hidden-parts', // desktop only — JSON array of overlay section ids
   purpleMode: 'lmu-analyzer-purple-mode', // desktop only — 'targets' | 'personal'
   excludedSessions: 'lmu-analyzer-excluded-sessions', // JSON array of sessionKey() ids
+  sessionNotes: 'lmu-analyzer-session-notes', // JSON { [sessionKey]: { note, tags } }
   trackModeSelected: 'lmu_trackmode_selected', // legacy name — renaming would lose users' stored value
 } as const;
 
@@ -37,8 +38,9 @@ export function lsGet(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 
-export function lsSet(key: string, value: string): void {
-  try { localStorage.setItem(key, value); } catch { /* quota exceeded or unavailable */ }
+/** False when the value couldn't be stored (quota exceeded or storage unavailable) */
+export function lsSet(key: string, value: string): boolean {
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
 }
 
 export function lsRemove(key: string): void {
@@ -51,6 +53,8 @@ export function saveFilters(selectedDrivers: string[], selectedClasses: CarClass
   lsSet(KEYS.activeView, activeView);
 }
 
+const stringArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
 export function loadFilters(): { selectedDrivers: string[]; selectedClasses: CarClass[]; activeView: string } | null {
   try {
     const drivers = lsGet(KEYS.selectedDrivers);
@@ -58,8 +62,9 @@ export function loadFilters(): { selectedDrivers: string[]; selectedClasses: Car
     const view = lsGet(KEYS.activeView);
     if (!drivers && !classes && !view) return null;
     return {
-      selectedDrivers: drivers ? JSON.parse(drivers) : [],
-      selectedClasses: classes ? JSON.parse(classes) : [],
+      // Arrays only: a bad stored value (e.g. from a backup) would otherwise break startup
+      selectedDrivers: stringArray(drivers ? JSON.parse(drivers) : []),
+      selectedClasses: stringArray(classes ? JSON.parse(classes) : []) as CarClass[],
       activeView: view || 'overview',
     };
   } catch {
@@ -96,9 +101,13 @@ export async function saveFiles(files: RaceFile[]): Promise<boolean> {
 
 interface CachedFiles {
   files: RaceFile[];
-  /** True when the cache was written by an app version predating the versioned format. */
+  /** True when the cache predates the versioned format, or was parsed before stream extras
+   *  (chat, sector records, driver changes, DNF reasons, server rules) — re-parsing adds them. */
   legacy: boolean;
 }
+
+// Every session parsed by this version has `chat` (possibly empty)
+const parsedBeforeExtras = (files: RaceFile[]) => files.some(f => f.sessions.some(s => s.chat === undefined));
 
 function unwrapCache(raw: unknown): CachedFiles | null {
   // Legacy caches were a plain RaceFile[] with the same shape as version 1 — accept them;
@@ -118,7 +127,7 @@ export async function loadCachedFiles(): Promise<CachedFiles | null> {
     if (cached) {
       // Rewrite legacy caches in versioned form so a future version bump doesn't discard them
       if (cached.legacy) void saveFiles(cached.files);
-      return cached;
+      return { ...cached, legacy: cached.legacy || parsedBeforeExtras(cached.files) };
     }
   } catch {
     // IndexedDB unavailable
@@ -130,7 +139,7 @@ export async function loadCachedFiles(): Promise<CachedFiles | null> {
     const cached = unwrapCache(JSON.parse(data));
     if (!cached) return null;
     saveFiles(cached.files);
-    return cached;
+    return { ...cached, legacy: cached.legacy || parsedBeforeExtras(cached.files) };
   } catch {
     return null;
   }
@@ -164,9 +173,10 @@ export function clearProfileAvatar() {
   lsRemove(KEYS.profileAvatar);
 }
 
-// Only the theme survives a data reload (pure UI preference); everything else —
+// Only the theme (pure UI preference) and session notes (hand-written, keyed by result file
+// name so they reattach on re-import) survive a data reload; everything else —
 // files, filters, profile, benchmarks toggle, track-mode selection — is wiped.
-const KEEP_ON_CLEAR: ReadonlySet<string> = new Set([KEYS.theme]);
+const KEEP_ON_CLEAR: ReadonlySet<string> = new Set([KEYS.theme, KEYS.sessionNotes]);
 
 export async function clearAll() {
   Object.values(KEYS).forEach(k => { if (!KEEP_ON_CLEAR.has(k)) lsRemove(k); });

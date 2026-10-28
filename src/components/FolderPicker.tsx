@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { FolderOpen, Import, Shield, Zap, RotateCcw } from 'lucide-react';
 import { isTauri } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ResultsFolder } from '../lib/types';
+import { importBackup } from '../lib/backup';
+import { errorMessage } from '../lib/formatting';
 
 const DEFAULT_RESULTS_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Log\\Results';
 
@@ -15,6 +17,21 @@ interface FolderPickerProps {
 }
 
 export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached, loading, error }: FolderPickerProps) {
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  // A backup lands in storage; reloading lets the app start from it like any cached data
+  async function handleRestore(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      await importBackup(file);
+      window.location.reload();
+    } catch (err) {
+      setRestoreError(errorMessage(err));
+    }
+  }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const desktop = isTauri();
   const isSupported = desktop || 'showDirectoryPicker' in window;
@@ -172,6 +189,13 @@ export function FolderPicker({ onFolderSelected, onFilesUploaded, onResumeCached
               </button>
             </div>
           )}
+
+          <input ref={backupInputRef} type="file" accept=".gz,.json,application/gzip,application/json" onChange={handleRestore} className="hidden" />
+          <button onClick={() => backupInputRef.current?.click()} disabled={loading}
+            className="mt-4 text-xs text-racing-muted hover:text-white underline decoration-racing-muted/30 transition-colors cursor-pointer disabled:opacity-50">
+            Restore from a backup file
+          </button>
+          {restoreError && <p className="mt-2 text-xs text-racing-red">{restoreError}</p>}
 
           {error && (
             <div className="mt-5 p-3 bg-racing-red/5 border border-racing-red/20 rounded-lg">

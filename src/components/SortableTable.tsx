@@ -1,5 +1,6 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, useCallback, type ReactNode } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { ContextMenu, type MenuItem, type MenuState } from './ContextMenu';
 
 export interface Column<T> {
   key: string;
@@ -21,13 +22,17 @@ interface SortableTableProps<T> {
   rowKey: (row: T, index: number) => string;
   rowClass?: (row: T, index: number) => string;
   onRowClick?: (row: T, index: number) => void;
+  /** Right-click actions for a row; an empty list keeps the browser's own menu */
+  rowMenu?: (row: T) => MenuItem[];
 }
 
 type SortDir = 'asc' | 'desc';
 
-export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick }: SortableTableProps<T>) {
+export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick, rowMenu }: SortableTableProps<T>) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   const handleSort = (key: string) => {
     if (sortCol === key) {
@@ -107,6 +112,12 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick }
               key={rowKey(row, i)}
               className={`border-b border-racing-border/20 hover:bg-racing-highlight/10 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${rowClass?.(row, i) ?? ''}`}
               onClick={onRowClick ? () => onRowClick(row, i) : undefined}
+              onContextMenu={rowMenu ? e => {
+                const items = rowMenu(row);
+                if (items.length === 0) return;
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, items });
+              } : undefined}
             >
               {columns.map(col => (
                 <td
@@ -121,6 +132,7 @@ export function SortableTable<T>({ columns, data, rowKey, rowClass, onRowClick }
           ))}
         </tbody>
       </table>
+      {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
     </div>
   );
 }

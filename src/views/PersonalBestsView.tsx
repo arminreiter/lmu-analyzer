@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { Trophy, Zap } from 'lucide-react';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
@@ -8,10 +8,14 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { trackOption, trackLabel } from '../lib/racepace';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { getTheoreticalBest } from '../lib/analytics';
+import { getTheoreticalBest, hasMixedSetups, matchesSetup, SETUP_FILTER_OPTIONS, type SetupFilter } from '../lib/analytics';
 import { formatLapTime, formatSector, formatSpeed } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
 import type { RaceFile, PersonalBest } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { truePace } from '../lib/stints';
+import { lapCard } from '../lib/shareCard';
+import { TrackLink, CarLink } from '../components/EntityLinks';
 
 type LapMode = 'car' | 'session' | 'all';
 
@@ -25,21 +29,53 @@ interface PersonalBestsViewProps {
 }
 
 export const PersonalBestsView = memo(function PersonalBestsView({ files, driverNames, onNavigate }: PersonalBestsViewProps) {
+  const sessionMenu = useSessionMenu();
   const [filterTrack, setFilterTrack] = useState<string>('All');
   const [filterCar, setFilterCar] = useState<string>('All');
   const [showTheoretical, setShowTheoretical] = useState(false);
   const [lapMode, setLapMode] = useState<LapMode>('car');
+  const [pickedSetup, setFilterSetup] = useState<SetupFilter>('all');
+  const mixedSetups = useMemo(() => hasMixedSetups(files), [files]);
+  // The control hides when the data stops having both kinds — so must its effect
+  const filterSetup: SetupFilter = mixedSetups ? pickedSetup : 'all';
+  const fileByName = useMemo(() => new Map(files.map(f => [f.fileName, f])), [files]);
 
   const { personalBests: bestPerCar, allSessionBests: bestPerSession, allLaps: everyLap, sectorMins } = useDataIndex();
-  const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCar;
+  const bySetup = useCallback((b: PersonalBest) => {
+    const file = fileByName.get(b.fileName);
+    return !file || matchesSetup(file, filterSetup);
+  }, [fileByName, filterSetup]);
+  // Per car under a setup filter: the car's best lap among that setup's laps, not its overall PB
+  const bestPerCarInSetup = useMemo(() => {
+    if (filterSetup === 'all') return bestPerCar;
+    const best = new Map<string, PersonalBest>();
+    for (const lap of everyLap) {
+      const key = `${lap.trackCourse}|${lap.carType}`;
+      if (bySetup(lap) && lap.lapTime < (best.get(key)?.lapTime ?? Infinity)) best.set(key, lap);
+    }
+    return [...best.values()];
+  }, [filterSetup, bestPerCar, everyLap, bySetup]);
+  // Valid lap times per track+car (respecting the setup filter), for the True Pace column
+  const truePaces = useMemo(() => {
+    const times = new Map<string, number[]>();
+    for (const lap of everyLap) {
+      if (!bySetup(lap)) continue;
+      const key = `${lap.trackCourse}|${lap.carType}`;
+      const list = times.get(key);
+      if (list) list.push(lap.lapTime);
+      else times.set(key, [lap.lapTime]);
+    }
+    return new Map([...times].map(([key, t]) => [key, truePace(t)]));
+  }, [everyLap, bySetup]);
+  const allBests = lapMode === 'all' ? everyLap : lapMode === 'session' ? bestPerSession : bestPerCarInSetup;
   const tracks = useMemo(() => Array.from(new Set(allBests.map(b => b.trackCourse))).sort(), [allBests]);
   const cars = useMemo(() => Array.from(new Set(allBests.map(b => b.carType))).sort(), [allBests]);
 
   const filtered = useMemo(() => allBests.filter(b => {
     if (filterTrack !== 'All' && b.trackCourse !== filterTrack) return false;
     if (filterCar !== 'All' && b.carType !== filterCar) return false;
-    return true;
-  }), [allBests, filterTrack, filterCar]);
+    return bySetup(b);
+  }), [allBests, filterTrack, filterCar, bySetup]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, PersonalBest[]>();
@@ -67,6 +103,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
           value={lapMode}
           onChange={setLapMode}
         />
+        {mixedSetups && <FilterButtonGroup options={SETUP_FILTER_OPTIONS} value={filterSetup} onChange={setFilterSetup} />}
         <button onClick={() => setShowTheoretical(!showTheoretical)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
             ${showTheoretical ? 'bg-racing-purple/15 text-racing-purple border border-racing-purple/25' : 'bg-racing-card border border-racing-border text-racing-muted hover:text-racing-text'}`}>
@@ -123,12 +160,17 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
             exportValue: r => r.rowType === 'theoretical' ? `${r.carType} (theoretical)` : r.carType,
             render: r => r.rowType === 'theoretical'
               ? <span className="text-racing-purple/80 text-xs">{r.carType} (theoretical)</span>
-              : <span className="text-white text-xs">{r.carType}</span> },
+              : <CarLink car={r.carType} className="text-white text-xs" /> },
           { key: 'class', label: 'Class', width: '100px', sortValue: r => r.carClass,
             render: r => <ClassBadge carClass={r.carClass} /> },
           { key: 'lapTime', label: 'Lap Time', align: 'right', mono: true, width: '10%',
             sortValue: r => r.lapTime,
             render: r => <span className={`font-bold ${r.rowType === 'theoretical' ? 'text-racing-purple glow-purple' : r.lapTime === fastestLap ? 'text-racing-gold' : 'text-white'}`}>{formatLapTime(r.lapTime)}</span> },
+          { key: 'truePace', label: 'True Pace', align: 'right', mono: true, width: '9%',
+            sortValue: r => truePaces.get(`${r.trackCourse}|${r.carType}`) ?? null,
+            exportValue: r => r.rowType === 'theoretical' ? null : formatLapTime(truePaces.get(`${r.trackCourse}|${r.carType}`) ?? null),
+            render: r => r.rowType === 'theoretical' ? <span className="text-racing-muted/40">&mdash;</span>
+              : <span className="text-racing-text" title="Median of your 5 fastest laps in this car here — the pace you can repeat">{formatLapTime(truePaces.get(`${r.trackCourse}|${r.carType}`) ?? null)}</span> },
           { key: 's1', label: 'S1', align: 'right', mono: true, width: '8%',
             sortValue: r => r.sector1,
             render: r => <span className={r.rowType === 'theoretical' ? 'text-racing-purple/70' : r.sector1 !== null && r.sector1 <= bestS1 ? 'text-racing-green font-medium' : 'text-racing-muted'}>{formatSector(r.sector1)}</span> },
@@ -154,7 +196,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
 
         return (
           <div key={track} className="data-card carbon-fiber overflow-hidden">
-            <DataCardHeader title={trackLabel(track).toUpperCase()}>
+            <DataCardHeader title={<TrackLink track={track}>{trackLabel(track).toUpperCase()}</TrackLink>}>
               <span className="ml-auto" />
               <ExportButton columns={columns} data={defaultSorted} filename={`lmu-personal-bests-${track}`} />
             </DataCardHeader>
@@ -163,6 +205,7 @@ export const PersonalBestsView = memo(function PersonalBestsView({ files, driver
               data={defaultSorted}
               rowKey={(r, i) => `${r.rowType}-${r.carType}-${r.fileName}-${r.lapNumber}-${i}`}
               rowClass={r => r.rowType === 'theoretical' ? 'bg-racing-purple/[0.04]' : r.lapTime === fastestLap ? 'bg-racing-gold/[0.03]' : ''}
+              rowMenu={r => r.rowType === 'theoretical' ? [] : sessionMenu({ ...r, card: () => lapCard(r, truePaces.get(`${r.trackCourse}|${r.carType}`)) })}
             />
           </div>
         );

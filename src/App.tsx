@@ -18,12 +18,15 @@ import { DriverProfileView } from './views/DriverProfileView';
 import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
 import { LiveView } from './views/LiveView';
+import { FuelCalculatorView } from './views/FuelCalculatorView';
+import { SharedSessionView } from './views/SharedSessionView';
 import { loadFolder, parseUploadedFiles } from './lib/parser';
 import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, excludeSessions, sessionKey, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
 import { useExcludedSessions } from './lib/live';
 import { errorMessage } from './lib/formatting';
 import { parseSessionContext } from './lib/sessionContext';
 import { DataIndexProvider } from './lib/DataIndexContext';
+import { SessionActionsContext, NotifyContext } from './lib/sessionMenu';
 import * as storage from './lib/storage';
 import { useTheme } from './lib/useTheme';
 import { notifyNewSessions } from './lib/sessionNotifications';
@@ -31,6 +34,13 @@ import type { RaceFile, DriverSummary, CarClass, ResultsFolder } from './lib/typ
 
 // The Live view needs the desktop app's LMU connection — a #live link in the browser lands on Overview
 const desktopOnlyFallback = (view: string) => (view === 'live' && !isTauri() ? 'overview' : view);
+
+// Views that can be restored without a context ('session' needs one, 'shared' is never an app view)
+const RESTORABLE_VIEWS = new Set(['live', 'overview', 'bests', 'sessions', 'tracks', 'cars', 'races', 'fuel', 'profile', 'benchmarks', 'trackmode', 'about']);
+const restoredView = (view: string | undefined) => desktopOnlyFallback(view && RESTORABLE_VIEWS.has(view) ? view : 'overview');
+
+// History entry of a share link: `viaHistory` = pasted into this tab, so the app's own entry is behind it
+type SharedHistoryState = { view: 'shared'; context: string | null; viaHistory?: boolean; direct?: boolean };
 
 // Build a URL hash from view + context
 const buildHash = (view: string, context: string | null) =>
@@ -49,10 +59,19 @@ const parseHash = (hash: string): { view: string; context: string | null } | nul
   const raw = hash.startsWith('#') ? hash.slice(1) : hash;
   const slash = raw.indexOf('/');
   if (slash === -1) return { view: raw, context: null };
-  return { view: raw.slice(0, slash), context: decodeURIComponent(raw.slice(slash + 1)) };
+  try {
+    return { view: raw.slice(0, slash), context: decodeURIComponent(raw.slice(slash + 1)) };
+  } catch {
+    return null; // malformed %-escape (e.g. a truncated pasted link) — land on the default view
+  }
 };
 
 function App() {
+  // A #shared/<payload> link shows that session on its own, whatever data is (or isn't) loaded
+  const [sharedPayload, setSharedPayload] = useState(() => {
+    const h = parseHash(window.location.hash);
+    return h?.view === 'shared' ? h.context : null;
+  });
   const [files, setFiles] = useState<RaceFile[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [playerDrivers, setPlayerDrivers] = useState<string[]>([]);
@@ -125,11 +144,11 @@ function App() {
     }
     // URL hash wins over saved view so deep links / reloads land on the right view
     const fromHash = parseHash(window.location.hash);
-    if (fromHash) {
-      setActiveView(desktopOnlyFallback(fromHash.view));
+    if (fromHash && fromHash.view !== 'shared') {
+      setActiveView(fromHash.view === 'session' && fromHash.context ? 'session' : restoredView(fromHash.view));
       setViewContext(fromHash.context);
     } else if (savedFilters) {
-      setActiveView(desktopOnlyFallback(savedFilters.activeView || 'overview'));
+      setActiveView(restoredView(savedFilters.activeView));
     }
     setLoaded(true);
     return parsed;
@@ -320,10 +339,23 @@ function App() {
   }, [activeView]);
 
   const isPoppingRef = useRef(false);
+  // "Analyze your own races" on a pasted link walks back through history to the app's entry
+  const exitingSharedRef = useRef(false);
+  const currentViewRef = useRef({ activeView, viewContext });
+  useEffect(() => { currentViewRef.current = { activeView, viewContext }; });
+
+  // A share link opened directly: mark its entry so popstate and exit can tell it from a pasted one
+  // (history.state survives reloads, a ref wouldn't)
+  useEffect(() => {
+    const h = parseHash(window.location.hash);
+    if (h?.view === 'shared' && !window.history.state) {
+      window.history.replaceState({ view: 'shared', context: h.context, direct: true } satisfies SharedHistoryState, '');
+    }
+  }, []);
 
   // Push history entry when view changes (unless triggered by popstate)
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || sharedPayload) return;
     if (isPoppingRef.current) {
       isPoppingRef.current = false;
       return;
@@ -336,12 +368,33 @@ function App() {
     } else if (!window.history.state) {
       window.history.replaceState(state, '', hash);
     }
-  }, [activeView, viewContext, loaded]);
+  }, [activeView, viewContext, loaded, sharedPayload]);
 
   // Listen for browser back/forward
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
       const state = (e.state as { view: string; context: string | null } | null) ?? parseHash(window.location.hash);
+      if (state?.view === 'shared') {
+        const entry = e.state as SharedHistoryState | null;
+        if (exitingSharedRef.current) {
+          // Leaving: skip over earlier pasted links; a directly opened one becomes the app's entry
+          if (entry?.viaHistory) {
+            window.history.back();
+            return;
+          }
+          exitingSharedRef.current = false;
+          const { activeView, viewContext } = currentViewRef.current;
+          window.history.replaceState({ view: activeView, context: viewContext }, '', buildHash(activeView, viewContext));
+          setSharedPayload(null);
+          return;
+        }
+        // A link pasted into this tab arrives as a fresh entry without state
+        if (!entry) window.history.replaceState({ view: 'shared', context: state.context, viaHistory: true } satisfies SharedHistoryState, '');
+        setSharedPayload(state.context);
+        return;
+      }
+      exitingSharedRef.current = false;
+      setSharedPayload(null);
       if (!state) return;
       isPoppingRef.current = true;
       setActiveView(desktopOnlyFallback(state.view));
@@ -362,6 +415,7 @@ function App() {
   );
   const [excludedIds, toggleExcluded] = useExcludedSessions();
   const filteredFiles = useMemo(() => excludeSessions(classFiles, excludedIds), [classFiles, excludedIds]);
+  const sessionActions = useMemo(() => ({ onNavigate: navigateTo, excludedIds, toggleExcluded }), [navigateTo, excludedIds, toggleExcluded]);
   // Excluded sessions stay reachable (Session Detail, Sessions view list) so they can be included again
   const excludedSessions = useMemo(() => classFiles.flatMap(file => file.sessions
     .filter(session => excludedIds.has(sessionKey(file.fileName, session.sessionIndex)))
@@ -418,6 +472,23 @@ function App() {
   );
 
 
+  if (sharedPayload) {
+    return (
+      // key: a new link starts from a fresh view (no stale session, error or slow earlier parse)
+      <SharedSessionView key={sharedPayload} encoded={sharedPayload} onExit={() => {
+        if ((window.history.state as SharedHistoryState | null)?.viaHistory) {
+          // Pasted into this tab: walk back to the app's own entry (popstate clears the link)
+          exitingSharedRef.current = true;
+          window.history.back();
+          return;
+        }
+        // Opened directly: replace with the app's own entry so the history-push effect finds it and adds nothing
+        window.history.replaceState({ view: activeView, context: viewContext }, '', buildHash(activeView, viewContext));
+        setSharedPayload(null);
+      }} />
+    );
+  }
+
   if (!loaded) {
     return (
       <>
@@ -464,6 +535,8 @@ function App() {
             <p className="text-sm mt-1">Select at least one driver from the dropdown above.</p>
           </div>
         ) : (
+          <NotifyContext.Provider value={addNotice}>
+          <SessionActionsContext.Provider value={sessionActions}>
           <DataIndexProvider files={filteredFiles} driverNames={selectedDrivers}>
             {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
@@ -477,10 +550,13 @@ function App() {
             {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} onNavigate={navigateTo} />}
             {activeView === 'benchmarks' && <RacePaceView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} onViewChange={setActiveView} />}
             {activeView === 'trackmode' && <TrackModeView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} onViewChange={setActiveView} />}
+            {activeView === 'fuel' && <FuelCalculatorView />}
             {activeView === 'races' && <RaceResultsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'live' && isTauri() && <LiveView files={filteredFiles} driverNames={selectedDrivers} benchmarksEnabled={racePaceEnabled} />}
             {activeView === 'profile' && <DriverProfileView files={filteredFiles} driverNames={selectedDrivers} />}
           </DataIndexProvider>
+          </SessionActionsContext.Provider>
+          </NotifyContext.Provider>
         )}
       </main>
 

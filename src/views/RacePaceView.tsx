@@ -26,6 +26,8 @@ import {
   type PaceRating,
 } from '../lib/racepace';
 import type { RaceFile, PersonalBest, CarClass } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { CarLink } from '../components/EntityLinks';
 
 interface RacePaceViewProps {
   files: RaceFile[];
@@ -70,6 +72,7 @@ function aggregateByClass<T>(
 }
 
 export const RacePaceView = memo(function RacePaceView({ files, driverNames, onNavigate, onViewChange }: RacePaceViewProps) {
+  const sessionMenu = useSessionMenu();
   const { benchmarkMap, loading, error } = useBenchmarks();
   const [selectedTrack, setSelectedTrack] = useState<string>('All');
   const [selectedCar, setSelectedCar] = useState<string>('All');
@@ -277,7 +280,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
   const columns: Column<ComparisonRow>[] = [
     { key: 'car', label: 'Car', width: '14%', cellClass: 'pl-4 pr-1',
       sortValue: r => r.best.carType,
-      render: r => <span className="text-white text-xs">{r.best.carType}</span> },
+      render: r => <CarLink car={r.best.carType} className="text-white text-xs" /> },
     { key: 'class', label: 'Class', width: '9%', cellClass: 'px-0',
       sortValue: r => r.best.carClass,
       render: r => <ClassBadge carClass={r.best.carClass} /> },
@@ -513,6 +516,7 @@ export const RacePaceView = memo(function RacePaceView({ files, driverNames, onN
               columns={columns}
               data={sorted}
               rowKey={r => `${r.best.carType}-${r.best.fileName}-${r.best.lapNumber}`}
+              rowMenu={r => sessionMenu(r.best)}
               rowClass={r => {
                 if (r.rating === 'Alien') return 'bg-racing-purple/[0.04]';
                 if (r.rating === 'Competitive') return 'bg-racing-green/[0.03]';

@@ -9,8 +9,9 @@ import { buildLapColumns } from '../components/lapColumns';
 import { StatCell, LapValidityCell } from '../components/StatCell';
 import { formatDistance } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
-import { trackLabel } from '../lib/racepace';
 import type { RaceFile, PersonalBest } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { TrackLink } from '../components/EntityLinks';
 
 type LapMode = 'track' | 'session' | 'all';
 
@@ -28,6 +29,7 @@ interface CarsViewProps {
 }
 
 export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsViewProps) {
+  const sessionMenu = useSessionMenu();
   const [selectedCar, setSelectedCar] = useState<string | null>(initialCar ?? null);
   const [lapMode, setLapMode] = useState<LapMode>('track');
   const { carStats: cars, personalBests: bestPerTrack, allSessionBests: bestPerSession, allLaps } = useDataIndex();
@@ -40,9 +42,7 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
 
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
     { key: 'track', label: 'Track', width: '22%', sortValue: (r: PersonalBest) => r.trackCourse,
-      render: (r: PersonalBest) => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('tracks', r.trackCourse); }} className="text-white cursor-pointer">{trackLabel(r.trackCourse)}</button>
-        : <span className="text-white">{trackLabel(r.trackCourse)}</span> },
+      render: (r: PersonalBest) => <TrackLink track={r.trackCourse} className="text-white" /> },
     ...buildLapColumns(onNavigate),
   ], [onNavigate]);
 
@@ -97,6 +97,7 @@ export const CarsView = memo(function CarsView({ initialCar, onNavigate }: CarsV
               columns={lapColumns}
               data={sortedCarLaps}
               rowKey={(r, i) => `${r.trackCourse}-${r.fileName}-${r.lapNumber}-${i}`}
+              rowMenu={sessionMenu}
             />
           </div>
         </>

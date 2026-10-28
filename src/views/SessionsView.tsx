@@ -5,12 +5,17 @@ import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isOnline, isRatedRace, calculateConsistency, getTopSpeed, sessionKey } from '../lib/analytics';
-import { trackOption, trackLabel } from '../lib/racepace';
+import { isOnline, isRatedRace, calculateConsistency, getTopSpeed, sessionKey, hasMixedSetups, matchesSetup, SETUP_FILTER_OPTIONS, type SetupFilter } from '../lib/analytics';
+import { trackOption } from '../lib/racepace';
 import { formatLapTime, formatSpeed, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
 import { buildSessionContext } from '../lib/sessionContext';
 import { useDataIndex } from '../lib/useDataIndex';
+import { useSessionNotes, allTags } from '../lib/sessionNotes';
+import { TagChip } from '../components/SessionNotesCard';
+import { StickyNote } from 'lucide-react';
 import type { RaceFile, DriverResult, SessionData } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { TrackLink, CarLink } from '../components/EntityLinks';
 
 interface SessionsViewProps {
   files: RaceFile[];
@@ -26,10 +31,18 @@ type SessionRow = {
   topSpeed: number | null; consistency: number | null;
 };
 
-export const SessionsView = memo(function SessionsView({ onNavigate, excluded = [], onToggleExcluded }: SessionsViewProps) {
+export const SessionsView = memo(function SessionsView({ files, onNavigate, excluded = [], onToggleExcluded }: SessionsViewProps) {
   const [filterSetting, setFilterSetting] = useState<'all' | 'online' | 'rated'>('all');
   const [filterType, setFilterType] = useState<string>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
+  const [pickedSetup, setFilterSetup] = useState<SetupFilter>('all');
+  const [filterTag, setFilterTag] = useState('All');
+  const [search, setSearch] = useState('');
+  const [notes] = useSessionNotes();
+  const tags = useMemo(() => allTags(notes), [notes]);
+  const mixedSetups = useMemo(() => hasMixedSetups(files), [files]);
+  // The control hides when the data stops having both kinds — so must its effect
+  const filterSetup: SetupFilter = mixedSetups ? pickedSetup : 'all';
 
   const { driverSessions: allSessions } = useDataIndex();
   const tracks = useMemo(() => Array.from(new Set(allSessions.map(s => s.file.trackCourse))).sort(), [allSessions]);
@@ -42,9 +55,17 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
     })
     .filter(s => filterType === 'All' || s.session.type === filterType)
     .filter(s => filterTrack === 'All' || s.file.trackCourse === filterTrack)
+    .filter(s => matchesSetup(s.file, filterSetup))
+    .filter(s => {
+      const n = notes[sessionKey(s.file.fileName, s.session.sessionIndex)];
+      if (filterTag !== 'All' && !n?.tags.includes(filterTag)) return false;
+      if (!search.trim()) return true;
+      const haystack = [n?.note, ...(n?.tags ?? []), s.file.trackCourse, s.driver.carType, s.file.serverName].join(' ').toLowerCase();
+      return search.toLowerCase().split(/\s+/).every(word => haystack.includes(word));
+    })
     // Precompute per-row derived values once, so columns don't recompute in sortValue/render
     .map((s): SessionRow => ({ ...s, topSpeed: getTopSpeed(s.driver.laps), consistency: calculateConsistency(s.driver.laps) }))
-    .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
+    .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack, filterSetup, filterTag, search, notes]);
 
   const excludedRows = useMemo(() => excluded
     .map((s): SessionRow => ({ ...s, topSpeed: getTopSpeed(s.driver.laps), consistency: calculateConsistency(s.driver.laps) }))
@@ -61,7 +82,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
     },
     { key: 'track', label: 'Track', width: '25%',
       sortValue: r => r.file.trackCourse,
-      render: r => <span className="text-white text-sm font-medium">{trackLabel(r.file.trackCourse)}</span>,
+      render: r => <TrackLink track={r.file.trackCourse} className="text-white text-sm font-medium" />,
     },
     { key: 'class', label: 'Class', width: '100px',
       sortValue: r => r.driver.carClass,
@@ -69,7 +90,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
     },
     { key: 'car', label: 'Car', width: '18%',
       sortValue: r => r.driver.carType,
-      render: r => <span className="text-racing-muted text-xs">{r.driver.carType}</span>,
+      render: r => <CarLink car={r.driver.carType} className="text-racing-muted text-xs" />,
     },
     { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '115px',
       sortValue: r => r.driver.bestLapTime ?? Infinity,
@@ -97,11 +118,25 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
       sortValue: r => r.session.type === 'Race' && r.driver.gridPosition ? r.driver.gridPosition - r.driver.position : 0,
       render: r => { if (r.session.type !== 'Race' || !r.driver.gridPosition) return null; const g = r.driver.gridPosition - r.driver.position; return <span className={`text-xs font-bold ${g > 0 ? 'text-racing-green' : g < 0 ? 'text-racing-red' : 'text-racing-muted'}`}>{g > 0 ? '+' : ''}{g}</span>; },
     },
+    { key: 'notes', label: 'Notes', width: '14%',
+      sortValue: r => { const n = notes[sessionKey(r.file.fileName, r.session.sessionIndex)]; return n ? [...n.tags, n.note].join(' ') : null; },
+      exportValue: r => { const n = notes[sessionKey(r.file.fileName, r.session.sessionIndex)]; return n ? [n.tags.join(', '), n.note].filter(Boolean).join(' — ') : null; },
+      render: r => {
+        const n = notes[sessionKey(r.file.fileName, r.session.sessionIndex)];
+        if (!n) return null;
+        return (
+          <span className="flex items-center gap-1 overflow-hidden" title={n.note || undefined}>
+            {n.note && <StickyNote className="w-3.5 h-3.5 shrink-0 text-racing-yellow" />}
+            {n.tags.map(t => <TagChip key={t} tag={t} />)}
+          </span>
+        );
+      },
+    },
     { key: 'date', label: 'Date', align: 'right', width: '155px',
       sortValue: r => r.session.dateTime || r.file.timeString,
       render: r => <span className="text-racing-muted text-xs">{r.session.dateTime || r.file.timeString}</span>,
     },
-  ], []);
+  ], [notes]);
 
   const excludedColumns: Column<SessionRow>[] = useMemo(() => [...columns,
     { key: 'include', label: '', align: 'right', width: '80px',
@@ -112,6 +147,8 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
     },
   ], [columns, onToggleExcluded]);
 
+  const sessionMenu = useSessionMenu();
+  const rowMenu = (r: SessionRow) => sessionMenu({ fileName: r.file.fileName, sessionIndex: r.session.sessionIndex, driverName: r.driver.name, lapTime: r.driver.bestLapTime });
   const openSession = (r: SessionRow) => onNavigate?.('session', buildSessionContext(r.file.fileName, r.session.sessionIndex, r.driver.name));
 
   return (
@@ -127,6 +164,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
           value={filterType}
           onChange={setFilterType}
         />
+        {mixedSetups && <FilterButtonGroup options={SETUP_FILTER_OPTIONS} value={filterSetup} onChange={setFilterSetup} />}
         <div className="flex items-center gap-2">
           <label className="text-racing-muted text-xs uppercase tracking-wider">Track:</label>
           <SearchableSelect
@@ -138,6 +176,11 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
             onChange={setFilterTrack}
           />
         </div>
+        {tags.length > 0 && (
+          <SearchableSelect value={filterTag} options={[{ value: 'All', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} onChange={setFilterTag} />
+        )}
+        <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes, tags, track, car…" aria-label="Search sessions"
+          className="w-56 bg-racing-card border border-racing-border rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-racing-red/60" />
         <span className="text-racing-muted text-xs">{filtered.length} sessions</span>
       </div>
 
@@ -151,6 +194,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
           data={filtered}
           rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}-${r.driver.name}`}
           onRowClick={openSession}
+          rowMenu={rowMenu}
         />
       </div>
 
@@ -164,6 +208,7 @@ export const SessionsView = memo(function SessionsView({ onNavigate, excluded = 
             data={excludedRows}
             rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}`}
             onRowClick={openSession}
+            rowMenu={rowMenu}
           />
         </div>
       )}

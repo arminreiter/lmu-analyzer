@@ -1,8 +1,10 @@
 import type {
   RaceFile, SessionData, SessionType, DriverResult, LapData,
   CarClass, IncidentData, PenaltyData, TrackLimitData, ResultsFolder,
+  DriverChangeData, ChatData, SectorBestData,
 } from './types';
 import { invoke } from '@tauri-apps/api/core';
+import { dropRepeats, changeKey, sectorRecordKey, SECTOR_REPEAT_WINDOW } from './analytics';
 
 function getText(el: Element, tag: string): string {
   return el.getElementsByTagName(tag)[0]?.textContent?.trim() ?? '';
@@ -11,6 +13,12 @@ function getText(el: Element, tag: string): string {
 function getNum(el: Element, tag: string): number {
   const val = parseFloat(getText(el, tag));
   return isNaN(val) ? 0 : val;
+}
+
+/** A 0/1 setting; undefined when the element is missing so the UI doesn't invent a value */
+function getFlag(el: Element, tag: string): boolean | undefined {
+  const text = getText(el, tag);
+  return text === '' ? undefined : text === '1';
 }
 
 function getAttr(el: Element, attr: string): string {
@@ -73,6 +81,24 @@ function parseLap(lapEl: Element): LapData {
   };
 }
 
+// <Swap startLap="1" endLap="24">Goia Cristian</Swap>
+function parseSwaps(driverEl: Element, laps: LapData[]): DriverResult['swaps'] {
+  const els = driverEl.getElementsByTagName('Swap');
+  if (els.length === 0) return undefined;
+  const swaps = Array.from(els, el => ({
+    driver: el.textContent?.trim() ?? '',
+    startLap: parseInt(getAttr(el, 'startLap')) || 0,
+    endLap: parseInt(getAttr(el, 'endLap')) || 0,
+  }));
+  // A livery's placeholder driver often "drives" lap 1 — the untimed garage lap — before you take
+  // over: that's not a swap, so give lap 1 to the real first driver
+  const lap1 = laps.find(l => l.num === 1);
+  if (swaps.length > 1 && swaps[0].startLap === 1 && swaps[0].endLap === 1 && !lap1?.lapTime) {
+    return [{ ...swaps[1], startLap: 1 }, ...swaps.slice(2)];
+  }
+  return swaps;
+}
+
 function parseDriver(driverEl: Element): DriverResult {
   const laps: LapData[] = [];
   const lapEls = driverEl.getElementsByTagName('Lap');
@@ -103,6 +129,9 @@ function parseDriver(driverEl: Element): DriverResult {
     pitstops: parseInt(getText(driverEl, 'Pitstops')) || 0,
     finishStatus: getText(driverEl, 'FinishStatus'),
     controlAndAids: getText(driverEl, 'ControlAndAids'),
+    numDriverChanges: getText(driverEl, 'NumDriverChanges') ? parseInt(getText(driverEl, 'NumDriverChanges')) || 0 : undefined,
+    swaps: parseSwaps(driverEl, laps),
+    dnfReason: getText(driverEl, 'DNFReason') || undefined,
     laps,
   };
 }
@@ -120,8 +149,11 @@ function parseStreamEvents(streamEl: Element | null) {
   const incidents: IncidentData[] = [];
   const penalties: PenaltyData[] = [];
   const trackLimits: TrackLimitData[] = [];
+  const driverChanges: DriverChangeData[] = [];
+  const chat: ChatData[] = [];
+  const sectorBests: SectorBestData[] = [];
 
-  if (!streamEl) return { incidents, penalties, trackLimits };
+  if (!streamEl) return { incidents, penalties, trackLimits, driverChanges, chat, sectorBests };
 
   for (let i = 0; i < streamEl.children.length; i++) {
     const child = streamEl.children[i];
@@ -156,14 +188,34 @@ function parseStreamEvents(streamEl: Element | null) {
         currentPoints: parseFloat(getAttr(child, 'CurrentPoints')) || 0,
         resolution,
       });
+    } else if (tag === 'DriverChange') {
+      // Slot=0 Vehicle="Garage 59 2026 #10:WEC" Old="Armin Reiter" New="Christopher Sperl"
+      const field = (name: string) => text.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? '';
+      const slot = text.match(/Slot=(\d+)/)?.[1];
+      const change = { time: et, slot: slot === undefined ? undefined : Number(slot), vehicle: field('Vehicle'), oldDriver: field('Old'), newDriver: field('New') };
+      driverChanges.push(change);
+    } else if (tag === 'ChatMessage') {
+      const sep = text.indexOf(': ');
+      chat.push(sep === -1
+        ? { time: et, sender: '', message: text }
+        : { time: et, sender: text.slice(0, sep), message: text.slice(sep + 2) });
+    } else if (tag === 'Sector') {
+      const sector = parseInt(getAttr(child, 'Sector'));
+      if (sector === 1 || sector === 2 || sector === 3) {
+        sectorBests.push({ time: et, driver: getAttr(child, 'Driver'), sector, carClass: resolveCarClass(getAttr(child, 'Class')) });
+      }
     }
   }
-  return { incidents, penalties, trackLimits };
+  return {
+    incidents, penalties, trackLimits, chat,
+    driverChanges: dropRepeats(driverChanges, changeKey),
+    sectorBests: dropRepeats(sectorBests, sectorRecordKey, SECTOR_REPEAT_WINDOW),
+  };
 }
 
 function parseSession(sessionEl: Element, sourceTag: string, type: SessionType, index: number): SessionData {
   const streamEl = sessionEl.getElementsByTagName('Stream')[0] ?? null;
-  const { incidents, penalties, trackLimits } = parseStreamEvents(streamEl);
+  const { incidents, penalties, trackLimits, driverChanges, chat, sectorBests } = parseStreamEvents(streamEl);
 
   const drivers: DriverResult[] = [];
   const driverEls = sessionEl.getElementsByTagName('Driver');
@@ -183,6 +235,9 @@ function parseSession(sessionEl: Element, sourceTag: string, type: SessionType, 
     incidents,
     penalties,
     trackLimits,
+    driverChanges,
+    chat,
+    sectorBests,
   };
 }
 
@@ -231,6 +286,9 @@ export function parseRaceFile(xmlString: string, fileName: string): RaceFile {
     fuelMult: getNum(root, 'FuelMult'),
     tireMult: getNum(root, 'TireMult'),
     freeSettings: getNum(root, 'FreeSettings'),
+    fixedSetups: getFlag(root, 'FixedSetups'),
+    fixedUpgrades: getFlag(root, 'FixedUpgrades'),
+    tireWarmers: getFlag(root, 'TireWarmers'),
     vehiclesAllowed,
     sessions,
   };

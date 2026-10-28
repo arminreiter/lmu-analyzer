@@ -27,6 +27,8 @@ import {
   type PaceRating,
 } from '../lib/racepace';
 import type { RaceFile, CarClass, PersonalBest } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { CarLink } from '../components/EntityLinks';
 
 interface TrackModeViewProps {
   files: RaceFile[];
@@ -71,6 +73,7 @@ const rowLapTime = (r: YourTimesRow) => r.rowType === 'benchmark' ? r.lapTime : 
 const rowCarClass = (r: YourTimesRow) => r.rowType === 'benchmark' ? r.carClass : r.pb.carClass;
 
 export const TrackModeView = memo(function TrackModeView({ files, driverNames, initialTrack, onNavigate, onViewChange }: TrackModeViewProps) {
+  const sessionMenu = useSessionMenu();
   const { trackStats, personalBests, allLaps, driverSessions, sectorMins } = useDataIndex();
 
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(
@@ -306,9 +309,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`text-xs ${getRatingColor(r.tierLabel)} brightness-75`}>Benchmark {r.tierLabel}</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple text-xs font-medium">{r.pb.carType} <span className="text-[10px] opacity-60">(theoretical)</span></span>;
-        return onNavigate
-          ? <button onClick={() => onNavigate('cars', r.pb.carType)} className="text-white text-xs font-medium hover:text-racing-red transition-colors cursor-pointer text-left">{r.pb.carType}</button>
-          : <span className="text-white text-xs font-medium">{r.pb.carType}</span>;
+        return <CarLink car={r.pb.carType} className="text-white text-xs font-medium" />;
       } },
     { key: 'class', label: 'Class', width: '88px', cellClass: 'px-1', sortValue: r => rowCarClass(r),
       render: r => <ClassBadge carClass={rowCarClass(r)} /> },
@@ -506,6 +507,7 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
                   if (r.rowType === 'theoretical') return 'bg-racing-purple/[0.04]';
                   return '';
                 }}
+                rowMenu={r => r.rowType === 'lap' ? sessionMenu(r.pb) : []}
               />
             </div>
           )}

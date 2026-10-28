@@ -46,6 +46,13 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/lib/racepace.ts` — Community benchmark integration. Fetches pace tiers from ohne_speed's Google Sheet CSV. Rates laps as Alien/Competitive/Good/Midpack/Tail-ender/Offline. Single source of truth for tier order (`RATING_ORDER`), tier colors, and benchmark lookup (`buildBenchmarkMap()`)
 - `src/lib/DataIndexContext.tsx` + `dataIndexStore.ts` + `useDataIndex.ts` — Context providing precomputed indices over the loaded files (per-driver sessions, all laps, sector minimums for theoretical bests)
 - `src/lib/live.ts` — Desktop live telemetry: `useLiveTelemetry()` (polls `lmu_live`, tracks session laps/sectors), `useLiveReferences()` (my PBs, theoretical best, benchmark tiers for the live track+class), `timingClass()` (purple/green/yellow sector colors), `displayedLap()`/`refSectors()`/`sectorDeltas()`, `useLiveTargets()`/`useHiddenTargets()` (id sets synced between main and overlay window via the `storage` event), `activeTargets()`, `toggleOverlay()`
+- `src/lib/stints.ts` — `getStints()` (split at pit laps — the pit flag is on the in-lap; per-stint pace/trend/fuel/VE/wear/pit loss), `usageLaps()`/`usagePerLap()`/`usageMedians()` (skip lap 1, in- and out-laps: LMU books the refuel into the out-lap's fuelUsed/veUsed — run `usageLaps` on a driver's whole lap list, never a stint slice), `cleanLapTimes()`, `planFuel()`/`lapsForMinutes()` for the Fuel Calculator, `truePace()` (median of the 5 fastest laps), `getClassGaps()` (gap to class leader / car ahead per lap, from lap completion times)
+- `src/lib/sessionMenu.tsx` — `SessionActionsContext` (navigate + excluded sessions, provided by App) and `useSessionMenu()`: right-click items (open session, copy lap time, exclude/include) for any table row that points at a session
+- `src/lib/shareCard.ts` — Share images drawn on a canvas (1200×630, always dark): `sessionCard()`, `lapCard()`, `downloadShareCard()`, `copyShareCard()`
+- `src/lib/shareLink.ts` — `buildShareLink()`/`parseShareLink()`: one session deflated into `#shared/<base64url>` (the shared driver's full laps, class rivals as lap tuples, no chat); the desktop app links to lmu.a31.at. Rendered by `SharedSessionView` without any loaded data, inside an error boundary
+- `src/lib/backup.ts` — `exportBackup()`/`importBackup()`: cached files + every `KEYS` value (except files/dataSource) as gzipped JSON; restore validates the file shapes, writes storage, detaches the results folder (a re-read would replace the restored results), then the page reloads
+- `src/lib/download.ts` — `downloadBlob()`, `compress()`/`decompress()` (native CompressionStream)
+- `src/lib/sessionNotes.ts` — `useSessionNotes()`: free-text note + tags per session (sessionKey ids) in localStorage; kept on data reload (`KEEP_ON_CLEAR`)
 - `src/lib/useBenchmarks.ts` — Hook wrapping the benchmark fetch (returns `benchmarks`, `benchmarkMap`, `loading`, `error`)
 - `src/lib/sessionContext.ts` — `buildSessionContext()`/`parseSessionContext()` for the session-navigation string
 - `src/lib/formatting.ts` — Time/number formatters, `errorMessage()`, chart theme constants (`CHART_AXIS_TICK`, `CHART_GRID_STROKE`)
@@ -57,7 +64,7 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 
 - `src/components/Header.tsx` — Sticky header: logo, driver/class filters, benchmark toggle, refresh/install/reload buttons, tab navigation
 - `src/components/FolderPicker.tsx` — Initial file loading UI: folder selection (FSA), file upload fallback, resume cached data
-- `src/components/SortableTable.tsx` — Reusable sortable table with fixed column widths via `<colgroup>`. All data tables use this component
+- `src/components/SortableTable.tsx` — Reusable sortable table with fixed column widths via `<colgroup>`. All data tables use this component. `rowMenu` adds a right-click menu (`ContextMenu.tsx`, portalled to body)
 - `src/components/SearchableMultiSelect.tsx` — Multi-select dropdown with search
 - `src/components/SearchableSelect.tsx` — Single-select dropdown with search
 - `src/components/ClassBadge.tsx` — Color-coded car class badge
@@ -69,21 +76,25 @@ Build outputs to `dist/`. Deployed via Cloudflare Pages (`wrangler.jsonc`).
 - `src/components/PaceSubNav.tsx` — Overview/Per-Track tab bar shared by Race Pace and Track Mode
 - `src/components/PillSelector.tsx`, `FilterButtonGroup.tsx` — Shared filter controls
 - `src/components/SessionLink.tsx` — Link into Session Detail (uses `sessionContext.ts`)
+- `src/components/ErrorBoundary.tsx` — Generic boundary (`fallback` prop); wraps the whole app in `main.tsx` with `AppCrashed` (offers clearing cached results) and the shared view
+- `src/components/EntityLinks.tsx` — `TrackLink`/`CarLink`: a track or car name that opens the Tracks/Cars view (via `SessionActionsContext`); use these wherever a track or car name is shown
+- `src/components/SessionNotesCard.tsx` — Notes/tags editor in Session Detail; `TagChip`
 - `src/components/OhneSpeedCredit.tsx` — Benchmark data attribution
 - `src/components/LapClock.tsx` — Running lap time, interpolated per frame between telemetry polls (writes the DOM directly, no re-render)
 - `src/components/lapColumns.tsx` — Shared lap-table column definitions for Tracks/Cars views
 
 ### Views
 
-Twelve views: Live (desktop only), Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
+Thirteen views: Live (desktop only), Overview, Personal Bests, Sessions, Session Detail, Tracks, Cars, Race Results, Fuel Calculator, Race Pace, Track Mode, Driver Profile, About. Each receives `files` (already filtered by class) and `driverNames`.
 
 - `LiveView` — Desktop only. Polls `lmu_live` every 100ms; current/last lap sector strip, gap table (SortableTable) to my PB, theoretical best, benchmark tiers and optionally my individual laps (Targets / Top 10 / All) for the current track+class; row click toggles targets (multi-select) shared with the overlay; invalidated laps shown in orange
 - `OverlayView` — Not a tab: the always-on-top, transparent overlay window (`index.html?overlay`, routed in `main.tsx`), styled after LMU's timing widget (Lap/Last/Best/Current, sector bar with sector times, one delta row per selected target); gear menu toggles each section (`PARTS`, persisted via `useOverlayHiddenParts()`), sets the purple rule (`usePurpleMode()`: beat all selected targets / my best sector with any car of the class / with this car) and picks targets. Loads cached files itself; resizes its window to the card. Game must run borderless/windowed to see it
 - `OverviewView` — Dashboard with stat cards (sessions, laps, races, tracks, cars, distance, best lap) + track/car stats tables
-- `PersonalBestsView` — Best laps per track/car with theoretical best (combined best sectors), filterable by track/car/mode
-- `SessionsView` — All sessions with filters (setting, type, track); click row → SessionDetailView
-- `SessionDetailView` — Lap-by-lap chart, tire wear analysis, fuel consumption, pitstops, incidents, penalties, track limits
-- `TracksView` — Per-track performance with best laps by class, sector breakdown, car usage history
+- `PersonalBestsView` — Best laps per track/car with true pace and theoretical best (combined best sectors), filterable by track/car/mode (and fixed/open setups when the data has both)
+- `SessionsView` — All sessions with filters (setting, type, track, tag, setups) and a search over notes/tags/track/car; click row → SessionDetailView
+- `SessionDetailView` — Share menu (image / link), lap-by-lap chart, class gap chart (races), stints (incl. driver changes), tire wear analysis, fuel consumption, pitstops, incidents, penalties, track limits, session-best sector timeline, chat
+- `FuelCalculatorView` — Fuel/VE race plan for a track+car, prefilled with your median use per lap (1x fuel-rate sessions only); stops, per-stint fill
+- `TracksView` — Per-track performance with best laps by class, sector breakdown, car usage history, PB progression per car
 - `CarsView` — Per-car usage, best laps, track visits, sessions, distance
 - `RaceResultsView` — Race outcomes with position progress chart, wins/podiums/top-5s stats, DNF tracking
 - `RacePaceView` — Community benchmark comparison (ohne_speed pace tiers), rating badges, delta to next target
@@ -116,10 +127,13 @@ Purple is reserved — don't use it for general "best" highlighting. It only app
 ### Persistence
 
 - **IndexedDB** — Stores parsed `RaceFile[]` and `FileSystemDirectoryHandle` for folder refresh
+- **Backup** — Driver Profile settings (export/restore) and the folder picker (restore) move all of the above between browsers/machines
 - **localStorage** — Filter preferences (selected drivers, classes, active view), driver profile (name, avatar), benchmark toggle, data source type
 - Auto-restores cached data on app load; re-reads folder if handle is still valid
 
 ### LMU XML Data Format
+
+Besides incidents/penalties/track limits, the `<Stream>` holds `<DriverChange>` (often incomplete — compare with the driver's `<NumDriverChanges>`), `<ChatMessage>` and `<Sector>` (new class-best sector; et can run ~2s off the lap clock after a rejoin, and records get re-logged out of order). Repeats are dropped with `dropRepeats()` (analytics.ts) both when parsing and when merging rejoin fragments. A swap is logged during the stop, after the out-lap's `et` (lap start). Prefer each car's own `<Swap startLap endLap>` list (authoritative). A range ends on the in-lap or the out-lap after it depending on where the stop falls, so stints are attributed by their in-lap; a leading `1–1` swap on an untimed lap 1 is the livery's placeholder driver and is folded away when parsing; stints also split at swaps away from a stop (garage swaps). The stream log is matched by livery name, which several cars can share — `carDriverChanges()` filters by the entry `Slot=` (or, for older caches, the swap chain linked to the entry's driver). Sector-record repeats use a 45 s window per file but 5 s when merging rejoin fragments (their clocks can restart). A missing `<NumDriverChanges>` means unknown, not 0. These are optional on `SessionData` because older caches lack them; `loadCachedFiles()` flags such caches as `legacy` so the re-import notice shows. `FixedSetups`/`FixedUpgrades`/`TireWarmers` are undefined when missing.
 
 Files are named like `2026_03_14_13_23_07-86P1.xml` (timestamp + session code). Suffix indicates: P=Practice, Q=Qualifying, R=Race. The XML uses rFactor format with `<RaceResults>` root containing session elements (`<Practice1>`, `<Qualify>`, `<Race>`, etc.), each with `<Driver>` elements containing `<Lap>` elements with attributes for sector times, tire wear, fuel, speed, etc.
 

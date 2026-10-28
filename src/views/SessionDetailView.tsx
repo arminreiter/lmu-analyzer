@@ -1,17 +1,26 @@
-import { useState, useMemo, memo } from 'react';
-import { ArrowLeft, Users, Timer, BarChart3, LifeBuoy, AlertTriangle, Ban, ShieldAlert, UserCheck, EyeOff, Eye } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { useState, useMemo, useCallback, memo } from 'react';
+import { ArrowLeft, Users, Timer, BarChart3, LifeBuoy, AlertTriangle, Ban, ShieldAlert, UserCheck, EyeOff, Eye, Layers, MessageSquare, Zap, Share2, ImageDown, Image as ImageIcon, Link2 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, ReferenceLine } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { SessionLink } from '../components/SessionLink';
 import { trackLabel } from '../lib/racepace';
-import { getTireWearPerLap, getTopSpeed, isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL } from '../lib/analytics';
-import { formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
-import type { RaceFile, SessionData, DriverResult, LapData } from '../lib/types';
+import { getTireWearPerLap, getTopSpeed, isDnf, isDriverIncident, isOnline, isValidLap, lapTimeStats, MAX_INT32_SENTINEL, sessionKey } from '../lib/analytics';
+import { formatFinishStatus, formatLapTime, formatSector, formatSpeed, formatEventTime, getChartTooltipStyle, getConsistencyColor, getSessionTypeStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
+import { getStints, getClassGaps, usagePerLap, carDriverChanges, hasReliableDrivers, type Stint } from '../lib/stints';
+import { useSessionMenu, type SessionRef } from '../lib/sessionMenu';
+import { useSessionNotes, allTags } from '../lib/sessionNotes';
+import { SessionNotesCard } from '../components/SessionNotesCard';
+import { ContextMenu, type MenuState } from '../components/ContextMenu';
+import { sessionCard, copyShareCard, downloadShareCard } from '../lib/shareCard';
+import { buildShareLink } from '../lib/shareLink';
+import { errorMessage } from '../lib/formatting';
+import type { RaceFile, SessionData, DriverResult, LapData, ChatData, SectorBestData, CarClass } from '../lib/types';
+import { TrackLink, CarLink } from '../components/EntityLinks';
 
-type Tab = 'overview' | 'laps' | 'charts' | 'tyres' | 'incidents' | 'penalties' | 'tracklimits';
+type Tab = 'overview' | 'laps' | 'stints' | 'charts' | 'tyres' | 'incidents' | 'penalties' | 'tracklimits' | 'sectors' | 'chat';
 
 interface SessionDetailViewProps {
   onNavigate?: (view: string, context?: string) => void;
@@ -21,13 +30,42 @@ interface SessionDetailViewProps {
   session: SessionData;
   driver: DriverResult;
   onBack: () => void;
+  /** Opened from a #shared link: someone else's session, so no notes */
+  shared?: boolean;
   /** Whether this session is left out of all stats, bests and benchmarks */
   excluded?: boolean;
   onToggleExcluded?: () => void;
 }
 
-export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack, onNavigate, playerNames, excluded, onToggleExcluded }: SessionDetailViewProps) {
+export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack, onNavigate, playerNames, shared, excluded, onToggleExcluded }: SessionDetailViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [notes, saveNote] = useSessionNotes();
+  const noteKey = sessionKey(file.fileName, session.sessionIndex);
+  const knownTags = useMemo(() => allTags(notes), [notes]);
+
+  // Share: image card (clipboard or file) and a link that carries the session itself
+  const [shareMenu, setShareMenu] = useState<MenuState | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const closeShareMenu = useCallback(() => setShareMenu(null), []);
+  const flash = (msg: string) => { setShareStatus(msg); setTimeout(() => setShareStatus(null), 3000); };
+  const share = (action: () => Promise<string>) => () => { action().then(flash, e => flash(`Sharing failed: ${errorMessage(e)}`)); };
+  const openShareMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const card = () => sessionCard(file, session, driver);
+    setShareMenu({ x: r.left, y: r.bottom + 4, items: [
+      { label: 'Copy image', icon: <ImageIcon className="w-3.5 h-3.5" />, onClick: share(async () => {
+        if (await copyShareCard(card())) return 'Image copied';
+        await downloadShareCard(card());
+        return 'Image downloaded';
+      }) },
+      { label: 'Download image', icon: <ImageDown className="w-3.5 h-3.5" />, onClick: share(async () => { await downloadShareCard(card()); return 'Image downloaded'; }) },
+      { label: 'Copy link', icon: <Link2 className="w-3.5 h-3.5" />, onClick: share(async () => {
+        const url = await buildShareLink(file, session, driver);
+        await navigator.clipboard.writeText(url);
+        return `Link copied (${Math.ceil(url.length / 1024)} KB)`;
+      }) },
+    ] });
+  };
 
   const validLaps = useMemo(() => driver.laps.filter(isValidLap), [driver.laps]);
 
@@ -53,15 +91,14 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
     const median = [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)];
     const { avg, stdDev, consistency } = lapTimeStats(times);
 
-    const speeds = validLaps.map(l => l.topSpeed);
-    const avgSpeed = speeds.reduce((s, v) => s + v, 0) / speeds.length;
-    const topSpeed = Math.max(...speeds);
+    // LMU records 0 km/h on some laps (often online) — leave those out instead of dragging the average down
+    const speeds = validLaps.map(l => l.topSpeed).filter(v => v > 0);
+    const avgSpeed = speeds.length ? speeds.reduce((s, v) => s + v, 0) / speeds.length : null;
+    const topSpeed = speeds.length ? Math.max(...speeds) : null;
 
-    // Fuel consumption per lap
-    const fuelLaps = driver.laps.filter(l => l.fuelUsed > 0);
-    const avgFuelPerLap = fuelLaps.length > 0
-      ? (fuelLaps.reduce((s, l) => s + l.fuelUsed, 0) / fuelLaps.length) * 100
-      : null;
+    // Fuel per lap — same median over lap 1/in/out-lap-free laps as the Stints tab and Fuel Calculator
+    const fuelPerLap = usagePerLap(driver.laps).fuel;
+    const avgFuelPerLap = fuelPerLap === null ? null : fuelPerLap * 100;
 
     return { best, worst, avg, median, stdDev, consistency, avgSpeed, topSpeed, avgFuelPerLap };
   }, [validLaps, driver.laps]);
@@ -89,33 +126,39 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
   const TABS: { id: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'overview', label: 'Standings', icon: <Users className="w-3.5 h-3.5" /> },
     { id: 'laps', label: 'Lap Details', icon: <Timer className="w-3.5 h-3.5" /> },
+    { id: 'stints', label: 'Stints', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'charts', label: 'Charts', icon: <BarChart3 className="w-3.5 h-3.5" /> },
     { id: 'tyres', label: 'Tyre Wear', icon: <LifeBuoy className="w-3.5 h-3.5" /> },
     { id: 'incidents', label: 'Incidents', icon: <AlertTriangle className="w-3.5 h-3.5" />, count: driverIncidents.length },
     { id: 'penalties', label: 'Penalties', icon: <Ban className="w-3.5 h-3.5" />, count: driverPenalties.length },
     { id: 'tracklimits', label: 'Track Limits', icon: <ShieldAlert className="w-3.5 h-3.5" />, count: driverTrackLimits.length },
+    { id: 'sectors', label: 'Sector Bests', icon: <Zap className="w-3.5 h-3.5" /> },
+    { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" />, count: session.chat?.length ?? 0 },
   ];
+  const lapRef = (driverName: string, lapTime: number | null): SessionRef =>
+    ({ fileName: file.fileName, sessionIndex: session.sessionIndex, driverName, lapTime, current: driverName === driver.name });
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={onBack}
           className="p-2 rounded-lg text-racing-muted hover:text-white hover:bg-racing-highlight/20 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1 min-w-0">
+        {/* min-w: on phones the title keeps the first row and the buttons wrap below */}
+        <div className="flex-1 min-w-[16rem]">
           <div className="flex items-center gap-3">
             <span className={`px-2.5 py-1 rounded text-xs font-bold ${getSessionTypeStyle(session.type)}`}>
               {session.type}
             </span>
-            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate">{trackLabel(file.trackCourse)}</h1>
+            <h1 className="font-racing text-lg font-bold text-white tracking-wider truncate"><TrackLink track={file.trackCourse} /></h1>
             <ClassBadge carClass={driver.carClass} />
           </div>
           <p className="text-racing-muted text-xs mt-0.5">
-            {driver.name} &middot; {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
+            {driver.name} &middot; <CarLink car={driver.carType} /> &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
             {isOnline(file) && <span className="text-racing-blue ml-2">Online</span>}
             {excluded && <span className="text-racing-orange ml-2">Excluded from stats</span>}
           </p>
@@ -126,6 +169,12 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
             <UserCheck className="w-3.5 h-3.5" /> Select me
           </SessionLink>
         )}
+        {shareStatus && <span className="text-xs text-racing-green whitespace-nowrap">{shareStatus}</span>}
+        <button onClick={openShareMenu} title="Share this session as an image or link"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-racing-border text-racing-muted hover:text-white hover:bg-racing-highlight/20 transition-colors cursor-pointer whitespace-nowrap">
+          <Share2 className="w-3.5 h-3.5" /> Share
+        </button>
+        {shareMenu && <ContextMenu menu={shareMenu} onClose={closeShareMenu} />}
         {onToggleExcluded && (
           <button onClick={onToggleExcluded}
             title={excluded ? 'Count this session in stats, bests and benchmarks again' : 'Leave this session out of all stats, bests and benchmarks'}
@@ -139,6 +188,9 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
 
       {/* Driver / session / performance context — always visible, independent of the active tab */}
       <DriverSessionCards file={file} session={session} driver={driver} stats={stats} />
+
+      {/* key: reset the draft when navigating to another session */}
+      {!shared && <SessionNotesCard key={noteKey} value={notes[noteKey] ?? { note: '', tags: [] }} knownTags={knownTags} onChange={v => saveNote(noteKey, v)} />}
 
       {/* Tabs */}
       <nav className="flex gap-0 border-b border-racing-border overflow-x-auto scrollbar-none">
@@ -157,6 +209,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
               <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold
                 ${tab.id === 'incidents' ? 'bg-racing-orange/20 text-racing-orange' :
                   tab.id === 'penalties' ? 'bg-racing-red/20 text-racing-red' :
+                  tab.id === 'chat' ? 'bg-racing-highlight/30 text-racing-text' :
                   'bg-racing-yellow/20 text-racing-yellow'}`}>
                 {tab.count}
               </span>
@@ -167,14 +220,17 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <StandingsTab file={file} session={session} driver={driver} standings={standings} onNavigate={onNavigate} />
+        <StandingsTab file={file} session={session} driver={driver} standings={standings} onNavigate={onNavigate} lapRef={lapRef} />
       )}
-      {activeTab === 'laps' && <LapsTab driver={driver} validLaps={validLaps} />}
-      {activeTab === 'charts' && <ChartsTab driver={driver} validLaps={validLaps} />}
+      {activeTab === 'laps' && <LapsTab driver={driver} validLaps={validLaps} lapRef={lapRef} />}
+      {activeTab === 'stints' && <StintsTab session={session} driver={driver} />}
+      {activeTab === 'charts' && <ChartsTab driver={driver} session={session} validLaps={validLaps} />}
       {activeTab === 'tyres' && <TyreWearTab driver={driver} />}
       {activeTab === 'incidents' && <IncidentsTab incidents={driverIncidents} />}
       {activeTab === 'penalties' && <PenaltiesTab penalties={driverPenalties} />}
       {activeTab === 'tracklimits' && <TrackLimitsTab trackLimits={driverTrackLimits} />}
+      {activeTab === 'sectors' && <SectorBestsTab session={session} driver={driver} />}
+      {activeTab === 'chat' && <ChatTab chat={session.chat ?? []} driver={driver} />}
     </div>
   );
 });
@@ -183,7 +239,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
 
 interface StatsData {
   best: number; worst: number; avg: number; median: number;
-  stdDev: number; consistency: number; avgSpeed: number; topSpeed: number;
+  stdDev: number; consistency: number; avgSpeed: number | null; topSpeed: number | null;
   avgFuelPerLap: number | null;
 }
 
@@ -202,7 +258,7 @@ function DriverSessionCards({ file, session, driver, stats }: {
           <div className="grid grid-cols-2 gap-y-2.5 gap-x-4 text-sm">
             <InfoRow label="Team" value={driver.teamName} />
             <InfoRow label="Car #" value={driver.carNumber} />
-            <InfoRow label="Status" value={driver.finishStatus}
+            <InfoRow label="Status" value={formatFinishStatus(driver)}
               valueClass={!isDnf(driver.finishStatus) ? 'text-racing-green' : 'text-racing-red'} />
             <InfoRow label="Pitstops" value={String(driver.pitstops)} />
             {session.type === 'Race' && (
@@ -241,6 +297,9 @@ function DriverSessionCards({ file, session, driver, stats }: {
             <InfoRow label="Drivers" value={String(session.drivers.length)} />
             <InfoRow label="Game Version" value={file.gameVersion} />
             <InfoRow label="Damage" value={`${file.damageMult.toFixed(0)}%`} />
+            {file.fixedSetups !== undefined && <InfoRow label="Setups" value={file.fixedSetups ? 'Fixed' : 'Open'} />}
+            {file.fixedUpgrades !== undefined && <InfoRow label="Upgrades" value={file.fixedUpgrades ? 'Fixed' : 'Open'} />}
+            {file.tireWarmers !== undefined && <InfoRow label="Tyre Warmers" value={file.tireWarmers ? 'On' : 'Off'} />}
             {file.fuelMult !== 1 && <InfoRow label="Fuel Rate" value={`${file.fuelMult}x`} />}
             {file.tireMult !== 1 && <InfoRow label="Tire Rate" value={`${file.tireMult}x`} />}
           </div>
@@ -260,7 +319,7 @@ function DriverSessionCards({ file, session, driver, stats }: {
             <MiniStat label="Consistency" value={`${stats.consistency.toFixed(1)}%`}
               accent={getConsistencyColor(stats.consistency)} />
             <MiniStat label="Top Speed" value={formatSpeed(stats.topSpeed)} accent="text-racing-orange" />
-            <MiniStat label="Avg Speed" value={formatSpeed(stats.avgSpeed)} />
+            <MiniStat label="Avg Top Speed" value={formatSpeed(stats.avgSpeed)} />
             {stats.avgFuelPerLap !== null && (
               <MiniStat label="Fuel/Lap" value={`${stats.avgFuelPerLap.toFixed(2)}%`} accent="text-racing-yellow" />
             )}
@@ -271,11 +330,13 @@ function DriverSessionCards({ file, session, driver, stats }: {
   );
 }
 
-function StandingsTab({ file, session, driver, standings, onNavigate }: {
+function StandingsTab({ file, session, driver, standings, onNavigate, lapRef }: {
   file: RaceFile; session: SessionData; driver: DriverResult;
   standings: StandingRow[];
   onNavigate?: (view: string, context?: string) => void;
+  lapRef: (driverName: string, lapTime: number | null) => SessionRef;
 }) {
+  const sessionMenu = useSessionMenu();
   // Find current driver index in standings
   const driverIdx = standings.findIndex(d => d.name === driver.name);
 
@@ -291,7 +352,7 @@ function StandingsTab({ file, session, driver, standings, onNavigate }: {
           : <span className={cls}>{r.name}</span>;
       } },
     { key: 'car', label: 'Car', width: '15%', sortValue: r => r.carType,
-      render: r => <div className="flex items-center gap-1.5 truncate"><span className="text-racing-muted text-xs truncate">{r.carType}</span><ClassBadge carClass={r.carClass} /></div> },
+      render: r => <div className="flex items-center gap-1.5 truncate"><CarLink car={r.carType} className="text-racing-muted text-xs" /><ClassBadge carClass={r.carClass} /></div> },
     { key: 'best', label: 'Best Lap', align: 'right', mono: true, width: '120px', sortValue: r => r.bestLapTime ?? Infinity,
       render: r => <span className="text-racing-green">{formatLapTime(r.bestLapTime)}</span> },
     { key: 'laps', label: 'Laps', align: 'right', width: '55px', sortValue: r => r.totalLaps,
@@ -307,8 +368,8 @@ function StandingsTab({ file, session, driver, standings, onNavigate }: {
         render: (r: DriverResult) => <span className="text-racing-muted">{r.pitstops}</span> },
       { key: 'strategy', label: 'Strategy', width: '120px', sortValue: (r: DriverResult) => r.pitstops,
         render: (r: DriverResult) => <TireStrategy laps={r.laps} /> },
-      { key: 'status', label: 'Status', width: '120px', sortValue: (r: DriverResult) => r.finishStatus,
-        render: (r: DriverResult) => <span className={`text-xs ${!isDnf(r.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.finishStatus}</span> },
+      { key: 'status', label: 'Status', width: '150px', sortValue: (r: DriverResult) => formatFinishStatus(r), exportValue: (r: DriverResult) => formatFinishStatus(r),
+        render: (r: DriverResult) => <span className={`text-xs ${!isDnf(r.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`} title={formatFinishStatus(r)}>{formatFinishStatus(r)}</span> },
     ] : []),
   ], [session, driver.name, file.fileName, onNavigate]);
 
@@ -326,6 +387,7 @@ function StandingsTab({ file, session, driver, standings, onNavigate }: {
         data={standings}
         rowKey={r => r.name}
         rowClass={r => r.name === driver.name ? 'bg-racing-green/[0.06]' : ''}
+        rowMenu={r => sessionMenu(lapRef(r.name, r.bestLapTime))}
       />
     </div>
   );
@@ -398,7 +460,8 @@ function MiniStat({ label, value, accent }: { label: string; value: string; acce
 
 // ── Laps Tab ─────────────────────────────────────────────────────────────────
 
-function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapData[] }) {
+function LapsTab({ driver, validLaps, lapRef }: { driver: DriverResult; validLaps: LapData[]; lapRef: (driverName: string, lapTime: number | null) => SessionRef }) {
+  const sessionMenu = useSessionMenu();
   const { bestS1, bestS2, bestS3 } = useMemo(() => ({
     bestS1: Math.min(...validLaps.map(l => l.sector1 ?? Infinity)),
     bestS2: Math.min(...validLaps.map(l => l.sector2 ?? Infinity)),
@@ -445,6 +508,7 @@ function LapsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapDa
         data={driver.laps}
         rowKey={r => String(r.num)}
         rowClass={r => r.lapTime !== null && r.lapTime === driver.bestLapTime ? 'bg-racing-green/[0.04]' : ''}
+        rowMenu={r => sessionMenu(lapRef(driver.name, r.lapTime))}
       />
     </div>
   );
@@ -584,7 +648,10 @@ function TyreWearTab({ driver }: { driver: DriverResult }) {
   );
 }
 
-function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: LapData[] }) {
+function ChartsTab({ driver, session, validLaps }: { driver: DriverResult; session: SessionData; validLaps: LapData[] }) {
+  const gaps = useMemo(() => (session.type === 'Race' ? getClassGaps(driver, session) : []), [driver, session]);
+  const hasRivals = gaps.some(g => g.ahead !== null || g.leader > 0);
+
   const lapChartData = useMemo(() => validLaps.map(l => ({
     lap: l.num,
     time: l.lapTime,
@@ -599,13 +666,35 @@ function ChartsTab({ driver, validLaps }: { driver: DriverResult; validLaps: Lap
     used: +(l.fuelUsed * 100).toFixed(2),
   })), [driver.laps]);
 
-  const speedData = useMemo(() => validLaps.map(l => ({
+  const speedData = useMemo(() => validLaps.filter(l => l.topSpeed > 0).map(l => ({
     lap: l.num,
     speed: l.topSpeed,
   })), [validLaps]);
 
   return (
     <div className="space-y-5">
+      {/* Gaps (race) */}
+      {hasRivals && gaps.length > 1 && (
+        <div className="data-card carbon-fiber p-4">
+          <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">GAP TO CLASS LEADER &amp; CAR AHEAD</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={gaps}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" type="number" domain={['dataMin', 'dataMax']} allowDecimals={false} tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} reversed tickFormatter={v => `+${Number(v).toFixed(0)}s`} />
+              <Tooltip contentStyle={getChartTooltipStyle()} labelFormatter={l => `Lap ${l}`}
+                formatter={(v: unknown, name: unknown, entry: unknown) => {
+                  const ahead = (entry as { payload: { aheadName: string | null } }).payload.aheadName;
+                  return [`+${Number(v).toFixed(3)}s`, name === 'Car ahead' && ahead ? `Car ahead (${ahead})` : String(name)];
+                }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="leader" stroke="var(--color-racing-gold)" strokeWidth={2} dot={false} name="Class leader" />
+              <Line type="monotone" dataKey="ahead" stroke="#2196f3" strokeWidth={1.5} dot={false} name="Car ahead" connectNulls={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Lap Times */}
       {lapChartData.length > 1 && (
         <div className="data-card carbon-fiber p-4">
@@ -791,6 +880,238 @@ function TrackLimitsTab({ trackLimits }: { trackLimits: SessionDetailViewProps['
       </DataCardHeader>
       <SortableTable columns={columns} data={trackLimits} rowKey={(_, i) => String(i)}
         rowClass={() => 'bg-racing-yellow/[0.02]'} />
+    </div>
+  );
+}
+
+// ── Stints Tab ───────────────────────────────────────────────────────────────
+
+const pct = (v: number | null, digits = 2) => (v === null ? '--' : `${(v * 100).toFixed(digits)}%`);
+
+function StintsTab({ session, driver }: { session: SessionData; driver: DriverResult }) {
+  const stints = useMemo(() => getStints(driver, session), [driver, session]);
+  const changes = useMemo(() => carDriverChanges(session, driver), [session, driver]);
+  // LMU's log often misses swaps; a partial log would credit stints to the wrong driver
+  const hasDrivers = hasReliableDrivers(driver, changes);
+  const pitLaps = stints.slice(0, -1).map(s => s.endLap);
+  const chartData = useMemo(() => driver.laps.filter(isValidLap).map(l => ({ lap: l.num, time: l.lapTime })), [driver.laps]);
+
+  const columns: Column<Stint>[] = useMemo(() => [
+    { key: 'stint', label: 'Stint', width: '60px', sortValue: r => r.index,
+      render: r => <span className="text-white font-bold">{r.index + 1}</span> },
+    { key: 'laps', label: 'Laps', width: '95px', sortValue: r => r.laps.length, exportValue: r => `${r.startLap}-${r.endLap}`,
+      render: r => <span className="text-racing-muted font-mono text-xs">L{r.startLap}–{r.endLap} <span className="text-racing-muted/50">({r.laps.length})</span></span> },
+    ...(hasDrivers ? [{ key: 'driver', label: 'Driver', width: '15%', sortValue: (r: Stint) => r.driver ?? '',
+      render: (r: Stint) => <span className={r.driver === driver.name ? 'text-racing-green' : 'text-white'}>{r.driver}</span> }] : []),
+    { key: 'compound', label: 'Cmpd', width: '80px', sortValue: r => r.compound,
+      render: r => <span className="text-racing-muted text-xs">{r.compound || '--'}</span> },
+    { key: 'avg', label: 'Avg Pace', align: 'right', mono: true, width: '100px', sortValue: r => r.avgPace,
+      render: r => <span className="text-white">{formatLapTime(r.avgPace)}</span> },
+    { key: 'best', label: 'Best', align: 'right', mono: true, width: '100px', sortValue: r => r.bestLap,
+      render: r => <span className={r.bestLap === driver.bestLapTime ? 'text-racing-green font-bold' : 'text-racing-muted'}>{formatLapTime(r.bestLap)}</span> },
+    { key: 'trend', label: 'Trend', align: 'right', mono: true, width: '95px', sortValue: r => r.trend,
+      render: r => r.trend === null ? <span className="text-racing-muted/40">--</span>
+        : <span className={r.trend > 0.02 ? 'text-racing-orange' : r.trend < -0.02 ? 'text-racing-green' : 'text-racing-muted'}
+            title="Lap time change per lap over the stint (clean laps only)">{r.trend > 0 ? '+' : ''}{r.trend.toFixed(3)}s/lap</span> },
+    { key: 'fuel', label: 'Fuel/Lap', align: 'right', mono: true, width: '85px', sortValue: r => r.fuelPerLap,
+      render: r => <span className="text-racing-yellow">{pct(r.fuelPerLap)}</span> },
+    { key: 've', label: 'VE/Lap', align: 'right', mono: true, width: '80px', sortValue: r => r.vePerLap,
+      render: r => <span className="text-racing-yellow/80">{pct(r.vePerLap)}</span> },
+    { key: 'wear', label: 'Wear/Lap', align: 'right', mono: true, width: '85px', sortValue: r => r.wearPerLap,
+      render: r => <span className="text-racing-muted">{r.wearPerLap === null ? '--' : `${r.wearPerLap.toFixed(2)}%`}</span> },
+    { key: 'pit', label: 'Pit Loss', align: 'right', mono: true, width: '85px', sortValue: r => r.pitLoss,
+      render: r => r.pitLoss === null ? <span className="text-racing-muted/40">--</span>
+        : <span className="text-racing-blue" title="In-lap + out-lap minus two median clean laps">+{r.pitLoss.toFixed(1)}s</span> },
+  ], [hasDrivers, driver.name, driver.bestLapTime]);
+
+  if (stints.length === 0) {
+    return <div className="text-center py-12 text-racing-muted text-sm">No laps recorded for this driver.</div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="data-card carbon-fiber overflow-hidden">
+        <DataCardHeader title="STINTS">
+          <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{stints.length} stints · pace from clean laps (no lap 1, in/out-laps or laps over 107%)</span>
+          <ExportButton columns={columns} data={stints} filename={`lmu-stints-${driver.name}`} />
+        </DataCardHeader>
+        <SortableTable<Stint> columns={columns} data={stints} rowKey={r => String(r.index)} />
+      </div>
+
+      {chartData.length > 1 && (
+        <div className="data-card carbon-fiber p-4">
+          <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">LAP TIMES BY STINT</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+              <XAxis dataKey="lap" type="number" domain={['dataMin', 'dataMax']} tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} />
+              <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
+              <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => formatLapTime(v as number)} labelFormatter={l => `Lap ${l}`} />
+              {pitLaps.map(l => <ReferenceLine key={l} x={l} stroke="#2196f3" strokeDasharray="4 3" label={{ value: 'PIT', fill: '#2196f3', fontSize: 10, position: 'top' }} />)}
+              <Line type="monotone" dataKey="time" stroke="#e10600" strokeWidth={1.5} dot={{ r: 2 }} name="Lap Time" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* The car's own <Swap> list says who drove which laps; otherwise fall back to the (often incomplete) event log */}
+      {(driver.swaps?.length ?? 0) > 1 ? (
+        <div className="data-card carbon-fiber overflow-hidden">
+          <DataCardHeader title="DRIVERS" />
+          <SortableTable columns={[
+            { key: 'driver', label: 'Driver', sortValue: r => r.driver,
+              render: r => <span className={r.driver === driver.name ? 'text-racing-green' : 'text-white'}>{r.driver}</span> },
+            { key: 'laps', label: 'Laps', align: 'right', mono: true, width: '140px', sortValue: r => r.startLap,
+              render: r => <span className="text-racing-muted">L{r.startLap}–{r.endLap} ({r.endLap - r.startLap + 1})</span> },
+          ]} data={driver.swaps!} rowKey={(_, i) => String(i)} />
+        </div>
+      ) : (changes.length > 0 || (driver.numDriverChanges ?? 0) > 0) && (
+        <div className="data-card carbon-fiber overflow-hidden">
+          <DataCardHeader title="DRIVER CHANGES">
+            <span className="ml-auto text-[10px] font-mono text-racing-muted/50">
+              {driver.numDriverChanges ?? '?'} reported by LMU · {changes.length} in the event log
+            </span>
+          </DataCardHeader>
+          {changes.length > 0 ? (
+            <SortableTable columns={[
+              { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
+                render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
+              { key: 'out', label: 'Out', sortValue: r => r.oldDriver, render: r => <span className="text-racing-muted">{r.oldDriver}</span> },
+              { key: 'in', label: 'In', sortValue: r => r.newDriver, render: r => <span className="text-white">{r.newDriver}</span> },
+            ]} data={changes} rowKey={(_, i) => String(i)} />
+          ) : (
+            <p className="px-4 py-3 text-xs text-racing-muted">LMU counted swaps for this car but didn't log when they happened.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sector Bests Tab ─────────────────────────────────────────────────────────
+
+type SectorBestRow = SectorBestData & { sectorTime: number | null; lap: number | null };
+
+/** Find the sector time behind a "new best for sector N" event from the driver's laps (lap `et` is the lap start) */
+function resolveSectorTime(session: SessionData, ev: SectorBestData): { sectorTime: number | null; lap: number | null } {
+  const d = session.drivers.find(x => x.name === ev.driver);
+  for (const lap of d?.laps ?? []) {
+    const parts = [lap.sector1, lap.sector2, lap.sector3].slice(0, ev.sector);
+    if (parts.some(p => p === null)) continue;
+    const end = lap.elapsedTime + (parts as number[]).reduce((sum, p) => sum + p, 0);
+    // The event's et is rounded and, after a rejoin, runs up to ~2.5s off the lap clock;
+    // sectors are far longer than that, so the window can't pick the wrong one
+    if (Math.abs(end - ev.time) < 3) return { sectorTime: parts[ev.sector - 1], lap: lap.num };
+  }
+  return { sectorTime: null, lap: null };
+}
+
+const NO_SECTOR_BESTS: SectorBestData[] = [];
+
+function SectorBestsTab({ session, driver }: { session: SessionData; driver: DriverResult }) {
+  const all = session.sectorBests ?? NO_SECTOR_BESTS;
+  const classes = useMemo(() => Array.from(new Set(all.map(b => b.carClass))), [all]);
+  const [pickedClass, setCarClass] = useState<CarClass | null>(null);
+  // Ignore a pick from another session that this one doesn't have
+  const carClass = pickedClass && classes.includes(pickedClass) ? pickedClass : classes.includes(driver.carClass) ? driver.carClass : classes[0];
+
+  const rows = useMemo(() => all
+    .filter(b => b.carClass === carClass)
+    .map((b): SectorBestRow => ({ ...b, ...resolveSectorTime(session, b) })),
+  [all, carClass, session]);
+  // The fastest matched record per sector; LMU re-logs records out of order after a rejoin, so
+  // "last event" isn't reliable. Fall back to the last event when no record could be matched to a lap.
+  const holders = ([1, 2, 3] as const).map(n => {
+    const sector = rows.filter(r => r.sector === n);
+    const timed = sector.filter(r => r.sectorTime !== null);
+    return timed.length ? timed.reduce((a, b) => (b.sectorTime! < a.sectorTime! ? b : a)) : sector.at(-1) ?? null;
+  });
+
+  const columns: Column<SectorBestRow>[] = useMemo(() => [
+    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
+      render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
+    { key: 'sector', label: 'Sector', width: '70px', align: 'center', sortValue: r => r.sector,
+      render: r => <span className="text-white font-bold">S{r.sector}</span> },
+    { key: 'driver', label: 'Driver', sortValue: r => r.driver,
+      render: r => <span className={r.driver === driver.name ? 'text-racing-green font-bold' : 'text-white'}>{r.driver}</span> },
+    { key: 'lap', label: 'Lap', align: 'right', width: '60px', sortValue: r => r.lap,
+      render: r => <span className="text-racing-muted">{r.lap ?? '--'}</span> },
+    { key: 'sectorTime', label: 'Sector Time', align: 'right', mono: true, width: '110px', sortValue: r => r.sectorTime,
+      render: r => <span className="text-racing-green">{formatSector(r.sectorTime)}</span> },
+  ], [driver.name]);
+
+  if (all.length === 0) {
+    return (
+      <div className="text-center py-12 text-racing-muted">
+        <Zap className="w-12 h-12 mx-auto mb-4 opacity-30" />
+        <p>No sector records logged in this session.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {classes.length > 1 && (
+        <div className="flex gap-2">
+          {classes.map(c => (
+            <button key={c} onClick={() => setCarClass(c)}
+              className={`cursor-pointer rounded transition-opacity ${c === carClass ? '' : 'opacity-40 hover:opacity-80'}`}>
+              <ClassBadge carClass={c} />
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="data-card carbon-fiber p-5">
+        <h3 className="text-xs uppercase tracking-wider text-racing-muted mb-3 font-medium">Session-best sectors at the flag</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {holders.map((h, i) => (
+            <div key={i} className="text-center min-w-0">
+              <p className="text-racing-muted text-[10px] uppercase tracking-wider">Sector {i + 1}</p>
+              <p className="font-mono text-sm font-bold text-racing-green">{h ? formatSector(h.sectorTime) : '--'}</p>
+              <p className={`text-xs truncate ${h?.driver === driver.name ? 'text-racing-green' : 'text-racing-muted'}`}>{h?.driver ?? '--'}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="data-card carbon-fiber overflow-hidden">
+        <DataCardHeader title="SECTOR RECORD TIMELINE">
+          <span className="ml-auto text-[10px] font-mono text-racing-muted/50">{rows.length} improvements</span>
+          <ExportButton columns={columns} data={rows} filename={`lmu-sector-bests-${carClass}`} />
+        </DataCardHeader>
+        <SortableTable<SectorBestRow> columns={columns} data={rows} rowKey={(_, i) => String(i)}
+          rowClass={r => r.driver === driver.name ? 'bg-racing-green/[0.04]' : ''} />
+      </div>
+    </div>
+  );
+}
+
+// ── Chat Tab ─────────────────────────────────────────────────────────────────
+
+function ChatTab({ chat, driver }: { chat: ChatData[]; driver: DriverResult }) {
+  if (chat.length === 0) {
+    return (
+      <div className="text-center py-12 text-racing-muted">
+        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
+        <p>No chat messages in this session.</p>
+      </div>
+    );
+  }
+
+  const columns: Column<ChatData>[] = [
+    { key: 'time', label: 'Time', width: '120px', mono: true, sortValue: r => r.time,
+      render: r => <span className="text-racing-muted">{formatEventTime(r.time)}</span> },
+    { key: 'sender', label: 'From', width: '180px', sortValue: r => r.sender,
+      render: r => <span className={r.sender === driver.name ? 'text-racing-green font-bold' : 'text-white'}>{r.sender || '--'}</span> },
+    { key: 'message', label: 'Message', sortValue: r => r.message,
+      render: r => <span className="text-racing-text whitespace-normal break-words">{r.message}</span> },
+  ];
+
+  return (
+    <div className="data-card carbon-fiber overflow-hidden">
+      <DataCardHeader title={`CHAT (${chat.length})`}>
+        <ExportButton columns={columns} data={chat} filename="lmu-chat" />
+      </DataCardHeader>
+      <SortableTable columns={columns} data={chat} rowKey={(_, i) => String(i)} />
     </div>
   );
 }

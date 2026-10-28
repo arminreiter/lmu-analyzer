@@ -26,6 +26,8 @@ function mergeDriverResult(entries: DriverResult[]): DriverResult {
     return b.totalLaps - a.totalLaps;
   });
   const base = { ...sorted[0] };
+  // Laps get renumbered below but fragment <Swap> ranges wouldn't match them — fall back to the swap log
+  base.swaps = undefined;
 
   // Merge laps across rejoin fragments. Lap numbers can reset on rejoin,
   // so we append each fragment's laps with renumbered offsets when overlaps
@@ -96,9 +98,35 @@ function mergeSessions(sessions: SessionData[]): SessionData {
       if (!tlKeys.has(key)) { tlKeys.add(key); base.trackLimits.push(tl); }
     }
   }
+  base.driverChanges = dropRepeats(sessions.flatMap(s => s.driverChanges ?? []), changeKey);
+  base.chat = dropRepeats(sessions.flatMap(s => s.chat ?? []), c => `${c.sender}|${c.message}`);
+  // Default 5 s here, not SECTOR_REPEAT_WINDOW: fragments' clocks can restart, so a genuine record in one
+  // fragment can sit within 45 s of a different record in another
+  base.sectorBests = dropRepeats(sessions.flatMap(s => s.sectorBests ?? []), sectorRecordKey);
 
   return base;
 }
+
+/**
+ * Stream events in time order with repeats dropped: the same key again within `windowSec`.
+ * LMU logs some events twice, and rejoin fragments re-log them a few seconds off the original.
+ */
+export function dropRepeats<T extends { time: number }>(items: T[], key: (item: T) => string, windowSec = 5): T[] {
+  const lastKept = new Map<string, number>();
+  return [...items].sort((a, b) => a.time - b.time).filter(item => {
+    const k = key(item);
+    const prev = lastKept.get(k);
+    if (prev !== undefined && item.time - prev < windowSec) return false;
+    lastKept.set(k, item.time);
+    return true;
+  });
+}
+
+export const changeKey = (c: { vehicle: string; oldDriver: string; newDriver: string }) => `${c.vehicle}|${c.oldDriver}|${c.newDriver}`;
+export const sectorRecordKey = (b: { driver: string; sector: number }) => `${b.driver}|${b.sector}`;
+// LMU re-logs sector records up to ~40 s later; a genuine second record by the same driver needs another
+// lap (≥ ~55 s even on Bahrain Outer). ponytail: fixed window — key on the matched lap if this ever misfires.
+export const SECTOR_REPEAT_WINDOW = 45;
 
 /**
  * Merges rejoin fragments: when LMU writes multiple XML files for the same
@@ -251,6 +279,23 @@ export function isRatedRace(file: RaceFile): boolean {
   // freeSettings may be missing on files from legacy caches — treat unknown as unrated
   return isOnline(file) && file.freeSettings != null && file.freeSettings !== MAX_INT32_SENTINEL;
 }
+
+export type SetupFilter = 'all' | 'fixed' | 'open';
+
+/** Fixed-setup and open-setup laps aren't comparable; the filter only matters when the data has both */
+// fixedSetups is undefined when unknown (file without <FixedSetups>, or cached before it was parsed):
+// those sessions only show under "All"
+export function hasMixedSetups(files: RaceFile[]): boolean {
+  return files.some(f => f.fixedSetups === true) && files.some(f => f.fixedSetups === false);
+}
+
+export function matchesSetup(file: RaceFile, filter: SetupFilter): boolean {
+  return filter === 'all' || (filter === 'fixed' ? file.fixedSetups === true : file.fixedSetups === false);
+}
+
+export const SETUP_FILTER_OPTIONS: { value: SetupFilter; label: string }[] = [
+  { value: 'all', label: 'All Setups' }, { value: 'fixed', label: 'Fixed' }, { value: 'open', label: 'Open' },
+];
 
 export function filterFilesByClasses(files: RaceFile[], classes: CarClass[]): RaceFile[] {
   if (classes.length === 0) return files;

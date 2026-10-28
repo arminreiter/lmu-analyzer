@@ -3,6 +3,7 @@ import { Download } from 'lucide-react';
 import { useClickOutside } from '../lib/useClickOutside';
 import * as XLSX from 'xlsx';
 import type { Column } from './SortableTable';
+import { downloadBlob } from '../lib/download';
 
 interface ExportButtonProps<T> {
   columns: Column<T>[];
@@ -64,13 +65,7 @@ function exportXLSX<T>(columns: Column<T>[], data: T[], filename: string) {
 }
 
 function download(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([content], { type: mimeType }), filename);
 }
 
 const formats: { key: ExportFormat; label: string }[] = [

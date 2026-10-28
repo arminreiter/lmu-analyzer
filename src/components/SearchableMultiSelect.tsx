@@ -67,16 +67,17 @@ export function SearchableMultiSelect({ values, options, onChange, placeholder =
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-racing-card border border-racing-border
+        className="w-full flex items-center gap-2 px-3 py-1.5 bg-racing-card border border-racing-border
           rounded-lg text-sm text-racing-text hover:border-racing-highlight transition-colors cursor-pointer"
       >
         {icon}
-        <span className="max-w-[200px] truncate">{displayText}</span>
+        <span className="max-w-[200px] truncate mr-auto">{displayText}</span>
         <ChevronDown className="w-3 h-3 text-racing-muted" />
       </button>
 
+      {/* Phones: the list spans the screen (top stays at the static position, right under the button) */}
       {open && (
-        <div className="absolute right-0 top-full mt-1 min-w-72 w-max max-w-[400px] bg-racing-card border border-racing-border
+        <div className="absolute right-0 top-full mt-1 min-w-72 w-max max-w-[400px] max-sm:fixed max-sm:top-auto max-sm:inset-x-4 max-sm:min-w-0 max-sm:w-auto max-sm:max-w-none bg-racing-card border border-racing-border
           rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Search */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-racing-border">

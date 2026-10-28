@@ -12,7 +12,11 @@ import { isValidLap } from '../lib/analytics';
 import { formatLapTime, formatSpeed, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
 import { useDataIndex } from '../lib/useDataIndex';
 import { trackLabel } from '../lib/racepace';
+import { truePace } from '../lib/stints';
+import { SearchableSelect } from '../components/SearchableSelect';
 import type { RaceFile, PersonalBest } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { CarLink } from '../components/EntityLinks';
 
 type LapMode = 'car' | 'session' | 'all';
 
@@ -30,6 +34,7 @@ interface TracksViewProps {
 }
 
 export const TracksView = memo(function TracksView({ files, initialTrack, onNavigate }: TracksViewProps) {
+  const sessionMenu = useSessionMenu();
   const [selectedTrack, setSelectedTrack] = useState<string | null>(initialTrack ?? null);
   const [lapMode, setLapMode] = useState<LapMode>('car');
   const { trackStats: tracks, personalBests: bestPerCar, allSessionBests: bestPerSession, allLaps, driverSessions: allSessions } = useDataIndex();
@@ -40,28 +45,36 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
   const trackLaps = useMemo(() => lapSource.filter(b => b.trackCourse === track), [lapSource, track]);
   const trackSessions = useMemo(() => allSessions.filter(s => s.file.trackCourse === track), [allSessions, track]);
 
-  // Lap time progression over sessions for this track
-  const progressionData = useMemo(() => {
-    const data: Array<{ session: string; lapTime: number; car: string }> = [];
-    for (const { file, driver } of trackSessions) {
-      if (driver.bestLapTime && driver.bestLapTime > 0) {
-        data.push({
-          session: file.timeString.slice(5, 16),
-          lapTime: driver.bestLapTime,
-          car: driver.carType,
-        });
-      }
+  // PB progression for one car here: each session's best valid lap, and the PB as it stood after it
+  const trackCars = useMemo(() => Array.from(new Set(trackSessions.map(s => s.driver.carType))).sort(), [trackSessions]);
+  const [pickedCar, setPickedCar] = useState<string | null>(null);
+  // Default to the car of the fastest lap here
+  const progressCar = pickedCar && trackCars.includes(pickedCar)
+    ? pickedCar
+    : bestPerCar.filter(b => b.trackCourse === track).sort((a, b) => a.lapTime - b.lapTime)[0]?.carType ?? trackCars[0];
+  const progression = useMemo(() => {
+    const sessions = trackSessions
+      .filter(s => s.driver.carType === progressCar)
+      .sort((a, b) => (a.session.dateTime || a.file.timeString).localeCompare(b.session.dateTime || b.file.timeString));
+    const data: Array<{ date: string; best: number; pb: number; newPb: number | null }> = [];
+    let pb = Infinity;
+    for (const { file, session, driver } of sessions) {
+      const times = driver.laps.filter(isValidLap).map(l => l.lapTime);
+      if (times.length === 0) continue;
+      const best = Math.min(...times);
+      const improved = best < pb;
+      pb = Math.min(pb, best);
+      data.push({ date: (session.dateTime || file.timeString).slice(2, 16), best, pb, newPb: improved ? best : null });
     }
-    return data;
-  }, [trackSessions]);
+    const allTimes = sessions.flatMap(s => s.driver.laps.filter(isValidLap).map(l => l.lapTime));
+    return { data, truePace: truePace(allTimes), pbs: data.filter(d => d.newPb !== null).length };
+  }, [trackSessions, progressCar]);
 
   const lapColumns: Column<PersonalBest>[] = useMemo(() => [
     { key: 'pos', label: '#', width: '35px', sortValue: (r: PersonalBest) => r.lapTime,
       render: (_: PersonalBest, i: number) => <span className="text-racing-muted font-mono text-xs">{i + 1}</span> },
     { key: 'car', label: 'Car', width: '18%', sortValue: (r: PersonalBest) => r.carType,
-      render: (r: PersonalBest) => onNavigate
-        ? <button onClick={(e) => { e.stopPropagation(); onNavigate('cars', r.carType); }} className="text-white cursor-pointer">{r.carType}</button>
-        : <span className="text-white">{r.carType}</span> },
+      render: (r: PersonalBest) => <CarLink car={r.carType} className="text-white" /> },
     { key: 'class', label: 'Class', width: '100px', sortValue: (r: PersonalBest) => r.carClass,
       render: (r: PersonalBest) => <ClassBadge carClass={r.carClass} /> },
     ...buildLapColumns(onNavigate),
@@ -124,26 +137,37 @@ export const TracksView = memo(function TracksView({ files, initialTrack, onNavi
               columns={lapColumns}
               data={sortedTrackLaps}
               rowKey={r => `${r.carType}-${r.fileName}-${r.lapNumber}`}
+              rowMenu={sessionMenu}
             />
           </div>
 
-          {/* Lap Time Progression */}
-          {progressionData.length > 1 && (
+          {/* PB progression for one car */}
+          {progression.data.length > 0 && (
             <div className="data-card carbon-fiber p-4">
-              <h3 className="font-racing text-sm font-bold text-white tracking-wider mb-4">LAP TIME PROGRESSION</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={progressionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
-                  <XAxis dataKey="session" tick={{ fill: CHART_AXIS_TICK, fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
-                  <Tooltip
-                    contentStyle={getChartTooltipStyle()}
-                    formatter={(v: unknown, _: unknown, entry: unknown) => [formatLapTime(v as number), (entry as { payload: { car: string } }).payload.car]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="lapTime" stroke="#e10600" strokeWidth={2} dot={{ fill: '#e10600', r: 3 }} name="Best Lap" />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h3 className="font-racing text-sm font-bold text-white tracking-wider">PB PROGRESSION</h3>
+                {trackCars.length > 1 && <SearchableSelect value={progressCar} options={trackCars.map(c => ({ value: c, label: c }))} onChange={setPickedCar} />}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                <StatCell label="Personal Best" mono value={<span className="text-racing-gold">{formatLapTime(progression.data.at(-1)!.pb)}</span>} />
+                <StatCell label="True Pace" mono value={formatLapTime(progression.truePace)} />
+                <StatCell label="Improvement" mono value={progression.data.length > 1 ? `-${(progression.data[0].best - progression.data.at(-1)!.pb).toFixed(3)}s` : '--'} />
+                <StatCell label="PBs Set" value={`${progression.pbs} in ${progression.data.length} sessions`} />
+              </div>
+              {progression.data.length > 1 && (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={progression.data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                    <XAxis dataKey="date" tick={{ fill: CHART_AXIS_TICK, fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                    <YAxis tick={{ fill: CHART_AXIS_TICK, fontSize: 11 }} domain={['auto', 'auto']} tickFormatter={v => formatLapTime(v)} />
+                    <Tooltip contentStyle={getChartTooltipStyle()} formatter={(v: unknown) => formatLapTime(v as number)} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="best" stroke="#8a8f98" strokeOpacity={0.5} strokeWidth={1} dot={{ fill: '#8a8f98', r: 2 }} name="Session best" />
+                    <Line type="stepAfter" dataKey="pb" stroke="var(--color-racing-gold)" strokeWidth={2} dot={false} name="Personal best" />
+                    <Line dataKey="newPb" stroke="none" dot={{ fill: 'var(--color-racing-gold)', r: 4 }} legendType="none" tooltipType="none" name="New PB" isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           )}
 

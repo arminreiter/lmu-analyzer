@@ -35,6 +35,7 @@ const VIEWS = [
   { id: 'tracks', label: 'Tracks' },
   { id: 'cars', label: 'Cars' },
   { id: 'races', label: 'Race Results' },
+  { id: 'fuel', label: 'Fuel Calculator' },
   { id: 'profile', label: 'Driver Profile' },
   { id: 'benchmarks', label: 'Benchmark Times' },
   { id: 'about', label: 'About' },
@@ -60,8 +61,9 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
       <div className="h-[2px] bg-gradient-to-r from-racing-red via-racing-red/60 to-racing-red/10" />
 
       <div className="max-w-[1600px] mx-auto px-4 lg:px-6">
-        <div className="flex items-center justify-between h-12">
-          <div className="flex items-center gap-3">
+        {/* Phones: logo + icons on one row, the two filters full-width below */}
+        <div className="flex flex-wrap items-center gap-y-2 sm:gap-x-2 py-2 sm:py-0 sm:h-12">
+          <div className="flex items-center gap-3 mr-auto">
             <div className="w-7 h-7 bg-racing-red flex items-center justify-center"
               style={{ clipPath: 'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))' }}>
               <span className="font-racing text-[9px] font-black text-[#fff] tracking-wider">LMU</span>
@@ -71,7 +73,7 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="order-last w-full flex gap-2 *:flex-1 *:min-w-0 sm:order-none sm:w-auto sm:*:flex-none">
             {/* Class filter */}
             <SearchableMultiSelect
               values={selectedClasses}
@@ -94,6 +96,9 @@ export function Header({ selectedDrivers, drivers, playerDrivers, onDriverChange
                 onSelect: () => onDriverChange(playerDrivers),
               }]}
             />
+          </div>
+
+          <div className="flex items-center sm:gap-2">
 
             <button
               onClick={onToggleRacePace}

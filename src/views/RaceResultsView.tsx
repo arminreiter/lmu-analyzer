@@ -8,10 +8,12 @@ import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
 import { StatCard } from '../components/StatCard';
 import { getRaceResults, isDnf, isOnline, isRatedRace, isDriverIncident, type RaceResult } from '../lib/analytics';
-import { formatLapTime, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE } from '../lib/formatting';
+import { formatLapTime, getChartTooltipStyle, CHART_AXIS_TICK, CHART_GRID_STROKE, formatFinishStatus } from '../lib/formatting';
 import { buildSessionContext } from '../lib/sessionContext';
-import { trackLabel, trackAlias } from '../lib/racepace';
+import { trackAlias } from '../lib/racepace';
 import type { RaceFile } from '../lib/types';
+import { useSessionMenu } from '../lib/sessionMenu';
+import { TrackLink, CarLink } from '../components/EntityLinks';
 
 type RaceRow = RaceResult & {
   incidentCount: number;
@@ -25,6 +27,7 @@ interface RaceResultsViewProps {
 }
 
 export const RaceResultsView = memo(function RaceResultsView({ files, driverNames, onNavigate }: RaceResultsViewProps) {
+  const sessionMenu = useSessionMenu();
   const [filter, setFilter] = useState<'all' | 'online' | 'rated'>('all');
   const allResults = useMemo(() => getRaceResults(files, driverNames), [files, driverNames]);
   const results = useMemo(() => {
@@ -60,9 +63,9 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
     { key: 'date', label: 'Date', width: '13%', sortValue: r => r.file.timeString,
       render: r => <span className="text-racing-muted text-xs">{r.file.timeString}</span> },
     { key: 'track', label: 'Track', width: '18%', sortValue: r => r.file.trackCourse,
-      render: r => <span className="text-white">{trackLabel(r.file.trackCourse)}</span> },
+      render: r => <TrackLink track={r.file.trackCourse} className="text-white" /> },
     { key: 'car', label: 'Car', width: '18%', sortValue: r => r.driver.carType,
-      render: r => <div className="flex items-center gap-2"><span className="text-racing-text text-xs">{r.driver.carType}</span><ClassBadge carClass={r.driver.carClass} /></div> },
+      render: r => <div className="flex items-center gap-2"><CarLink car={r.driver.carType} className="text-racing-text text-xs" /><ClassBadge carClass={r.driver.carClass} /></div> },
     { key: 'grid', label: 'Grid', align: 'center', width: '55px', sortValue: r => r.driver.classGridPosition ?? 999,
       render: r => <span className="text-racing-muted">{r.driver.classGridPosition ? `P${r.driver.classGridPosition}` : '--'}</span> },
     { key: 'finish', label: 'Finish', align: 'center', width: '70px', sortValue: r => r.classPosition,
@@ -92,8 +95,8 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
         const types = r.driverPenalties.map(p => p.type).join(', ');
         return <span className="text-racing-red font-mono" title={types}>{r.driverPenalties.length}</span>;
       } },
-    { key: 'status', label: 'Status', width: '10%', sortValue: r => r.driver.finishStatus,
-      render: r => <span className={`text-xs ${!isDnf(r.driver.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`}>{r.driver.finishStatus}</span> },
+    { key: 'status', label: 'Status', width: '10%', sortValue: r => formatFinishStatus(r.driver), exportValue: r => formatFinishStatus(r.driver),
+      render: r => <span className={`text-xs ${!isDnf(r.driver.finishStatus) ? 'text-racing-green' : 'text-racing-red'}`} title={formatFinishStatus(r.driver)}>{formatFinishStatus(r.driver)}</span> },
   ], []);
 
   return (
@@ -153,6 +156,7 @@ export const RaceResultsView = memo(function RaceResultsView({ files, driverName
           data={results}
           rowKey={(r, i) => `${r.file.fileName}-${i}`}
           onRowClick={onNavigate ? (row) => onNavigate('session', buildSessionContext(row.file.fileName, row.session.sessionIndex, row.driver.name)) : undefined}
+          rowMenu={r => sessionMenu({ fileName: r.file.fileName, sessionIndex: r.session.sessionIndex, driverName: r.driver.name, lapTime: r.driver.bestLapTime })}
         />
       </div>
 

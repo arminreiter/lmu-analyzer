@@ -13,6 +13,12 @@ export function formatDelta(delta: number): string {
   return `${sign}${Math.abs(delta).toFixed(3)}`;
 }
 
+/** Finish status with the retirement cause when LMU names one ("DNF · Suspension") */
+export function formatFinishStatus(driver: { finishStatus: string; dnfReason?: string }): string {
+  const reason = driver.dnfReason;
+  return reason && reason !== driver.finishStatus ? `${driver.finishStatus} · ${reason}` : driver.finishStatus;
+}
+
 export function formatEventTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -27,7 +33,9 @@ export function formatSector(v: number | null): string {
   return v.toFixed(3);
 }
 
-export function formatSpeed(kmh: number): string {
+/** LMU records 0 km/h when it didn't measure a lap (often online) — show that as missing */
+export function formatSpeed(kmh: number | null): string {
+  if (!kmh || kmh <= 0) return '--';
   return `${kmh.toFixed(0)} km/h`;
 }
 

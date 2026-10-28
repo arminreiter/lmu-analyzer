@@ -43,6 +43,12 @@ export interface DriverResult {
   pitstops: number;
   finishStatus: string;
   controlAndAids: string;
+  /** Why the car retired (Accident, Engine, Suspension, ...); only set for DNFs (absent in older caches) */
+  dnfReason?: string;
+  /** Swaps the game counted for this car; absent when the XML doesn't say (and in older caches) */
+  numDriverChanges?: number;
+  /** Who drove which laps of this car, from its <Swap> elements — authoritative when present */
+  swaps?: { driver: string; startLap: number; endLap: number }[];
   laps: LapData[];
 }
 
@@ -58,6 +64,35 @@ export interface SessionData {
   incidents: IncidentData[];
   penalties: PenaltyData[];
   trackLimits: TrackLimitData[];
+  // Absent in sessions cached before these were parsed — read with `?? []`
+  driverChanges?: DriverChangeData[];
+  chat?: ChatData[];
+  sectorBests?: SectorBestData[];
+}
+
+/** A driver swap in a shared car (LMU's log can miss swaps — compare with DriverResult.numDriverChanges) */
+export interface DriverChangeData {
+  time: number;
+  /** Entry slot of the car (absent in older caches) — unlike the livery name, unique per car */
+  slot?: number;
+  vehicle: string;
+  oldDriver: string;
+  newDriver: string;
+}
+
+export interface ChatData {
+  time: number;
+  /** Sender as written in the chat line — may be abbreviated, so not always a DriverResult name */
+  sender: string;
+  message: string;
+}
+
+/** "X set new best for sector N" — a new class-best sector in this session */
+export interface SectorBestData {
+  time: number;
+  driver: string;
+  sector: 1 | 2 | 3;
+  carClass: CarClass;
 }
 
 export interface IncidentData {
@@ -103,6 +138,10 @@ export interface RaceFile {
   fuelMult: number;
   tireMult: number;
   freeSettings: number;
+  // Server rules — absent in older caches
+  fixedSetups?: boolean;
+  fixedUpgrades?: boolean;
+  tireWarmers?: boolean;
   vehiclesAllowed: string[];
   sessions: SessionData[];
 }
