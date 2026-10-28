@@ -264,6 +264,18 @@ export function filterFilesByClasses(files: RaceFile[], classes: CarClass[]): Ra
   })).filter(f => f.sessions.length > 0);
 }
 
+/** Stable id of one session, for exclusion */
+export const sessionKey = (fileName: string, sessionIndex: number) => `${fileName}::${sessionIndex}`;
+
+/** Drops the sessions the user excluded (e.g. a no-BoP lobby that would skew bests and benchmarks) */
+export function excludeSessions(files: RaceFile[], excluded: Set<string>): RaceFile[] {
+  if (excluded.size === 0) return files;
+  return files.map(file => ({
+    ...file,
+    sessions: file.sessions.filter(s => !excluded.has(sessionKey(file.fileName, s.sessionIndex))),
+  })).filter(f => f.sessions.length > 0);
+}
+
 export function getAllDrivers(files: RaceFile[]): DriverSummary[] {
   const map = new Map<string, DriverSummary>();
 

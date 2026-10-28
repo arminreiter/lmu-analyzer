@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from 'react';
-import { ArrowLeft, Users, Timer, BarChart3, LifeBuoy, AlertTriangle, Ban, ShieldAlert, UserCheck } from 'lucide-react';
+import { ArrowLeft, Users, Timer, BarChart3, LifeBuoy, AlertTriangle, Ban, ShieldAlert, UserCheck, EyeOff, Eye } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
@@ -21,9 +21,12 @@ interface SessionDetailViewProps {
   session: SessionData;
   driver: DriverResult;
   onBack: () => void;
+  /** Whether this session is left out of all stats, bests and benchmarks */
+  excluded?: boolean;
+  onToggleExcluded?: () => void;
 }
 
-export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack, onNavigate, playerNames }: SessionDetailViewProps) {
+export const SessionDetailView = memo(function SessionDetailView({ file, session, driver, onBack, onNavigate, playerNames, excluded, onToggleExcluded }: SessionDetailViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const validLaps = useMemo(() => driver.laps.filter(isValidLap), [driver.laps]);
@@ -114,6 +117,7 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
           <p className="text-racing-muted text-xs mt-0.5">
             {driver.name} &middot; {driver.carType} &middot; #{driver.carNumber} &middot; {session.dateTime || file.timeString}
             {isOnline(file) && <span className="text-racing-blue ml-2">Online</span>}
+            {excluded && <span className="text-racing-orange ml-2">Excluded from stats</span>}
           </p>
         </div>
         {onNavigate && playerDriver && playerDriver.name !== driver.name && (
@@ -121,6 +125,15 @@ export const SessionDetailView = memo(function SessionDetailView({ file, session
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-racing-green/10 border border-racing-green/25 text-racing-green hover:bg-racing-green/20 transition-colors cursor-pointer whitespace-nowrap">
             <UserCheck className="w-3.5 h-3.5" /> Select me
           </SessionLink>
+        )}
+        {onToggleExcluded && (
+          <button onClick={onToggleExcluded}
+            title={excluded ? 'Count this session in stats, bests and benchmarks again' : 'Leave this session out of all stats, bests and benchmarks'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer whitespace-nowrap ${excluded
+              ? 'bg-racing-orange/10 border-racing-orange/25 text-racing-orange hover:bg-racing-orange/20'
+              : 'border-racing-border text-racing-muted hover:text-white hover:bg-racing-highlight/20'}`}>
+            {excluded ? <><Eye className="w-3.5 h-3.5" /> Include session</> : <><EyeOff className="w-3.5 h-3.5" /> Exclude this session</>}
+          </button>
         )}
       </div>
 

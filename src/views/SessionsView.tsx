@@ -5,7 +5,7 @@ import { FilterButtonGroup } from '../components/FilterButtonGroup';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SortableTable, type Column } from '../components/SortableTable';
 import { ExportButton } from '../components/ExportButton';
-import { isOnline, isRatedRace, calculateConsistency, getTopSpeed } from '../lib/analytics';
+import { isOnline, isRatedRace, calculateConsistency, getTopSpeed, sessionKey } from '../lib/analytics';
 import { trackOption, trackLabel } from '../lib/racepace';
 import { formatLapTime, formatSpeed, getConsistencyColor, getSessionTypeStyle } from '../lib/formatting';
 import { buildSessionContext } from '../lib/sessionContext';
@@ -16,6 +16,9 @@ interface SessionsViewProps {
   files: RaceFile[];
   driverNames: string[];
   onNavigate?: (view: string, context?: string) => void;
+  /** Sessions the user excluded from stats — listed separately so they can be included again */
+  excluded?: { file: RaceFile; session: SessionData; driver: DriverResult }[];
+  onToggleExcluded?: (key: string) => void;
 }
 
 type SessionRow = {
@@ -23,7 +26,7 @@ type SessionRow = {
   topSpeed: number | null; consistency: number | null;
 };
 
-export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsViewProps) {
+export const SessionsView = memo(function SessionsView({ onNavigate, excluded = [], onToggleExcluded }: SessionsViewProps) {
   const [filterSetting, setFilterSetting] = useState<'all' | 'online' | 'rated'>('all');
   const [filterType, setFilterType] = useState<string>('All');
   const [filterTrack, setFilterTrack] = useState<string>('All');
@@ -42,6 +45,10 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
     // Precompute per-row derived values once, so columns don't recompute in sortValue/render
     .map((s): SessionRow => ({ ...s, topSpeed: getTopSpeed(s.driver.laps), consistency: calculateConsistency(s.driver.laps) }))
     .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [allSessions, filterSetting, filterType, filterTrack]);
+
+  const excludedRows = useMemo(() => excluded
+    .map((s): SessionRow => ({ ...s, topSpeed: getTopSpeed(s.driver.laps), consistency: calculateConsistency(s.driver.laps) }))
+    .sort((a, b) => (b.session.dateTime || b.file.timeString).localeCompare(a.session.dateTime || a.file.timeString)), [excluded]);
 
   const columns: Column<SessionRow>[] = useMemo(() => [
     { key: 'type', label: 'Type', width: '95px',
@@ -96,6 +103,17 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
     },
   ], []);
 
+  const excludedColumns: Column<SessionRow>[] = useMemo(() => [...columns,
+    { key: 'include', label: '', align: 'right', width: '80px',
+      render: r => (
+        <button onClick={e => { e.stopPropagation(); onToggleExcluded?.(sessionKey(r.file.fileName, r.session.sessionIndex)); }}
+          className="text-racing-orange text-xs hover:text-white transition-colors cursor-pointer">Include</button>
+      ),
+    },
+  ], [columns, onToggleExcluded]);
+
+  const openSession = (r: SessionRow) => onNavigate?.('session', buildSessionContext(r.file.fileName, r.session.sessionIndex, r.driver.name));
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center">
@@ -132,9 +150,23 @@ export const SessionsView = memo(function SessionsView({ onNavigate }: SessionsV
           columns={columns}
           data={filtered}
           rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}-${r.driver.name}`}
-          onRowClick={r => onNavigate?.('session', buildSessionContext(r.file.fileName, r.session.sessionIndex, r.driver.name))}
+          onRowClick={openSession}
         />
       </div>
+
+      {excludedRows.length > 0 && (
+        <div className="data-card carbon-fiber overflow-hidden">
+          <DataCardHeader title="EXCLUDED SESSIONS">
+            <span className="ml-auto text-[10px] font-mono text-racing-muted/50">not counted in stats, bests or benchmarks</span>
+          </DataCardHeader>
+          <SortableTable<SessionRow>
+            columns={excludedColumns}
+            data={excludedRows}
+            rowKey={r => `${r.file.fileName}-${r.session.sessionIndex}`}
+            onRowClick={openSession}
+          />
+        </div>
+      )}
     </div>
   );
 });

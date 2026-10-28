@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { X, Settings2 } from 'lucide-react';
 import { LapClock } from '../components/LapClock';
 import {
-  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, useOverlayHiddenParts, usePurpleMode, PURPLE_MODES, activeTargets, displayedLap, lastLapOf,
+  useLiveTelemetry, useLiveReferences, useLiveTargets, useHiddenTargets, useOverlayHiddenParts, useExcludedSessions, usePurpleMode, PURPLE_MODES, activeTargets, displayedLap, lastLapOf,
   refSectors, sectorDeltas, totalDelta, timingClass, targetSectorClass, sessionBestSectors, time, type Reference,
 } from '../lib/live';
 import { getRatingColor } from '../lib/racepace';
+import { excludeSessions } from '../lib/analytics';
 import { formatLapTime, formatDelta, formatSector } from '../lib/formatting';
 import * as storage from '../lib/storage';
 import type { RaceFile } from '../lib/types';
@@ -45,7 +46,9 @@ const SECTOR_FILL: Record<string, string> = {
  * Runs standalone: reads the cached files and driver selection the main window saved and polls LMU itself.
  */
 export function OverlayView() {
-  const [files, setFiles] = useState<RaceFile[]>([]);
+  const [cachedFiles, setFiles] = useState<RaceFile[]>([]);
+  const [excluded] = useExcludedSessions();
+  const files = useMemo(() => excludeSessions(cachedFiles, excluded), [cachedFiles, excluded]);
   const [showSettings, setShowSettings] = useState(false);
   const [selected, toggleTarget] = useLiveTargets();
   const [hidden] = useHiddenTargets();

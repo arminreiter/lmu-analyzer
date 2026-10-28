@@ -420,6 +420,11 @@ export function useHiddenTargets() {
   return useSyncedSet(KEYS.liveHiddenTargets, []);
 }
 
+/** Sessions left out of all stats (sessionKey ids), shared by the main window and the overlay */
+export function useExcludedSessions() {
+  return useSyncedSet(KEYS.excludedSessions, []);
+}
+
 /** Overlay sections the user switched off (ids from OverlayView's PARTS) */
 export function useOverlayHiddenParts() {
   return useSyncedSet(KEYS.overlayHiddenParts, []);

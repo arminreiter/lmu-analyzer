@@ -3,6 +3,7 @@ import { Loader2, Gauge, Zap } from 'lucide-react';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { OhneSpeedCredit } from '../components/OhneSpeedCredit';
 import { PaceSubNav } from '../components/PaceSubNav';
+import { SessionLink } from '../components/SessionLink';
 import { RatingBadge } from '../components/RatingBadge';
 import { ClassBadge } from '../components/ClassBadge';
 import { DataCardHeader } from '../components/DataCardHeader';
@@ -342,7 +343,9 @@ export const TrackModeView = memo(function TrackModeView({ files, driverNames, i
       render: r => {
         if (r.rowType === 'benchmark') return <span className={`text-[10px] ${getRatingColor(r.tierLabel)} brightness-50`}>benchmark</span>;
         if (r.rowType === 'theoretical') return <span className="text-racing-purple/50 text-[10px]">best sectors</span>;
-        return <span className="text-racing-muted text-xs">{r.pb.sessionType} L{r.pb.lapNumber}</span>;
+        return onNavigate
+          ? <SessionLink fileName={r.pb.fileName} sessionIndex={r.pb.sessionIndex} driverName={r.pb.driverName} onNavigate={onNavigate}>{r.pb.sessionType} L{r.pb.lapNumber}</SessionLink>
+          : <span className="text-racing-muted text-xs">{r.pb.sessionType} L{r.pb.lapNumber}</span>;
       } },
     { key: 'date', label: 'Date', width: '13%', sortValue: r => r.rowType === 'lap' ? r.pb.date : 'zzz',
       render: r => {

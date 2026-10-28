@@ -19,7 +19,8 @@ import { RacePaceView } from './views/RacePaceView';
 import { AboutView } from './views/AboutView';
 import { LiveView } from './views/LiveView';
 import { loadFolder, parseUploadedFiles } from './lib/parser';
-import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
+import { getAllDrivers, detectPlayerDrivers, filterFilesByClasses, excludeSessions, sessionKey, deduplicateSessions, CLASS_SPEED_ORDER } from './lib/analytics';
+import { useExcludedSessions } from './lib/live';
 import { errorMessage } from './lib/formatting';
 import { parseSessionContext } from './lib/sessionContext';
 import { DataIndexProvider } from './lib/DataIndexContext';
@@ -355,16 +356,23 @@ function App() {
     setViewContext(context ?? null);
   }, []);
 
-  const filteredFiles = useMemo(
+  const classFiles = useMemo(
     () => filterFilesByClasses(files, selectedClasses),
     [files, selectedClasses]
   );
+  const [excludedIds, toggleExcluded] = useExcludedSessions();
+  const filteredFiles = useMemo(() => excludeSessions(classFiles, excludedIds), [classFiles, excludedIds]);
+  // Excluded sessions stay reachable (Session Detail, Sessions view list) so they can be included again
+  const excludedSessions = useMemo(() => classFiles.flatMap(file => file.sessions
+    .filter(session => excludedIds.has(sessionKey(file.fileName, session.sessionIndex)))
+    .map(session => ({ file, session, driver: session.drivers.find(d => selectedDrivers.includes(d.name)) ?? session.drivers[0] }))),
+  [classFiles, excludedIds, selectedDrivers]);
 
   // Resolve session detail from viewContext "fileName::sessionIndex[::driverName]"
   const sessionDetail = useMemo(() => {
     if (activeView !== 'session' || !viewContext) return null;
     const { fileName, sessionIndex, driverName } = parseSessionContext(viewContext);
-    const file = filteredFiles.find(f => f.fileName === fileName);
+    const file = classFiles.find(f => f.fileName === fileName);
     if (!file) return null;
     const session = file.sessions.find(s => s.sessionIndex === sessionIndex);
     if (!session) return null;
@@ -373,7 +381,7 @@ function App() {
       : session.drivers.find(d => selectedDrivers.includes(d.name));
     if (!driver) return null;
     return { file, session, driver };
-  }, [activeView, viewContext, filteredFiles, selectedDrivers]);
+  }, [activeView, viewContext, classFiles, selectedDrivers]);
 
   const handleSessionBack = useCallback(() => {
     window.history.back();
@@ -459,9 +467,11 @@ function App() {
           <DataIndexProvider files={filteredFiles} driverNames={selectedDrivers}>
             {activeView === 'overview' && <OverviewView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
             {activeView === 'bests' && <PersonalBestsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
-            {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} />}
+            {activeView === 'sessions' && <SessionsView files={filteredFiles} driverNames={selectedDrivers} onNavigate={navigateTo} excluded={excludedSessions} onToggleExcluded={toggleExcluded} />}
             {activeView === 'session' && sessionDetail && (
-              <SessionDetailView file={sessionDetail.file} session={sessionDetail.session} driver={sessionDetail.driver} onBack={handleSessionBack} onNavigate={navigateTo} playerNames={selectedDrivers} />
+              <SessionDetailView file={sessionDetail.file} session={sessionDetail.session} driver={sessionDetail.driver} onBack={handleSessionBack} onNavigate={navigateTo} playerNames={selectedDrivers}
+                excluded={excludedIds.has(sessionKey(sessionDetail.file.fileName, sessionDetail.session.sessionIndex))}
+                onToggleExcluded={() => toggleExcluded(sessionKey(sessionDetail.file.fileName, sessionDetail.session.sessionIndex))} />
             )}
             {activeView === 'tracks' && <TracksView files={filteredFiles} driverNames={selectedDrivers} initialTrack={viewContext} onNavigate={navigateTo} />}
             {activeView === 'cars' && <CarsView files={filteredFiles} driverNames={selectedDrivers} initialCar={viewContext} onNavigate={navigateTo} />}
