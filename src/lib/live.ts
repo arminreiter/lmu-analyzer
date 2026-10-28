@@ -186,8 +186,11 @@ export function useLiveReferences(files: RaceFile[], driverNames: string[], benc
   // My laps at this track in this class, and the car type matching the live vehicle (XML VehName)
   const history = useMemo(() => {
     if (!trackName || !carClass) return null;
-    const laps = getAllLaps(files, driverNames)
-      .filter(l => (l.trackCourse === trackName || l.trackVenue === trackName) && l.carClass === carClass);
+    const classLaps = getAllLaps(files, driverNames).filter(l => l.carClass === carClass);
+    // Match the layout (course) exactly. Only fall back to the venue when no course matches —
+    // a GP course is often named like its venue, which would pull in every other layout there.
+    const courseLaps = classLaps.filter(l => l.trackCourse === trackName);
+    const laps = courseLaps.length ? courseLaps : classLaps.filter(l => l.trackVenue === trackName);
     let carType: string | null = null;
     for (const file of files) for (const s of file.sessions) for (const d of s.drivers) {
       if (d.vehicleName === vehicleName) carType = d.carType;
